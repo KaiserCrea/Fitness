@@ -1,236 +1,42 @@
 <!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#09090a">
-<title>Fitness V0.4</title>
-<link rel="manifest" href="./manifest.webmanifest">
-<style>
-:root{
-  --bg:#080809;--panel:#151516;--panel2:#1c1c1e;--panel3:#101011;
-  --gold:#d2aa50;--gold2:#9f7b32;--text:#f7f3ea;--muted:#a6a097;
-  --line:#383229;--green:#4f7d5d;--red:#825050;--grey:#5d5d5d
-}
-*{box-sizing:border-box}
-html,body{margin:0;background:linear-gradient(180deg,#070708 0%,#111113 100%);color:var(--text);font-family:Arial,Helvetica,sans-serif;min-height:100%}
-body{min-height:100vh}
-button,input,select{font:inherit}
-.app{max-width:520px;margin:auto;padding:19px 15px 108px}
-.topline{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-.brand{font-size:12px;font-weight:900;letter-spacing:3px;color:var(--gold)}
-h1{font-size:31px;line-height:1.04;margin:5px 0 0}
-h2{font-size:20px;margin:0}
-h3{font-size:16px;margin:0}
-.muted{color:var(--muted)}
-.small{font-size:12px}
-.gold{color:var(--gold)}
-.badge{border:1px solid #5a4c2b;color:var(--gold);border-radius:999px;padding:7px 11px;font-size:12px}
-.card{background:linear-gradient(145deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 14px 32px #0006}
-.hero{padding:18px}
-.hero-title{font-size:26px;font-weight:800;margin-top:4px}
-.row{display:flex;gap:8px;align-items:center}.between{justify-content:space-between}.grow{flex:1}
-.btn{border:1px solid #514a3b;background:#1a1a1b;color:var(--text);padding:11px 12px;border-radius:12px}
-.btn.goldbtn{background:var(--gold);border-color:var(--gold);color:#17130b;font-weight:800}
-.btn.ok{border-color:#426a4e}.btn.fail{border-color:#744646}.btn.nr{border-color:#555}
-.btn.selected.ok{background:#294934}.btn.selected.fail{background:#552f2f}.btn.selected.nr{background:#3a3a3a}
-label,.label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
-input,select{width:100%;background:#0f0f10;border:1px solid #494235;color:white;border-radius:11px;padding:10px}
-.time-start{display:flex;gap:9px;align-items:center;margin-top:12px;color:var(--muted);font-size:13px}
-.time-start input{width:112px}
-.exercise-card{padding:0;overflow:hidden}
-.exercise-head{display:grid;grid-template-columns:58px 1fr auto;gap:11px;align-items:center;padding:14px 14px 11px}
-.thumb{width:58px;height:58px;border-radius:14px;border:1px solid #4c4335;background:
- radial-gradient(circle at 50% 32%,#4b402c 0 9%,#25211a 10% 16%,transparent 17%),
- linear-gradient(155deg,#23201a,#111);display:flex;align-items:flex-end;justify-content:center;color:var(--gold);font-size:11px;font-weight:800;padding-bottom:6px}
-.exnum{font-size:11px;color:var(--gold);font-weight:800;margin-bottom:3px}
-.exname{font-size:16px;font-weight:800;line-height:1.25}
-.sheetbtn{border:0;background:none;color:var(--gold);font-size:12px;padding:6px}
-.exercise-body{padding:0 14px 14px}
-.reference-input{margin-bottom:10px}
-.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.nextref{margin-top:10px}
-.finish{margin-top:16px}
-.finish-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
-.summary{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px}
-.summary span{font-size:12px;padding:6px 8px;border-radius:999px;background:#101011;border:1px solid #3f3a32}
-.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.comp{background:linear-gradient(145deg,#181819,#111);border:1px solid #40392f;border-radius:17px;padding:14px}
-.comp h3{font-size:17px}.last{font-size:12px;color:var(--muted);margin:7px 0 10px}
-.notice{padding:12px 14px;border:1px solid #4f452f;background:#17140f;border-radius:14px;color:#d8c89e;font-size:13px;line-height:1.35}
-.listline{padding:12px 0;border-bottom:1px solid #302d28}.listline:last-child{border:0}
-.stat{font-size:28px;font-weight:900;color:var(--gold)}
-.nav{position:fixed;bottom:0;left:0;right:0;background:#0b0b0cf4;border-top:1px solid #302c25;display:flex;justify-content:center;padding-bottom:max(7px,env(safe-area-inset-bottom));z-index:20}
-.navin{width:min(520px,100%);display:grid;grid-template-columns:repeat(4,1fr);padding:7px}
-.tab{border:0;background:none;color:#8e8981;padding:10px 1px;font-size:11px}.tab.active{color:var(--gold);font-weight:800}
-.back{border:0;background:none;color:var(--gold);padding:0;margin-bottom:8px;font-size:13px}
-.section-title{font-size:13px;color:var(--gold);letter-spacing:.6px;font-weight:800;margin:16px 0 6px}
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090909"><link rel="manifest" href="manifest.webmanifest"><style>
+*{box-sizing:border-box}body{margin:0;background:#090909;color:#f4f1eb;font-family:Arial,sans-serif;padding-bottom:86px}#app{max-width:760px;margin:auto;padding:28px}.eyebrow,.gold{color:#d9ad49}h1{font-size:46px;margin:8px 0 28px}h2{margin:5px 0}.card{background:linear-gradient(145deg,#1d1d1d,#151515);border:1px solid #3a352a;border-radius:28px;padding:24px;margin:16px 0}.row{display:flex;gap:12px;align-items:center;justify-content:space-between}.btn{border:1px solid #5b5138;background:#191919;color:#eee;border-radius:18px;padding:15px;font-size:17px}.primary{background:#d9ad49;color:#17120a;font-weight:bold}.exercise{padding:20px 0;border-bottom:1px solid #302d28}.exercise:last-child{border:0}.exercise input,.time{width:100%;background:#111;border:1px solid #514830;color:#fff;padding:15px;border-radius:16px;font-size:17px;margin:10px 0}.statuses{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.statuses button{padding:13px 5px;background:#171717;color:#eee;border:1px solid #555;border-radius:15px}.statuses .sel{border-color:#d9ad49;color:#d9ad49}.muted{color:#999}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.session{cursor:pointer}.bar{height:9px;background:#242424;border-radius:10px;overflow:hidden}.bar i{display:block;height:100%;background:#d9ad49}nav{position:fixed;bottom:0;left:0;right:0;height:72px;background:rgba(10,10,10,.97);border-top:1px solid #302c24;display:flex;justify-content:center;z-index:9}nav button{width:25%;max-width:190px;background:none;border:0;color:#8f8f8f}nav button.active{color:#d9ad49;font-weight:bold}@media(max-width:500px){#app{padding:24px 20px}h1{font-size:42px}.grid{grid-template-columns:1fr 1fr}.statuses button{font-size:14px}}
 </style>
-</head>
-<body>
-<div id="app"></div>
-<script>
-const PROGRAM={
- A:{
-  G1:["Développé couché machine convergente à disques","Écarté unilatéral poulie basse","Pec Deck / Butterfly","Dips lestés","Curl biceps barre EZ","Curl biceps haltères","Curl unilatéral pupitre vertical","Crunch abdominal","Abdominaux sur machine à crunch assis avec appui thoracique"],
-  G2:["Tirage horizontal poulie double poignée","Tirage bras tendus poulie haute barre","Rowing unilatéral haltère","Tirage vertical prise serrée en V","Extension triceps poulie","Barre au front","Dips sur banc","Relevé de jambes","Flexions latérales du buste"],
-  G3:["Développé épaules assis avec haltères","Tirage menton","Élévation latérale unilatérale poulie basse","Élévations latérales haltères","Hack Squat","Leg Extension","Leg Curl allongé","Mollets debout machine","Circuit abdos 8 min"]
- },
- B:{
-  G1:["Écarté poulie basse assis sur banc","Développé couché haltères","Écarté couché haltères","Pec Deck / Butterfly","Spider Curl","Curl marteau haltères","Curl biceps poulie basse en V","Circuit abdos 8 min"],
-  G2:["Tirage vertical prise neutre","Tirage horizontal prise large","Rowing assis machine / Seated Row","Tirage vertical prise serrée en V","Extension triceps corde","Extension triceps au-dessus de la tête haltère","Extension triceps couché haltères","Crunch lesté décliné — 10 kg","Flexion latérale sur banc décliné avec kettlebell"],
-  G3:["Développé militaire barre","Oiseau machine / Reverse Pec Deck","Élévations latérales assis avec haltères","Squat libre","Leg Press","Mollets assis machine","Relevé de jambes","Crunch abdominal"]
- },
- C:{
-  G1:["Développé incliné haltères","Écarté incliné haltères, paumes face à face","Écarté poulie basse","Chest Press","Curl incliné haltères","Curl barre EZ prise pronation","Curl biceps machine","Gainage"],
-  G2:["Soulevé de terre à la barre","Rowing barre","Lat Pulldown","Rowing poulie basse prise large vers le haut du torse","Extension triceps poulie arrière","Extension triceps poulie haute prise inversée","Dips assis machine","Circuit abdos 8 min"],
-  G3:["Développé militaire debout barre","Oiseau poulie","Élévation latérale bilatérale poulie basse","Élévation latérale couchée banc incliné avec haltère","Goblet Squat","Fentes marchées","Mollets assis machine","Relevé de jambes à la chaise romaine","Flexion latérale lestée sur banc décliné avec kettlebell"]
- }
-};
-const COMPLEMENT_DATA={
- "ATH A":[
-  ["Tapis incliné","10 min"],["Rameur","20 min"],["Vélo","15 min"],["Sled Push","6 à 8 passages de 15–20 m"],["Tapis","Temps restant pour atteindre 60 min"],["Étirements / mobilité","15 min"]
- ],
- "ATH B":[
-  ["Échauffement / tapis","10 min"],["Sled Push","15 min"],["Vélo en intervalles","15 min — 30 s intense / 60 s récupération"],["Rameur en intervalles","10 min — 45 s soutenu / 45 s récupération"],["Tapis — intervalles rapides","7 min"],["Retour au calme","3 min"],["Étirements / mobilité","15 min"]
- ],
- "Full Mix 1":[
-  ["Développé incliné à la Smith Machine",""],["Écarté à la poulie basse vers le haut debout",""],["Développé épaules assis avec haltères",""],["Élévations latérales avec haltères",""],["Rowing barre EZ",""],["Biceps Black Jack",""],["Magic Triceps à la barre EZ",""],["Crunch à la poulie haute à genoux",""],["Relevé de genoux suspendu",""],["Wood Chop à la poulie",""]
- ],
- "Full Mix 2":[
-  ["Rowing poitrine appuyée sur banc incliné avec haltères",""],["Tirage vertical prise neutre",""],["Tractions",""],["Curl biceps au pupitre avec barre EZ",""],["Spider Curl avec haltère sur banc incliné",""],["Extension Magic Triceps avec haltères",""],["Extension triceps au-dessus de la tête à la corde",""],["Élévation latérale unilatérale à la poulie, câble derrière le corps",""],["Pec Deck / Butterfly",""],["Crunch lesté sur banc décliné — 10 kg",""],["Flexion latérale lestée sur banc décliné avec kettlebell",""]
- ],
- "Full Mix 3":[
-  ["Leg Press horizontale",""],["Hack Squat",""],["Leg Extension",""],["Leg Curl allongé",""],["Mollets debout machine",""],["Adduction hanche machine",""],["Abduction hanche machine",""],["Circuit abdos 8 min",""]
- ],
- "Full Mix 4":[
-  ["Développé incliné avec haltères",""],["Écarté incliné à la poulie basse",""],["Élévation latérale unilatérale à la poulie, câble derrière le corps",""],["Oiseau avec haltères, poitrine appuyée sur banc incliné",""],["Curl biceps à la poulie basse en V",""],["Extension triceps à la corde",""],["Tirage vertical prise neutre",""],["Adduction de hanche à la machine",""],["Abduction de hanche à la machine",""],["Face Pull à la corde, poulie haute",""]
- ]
-};
-const COMPLEMENTS=Object.keys(COMPLEMENT_DATA);
-const KEY="fitness-v04";
-const $=s=>document.querySelector(s);
+<title>Fitness</title></head><body><div id="app"></div>
+<nav><button data-tab="today">Aujourd'hui</button><button data-tab="program">Programme</button><button data-tab="progress">Progression</button><button data-tab="history">Historique</button></nav>
+<script>const SESSIONS={"G1A": ["Développé couché machine convergente à disques", "Écarté unilatéral poulie basse", "Pec Deck / Butterfly", "Dips lestés", "Curl biceps barre EZ", "Curl biceps haltères", "Curl unilatéral pupitre vertical", "Crunch abdominal", "Abdominaux machine à crunch assis"], "G2A": ["Tirage horizontal poulie double poignée", "Tirage bras tendus poulie haute barre", "Rowing unilatéral haltère", "Tirage vertical prise serrée en V", "Extension triceps poulie", "Barre au front", "Dips sur banc", "Relevé de jambes", "Flexions latérales du buste"], "G3A": ["Développé épaules assis haltères", "Tirage menton", "Élévation latérale unilatérale poulie basse", "Élévations latérales haltères", "Hack Squat", "Leg Extension", "Leg Curl allongé", "Mollets debout machine", "Circuit abdos 8 min"], "G1B": ["Écarté poulie basse assis sur banc", "Développé couché haltères", "Écarté couché haltères", "Pec Deck / Butterfly", "Spider Curl", "Curl marteau haltères", "Curl biceps poulie basse en V", "Circuit abdos 8 min"], "G2B": ["Tirage vertical prise neutre", "Tirage horizontal prise large", "Rowing assis machine / Seated Row", "Tirage vertical prise serrée en V", "Extension triceps corde", "Extension triceps au-dessus de la tête haltère", "Extension triceps couché haltères", "Crunch lesté décliné — 10 kg", "Flexion latérale banc décliné kettlebell"], "G3B": ["Développé militaire barre", "Oiseau machine / Reverse Pec Deck", "Élévations latérales assis haltères", "Squat libre", "Leg Press", "Mollets assis machine", "Relevé de jambes", "Crunch abdominal"], "G1C": ["Développé incliné haltères", "Écarté incliné haltères paumes face à face", "Écarté poulie basse", "Chest Press", "Curl incliné haltères", "Curl barre EZ prise pronation", "Curl biceps machine", "Gainage"], "G2C": ["Soulevé de terre barre", "Rowing barre", "Lat Pulldown", "Rowing poulie basse prise large haut du torse", "Extension triceps poulie arrière", "Extension triceps poulie haute prise inversée", "Dips assis machine", "Circuit abdos 8 min"], "G3C": ["Développé militaire debout barre", "Oiseau poulie", "Élévation latérale bilatérale poulie basse", "Élévation latérale couchée banc incliné haltère", "Goblet Squat", "Fentes marchées", "Mollets assis machine", "Relevé de jambes chaise romaine", "Flexion latérale lestée banc décliné kettlebell"], "ATH A": ["Tapis incliné — 10 min", "Rameur — 20 min", "Vélo — 15 min", "Sled Push — 6 à 8 passages", "Tapis — temps restant jusqu’à 60 min", "Étirements / mobilité — 15 min"], "ATH B": ["Échauffement / tapis — 10 min", "Sled Push — 15 min", "Vélo intervalles — 15 min", "Rameur intervalles — 10 min", "Tapis intervalles rapides — 7 min", "Retour au calme — 3 min", "Étirements / mobilité — 15 min"], "Full Mix 1": ["Développé incliné Smith Machine", "Écarté poulie basse vers le haut debout", "Développé épaules assis haltères", "Élévations latérales haltères", "Rowing barre EZ", "Biceps Black Jack", "Magic Triceps barre EZ", "Crunch poulie haute à genoux", "Relevé de genoux suspendu", "Wood Chop poulie"], "Full Mix 2": ["Rowing poitrine appuyée banc incliné haltères", "Tirage vertical prise neutre", "Tractions", "Curl pupitre barre EZ", "Spider Curl haltère banc incliné", "Extension Magic Triceps haltères", "Extension triceps au-dessus de la tête corde", "Élévation latérale unilatérale poulie arrière", "Pec Deck / Butterfly", "Crunch lesté banc décliné — 10 kg", "Flexion latérale lestée banc décliné kettlebell"], "Full Mix 3": ["Leg Press horizontale", "Hack Squat", "Leg Extension", "Leg Curl allongé", "Mollets debout machine", "Adduction hanche machine", "Abduction hanche machine", "Circuit abdos 8 min"], "Full Mix 4": ["Développé incliné haltères", "Écarté incliné poulie basse", "Élévation latérale unilatérale poulie arrière", "Oiseau haltères poitrine appuyée banc incliné", "Curl biceps poulie basse en V", "Extension triceps corde", "Tirage vertical prise neutre", "Adduction hanche machine", "Abduction hanche machine", "Face Pull corde poulie haute"]};</script><script>
 
-function mondayISO(d=new Date()){
- let x=new Date(d);let day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);x.setHours(0,0,0,0);return x.toISOString().slice(0,10)
-}
-function weekDiff(a,b){return Math.floor((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/604800000)}
-function advanceLetter(l,n){let arr=["A","B","C"];return arr[(arr.indexOf(l)+n%3+3)%3]}
-function loadPrior(){
- for(const k of ["fitness-v03","fitness-v02","fitness-v01"]){let x=JSON.parse(localStorage.getItem(k)||"null");if(x)return x}
- return null
-}
-let prev=loadPrior();
-let state=JSON.parse(localStorage.getItem(KEY)||"null")||{
- setup:prev?.setup||false,week:prev?.week||"A",
- nextG:prev?.nextG==="DONE"?"COMPLEMENTS":(prev?.nextG||"G1"),
- history:prev?.history||[],refs:prev?.refs||{},draft:null,weekMonday:prev?.weekMonday||mondayISO(),
- selectedComplement:null
-};
-if(state.nextG==="DONE")state.nextG="COMPLEMENTS";
-let view="today";
-
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
-function normalizeWeek(){
- let cur=mondayISO(),diff=weekDiff(state.weekMonday||cur,cur);
- if(diff>0){state.week=advanceLetter(state.week,diff);state.nextG="G1";state.draft=null;state.selectedComplement=null;state.weekMonday=cur;save()}
-}
-normalizeWeek();
-
-function nav(){return `<nav class="nav"><div class="navin">${[["today","Aujourd'hui"],["program","Programme"],["progress","Progression"],["history","Historique"]].map(x=>`<button class="tab ${view===x[0]?"active":""}" data-v="${x[0]}">${x[1]}</button>`).join("")}</div></nav>`}
-function shell(title,body){$("#app").innerHTML=`<main class="app"><div class="topline"><div><div class="brand">FITNESS</div><h1>${title}</h1></div><span class="badge">Semaine ${state.week}</span></div>${body}</main>${nav()}`;document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{view=b.dataset.v;render()})}
-function setup(){
- shell("Première installation",`<p class="muted">Positionne ton cycle actuel.</p><div class="card"><label>Semaine du cycle</label><select id="w" style="margin-bottom:12px"><option>A</option><option>B</option><option>C</option></select><label>Prochaine séance G</label><select id="g" style="margin-bottom:14px"><option>G1</option><option>G2</option><option>G3</option></select><button id="go" class="btn goldbtn" style="width:100%">Commencer</button></div>`);
- $("#w").value=state.week;$("#g").value=state.nextG==="COMPLEMENTS"?"G3":state.nextG;
- $("#go").onclick=()=>{state.week=$("#w").value;state.nextG=$("#g").value;state.weekMonday=mondayISO();state.setup=true;save();render()}
-}
-function sessionName(){return state.nextG+state.week}
-function gList(){return PROGRAM[state.week]?.[state.nextG]||[]}
-function startDraft(name,items,isComplement=false){
- let now=new Date(),hh=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0"),ex={};
- items.forEach(it=>{let x=Array.isArray(it)?it[0]:it;let preset=Array.isArray(it)?it[1]:"";ex[x]={actual:state.refs[x]||preset||"",status:"",next:""}});
- state.draft={name,date:now.toISOString().slice(0,10),start:hh,end:"",duration:"",exercises:ex,isComplement};save();render()
-}
-function computeDuration(d){
- if(!d.start||!d.end)return "";
- let [sh,sm]=d.start.split(":").map(Number),[eh,em]=d.end.split(":").map(Number);
- let m=(eh*60+em)-(sh*60+sm);if(m<0)m+=1440;return String(m)
-}
-function lastDone(name){
- let h=state.history.find(x=>x.name===name);
- if(!h)return "Jamais réalisée";
- let dt=new Date((h.date||"")+"T12:00:00");return "Dernière : "+dt.toLocaleDateString("fr-FR")
-}
-function statusCounts(d){let a=Object.values(d.exercises||{}).map(x=>x.status);return{ok:a.filter(x=>x==="Réussi").length,fail:a.filter(x=>x==="Échoué").length,nr:a.filter(x=>x==="Non réalisé").length}}
-function sessionEditor(name,items,isComplement){
- let d=state.draft, names=items.map(it=>Array.isArray(it)?it[0]:it);
- let body=`<button class="back" id="backToday">← Retour</button>
- <div class="card hero"><div class="row between"><div><div class="gold small">${isComplement?"SÉANCE COMPLÉMENTAIRE":"SÉANCE PRIORITAIRE"}</div><div class="hero-title">${name}</div></div><span class="badge">En cours</span></div>
- <div class="time-start">Heure de début <input id="startTime" type="time" value="${d.start}"></div></div>`;
- body+=names.map((x,i)=>{let e=d.exercises[x]||{actual:"",status:"",next:""};return `<div class="card exercise-card">
- <div class="exercise-head"><div class="thumb">EX ${i+1}</div><div><div class="exnum">EXERCICE ${i+1}</div><div class="exname">${x}</div></div><button class="sheetbtn" data-sheet="${i}">Voir la fiche</button></div>
- <div class="exercise-body"><label>Charge / référence utilisée</label><input class="reference-input actual" data-i="${i}" value="${e.actual||""}" placeholder="À renseigner">
- <div class="status-grid">${["Réussi","Échoué","Non réalisé"].map((s,j)=>`<button class="btn ${j===0?"ok":j===1?"fail":"nr"} ${e.status===s?"selected":""} status" data-i="${i}" data-s="${s}">${s}</button>`).join("")}</div>
- ${e.status==="Réussi"?`<input class="nextref" data-i="${i}" value="${e.next||""}" placeholder="Prochaine référence">`:""}</div></div>`}).join("");
- let c=statusCounts(d);
- body+=`<div class="card finish"><h2>Fin de séance</h2><div class="finish-grid"><div><label>Heure de fin</label><input id="endTime" type="time" value="${d.end}"></div><div><label>Durée totale</label><input id="duration" type="number" min="0" value="${d.duration}" placeholder="min"></div></div>
- <div class="summary"><span>${c.ok} réussi${c.ok>1?"s":""}</span><span>${c.fail} échoué${c.fail>1?"s":""}</span><span>${c.nr} non réalisé${c.nr>1?"s":""}</span></div>
- <button class="btn goldbtn" id="saveSession" style="width:100%">Enregistrer la séance</button></div>`;
- shell("Aujourd'hui",body);
-
- $("#backToday").onclick=()=>{state.draft=null;save();render()};
- $("#startTime").onchange=e=>{d.start=e.target.value;if(d.end)d.duration=computeDuration(d);save();render()};
- $("#endTime").onchange=e=>{d.end=e.target.value;d.duration=computeDuration(d);save();render()};
- $("#duration").oninput=e=>{d.duration=e.target.value;save()};
- document.querySelectorAll(".actual").forEach(inp=>inp.oninput=e=>{let x=names[+e.target.dataset.i];d.exercises[x].actual=e.target.value;save()});
- document.querySelectorAll(".status").forEach(b=>b.onclick=()=>{let x=names[+b.dataset.i];d.exercises[x].status=b.dataset.s;if(b.dataset.s!=="Réussi")d.exercises[x].next="";save();render()});
- document.querySelectorAll(".nextref").forEach(inp=>inp.oninput=e=>{let x=names[+e.target.dataset.i];d.exercises[x].next=e.target.value;save()});
- document.querySelectorAll("[data-sheet]").forEach(b=>b.onclick=()=>alert("La fiche technique illustrée sera intégrée ici à l'étape suivante."));
- $("#saveSession").onclick=()=>{
-  if(!d.duration){alert("Renseigne l'heure de fin ou la durée totale.");return}
-  let saved=names.map(x=>({name:x,...d.exercises[x]}));
-  saved.forEach(e=>{if(e.status==="Réussi"&&e.next.trim())state.refs[e.name]=e.next.trim();else if(e.actual.trim()&&!state.refs[e.name])state.refs[e.name]=e.actual.trim()});
-  state.history.unshift({date:d.date,name:d.name,start:d.start,end:d.end,duration:+d.duration,exercises:saved});
-  let wasComp=d.isComplement;state.draft=null;
-  if(!wasComp){if(state.nextG==="G1")state.nextG="G2";else if(state.nextG==="G2")state.nextG="G3";else state.nextG="COMPLEMENTS"}
-  else state.nextG="COMPLEMENTS";
-  save();render()
- }
-}
+const $=s=>document.querySelector(s), app=$('#app');
+let state=JSON.parse(localStorage.getItem('fitness-v1')||'null')||{setup:false,week:'A',nextG:1,history:[],refs:{},selected:null};
+let tab='today'; const save=()=>localStorage.setItem('fitness-v1',JSON.stringify(state));
+const fmt=d=>new Intl.DateTimeFormat('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d);
+function nav(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab))}
+function render(){nav(); if(!state.setup)return setup(); ({today,program,progress,history}[tab])();}
+function setup(){app.innerHTML=`<div class=eyebrow>FITNESS</div><h1>Première installation</h1><div class=card><label>Semaine du cycle</label><select id=w class=time><option>A</option><option>B</option><option>C</option></select><label>Prochaine séance G</label><select id=g class=time><option value=1>G1</option><option value=2>G2</option><option value=3>G3</option></select><button id=start class="btn primary" style="width:100%">Commencer</button></div>`; $('#start').onclick=()=>{state.week=$('#w').value;state.nextG=+$('#g').value;state.setup=true;save();render()}}
+function currentG(){return `G${state.nextG}${state.week}`}
 function today(){
- if(!state.setup)return setup();
- if(state.draft){
-  let d=state.draft;
-  if(d.isComplement)return sessionEditor(d.name,COMPLEMENT_DATA[d.name],true);
-  return sessionEditor(d.name,gList(),false);
- }
- let date=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
- if(state.nextG==="COMPLEMENTS"){
-  let body=`<p class="muted">${date}</p><div class="card hero"><div class="gold small">SOCLE HEBDOMADAIRE TERMINÉ</div><div class="hero-title">G3${state.week} enregistré</div><p class="muted" style="margin-bottom:0">Choisis librement une séance complémentaire pour le reste de la semaine.</p></div>
-  <div class="comp-grid">${COMPLEMENTS.map(c=>`<div class="comp"><h3>${c}</h3><div class="last">${lastDone(c)}</div><button class="btn" style="width:100%" data-comp="${c}">Choisir</button></div>`).join("")}</div>`;
-  shell("Aujourd'hui",body);
-  document.querySelectorAll("[data-comp]").forEach(b=>b.onclick=()=>startDraft(b.dataset.comp,COMPLEMENT_DATA[b.dataset.comp],true));
-  return;
- }
- let name=sessionName();
- shell("Aujourd'hui",`<p class="muted">${date}</p><div class="card hero"><div class="row between"><div><div class="gold small">SÉANCE PRIORITAIRE</div><div class="hero-title">${name}</div></div><button class="btn goldbtn" id="begin">Démarrer</button></div></div>`);
- $("#begin").onclick=()=>startDraft(name,gList(),false)
+ let key=state.selected||currentG(), comp=key.startsWith('ATH')||key.startsWith('Full');
+ app.innerHTML=`<div class=eyebrow>FITNESS</div><div class=row><h1>Aujourd'hui</h1><span class="btn gold">Semaine ${state.week}</span></div><div class=muted>${fmt(new Date())}</div>
+ <div class=card><div class=gold>${comp?'SÉANCE COMPLÉMENTAIRE':'SÉANCE PRIORITAIRE'}</div><h2>${key}</h2><label>Heure de début</label><input id=startTime type=time class=time value="${new Date().toTimeString().slice(0,5)}"></div>
+ <div class=card id=exs>${(SESSIONS[key]||[]).map((x,i)=>exercise(key,x,i)).join('')}</div>
+ <div class=card><label>Heure de fin</label><input id=endTime type=time class=time><label>Durée totale réelle (min)</label><input id=duration type=number class=time placeholder="ex. 75"><button id=record class="btn primary" style="width:100%">Enregistrer la séance</button></div>`;
+ document.querySelectorAll('.statuses button').forEach(b=>b.onclick=()=>{b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel')});
+ $('#record').onclick=()=>record(key);
 }
-function program(){
- shell("Programme",`<div class="card"><div class="section-title">CYCLE G</div>${["A","B","C"].map(w=>`<div class="listline"><b>Semaine ${w}</b><div class="muted">G1${w} → G2${w} → G3${w}</div></div>`).join("")}</div>
- <div class="card"><div class="section-title">SÉANCES COMPLÉMENTAIRES</div>${COMPLEMENTS.map(c=>`<div class="listline"><b>${c}</b><div class="muted">${lastDone(c)}</div></div>`).join("")}</div>`)
-}
-function progress(){
- let refs=Object.entries(state.refs);
- shell("Progression",`<div class="card"><div class="stat">${state.history.length}</div><div class="muted">séance${state.history.length>1?"s":""} enregistrée${state.history.length>1?"s":""}</div></div>
- <div class="card"><h2>Références actuelles</h2>${refs.length?refs.map(([k,v])=>`<div class="listline"><b>${k}</b><div class="gold">${v}</div></div>`).join(""):`<p class="muted">Aucune référence enregistrée.</p>`}</div>`)
-}
-function history(){
- shell("Historique",`<div class="card"><h2>Séances enregistrées</h2>${state.history.length?state.history.map(h=>`<div class="listline"><b>${h.name}</b><div class="muted">${new Date((h.date||"")+"T12:00:00").toLocaleDateString("fr-FR")} · ${h.duration||0} min${h.start?" · "+h.start+(h.end?" → "+h.end:""):""}</div></div>`).join(""):`<p class="muted">Aucune séance enregistrée.</p>`}</div>`)
-}
-function render(){normalizeWeek();if(view==="today")today();else if(view==="program")program();else if(view==="progress")progress();else history()}
+function exercise(key,x,i){let ref=state.refs[x]||'';return `<div class=exercise data-i="${i}"><div class=row><div><small class=gold>EXERCICE ${i+1}</small><h2>${x}</h2></div><button class=btn onclick="sheet('${encodeURIComponent(x)}')">Voir la fiche</button></div><input class=ref placeholder="Charge / référence réellement utilisée" value="${ref}"><div class=statuses><button data-v="Réussi">Réussi</button><button data-v="Échoué">Échoué</button><button data-v="Non réalisé">Non réalisé</button></div></div>`}
+function record(key){let ex=[...document.querySelectorAll('.exercise')].map((e,i)=>({name:SESSIONS[key][i],ref:e.querySelector('.ref').value,status:e.querySelector('.sel')?.dataset.v||'Non renseigné'}));ex.forEach(x=>{if(x.ref)state.refs[x.name]=x.ref});state.history.unshift({date:new Date().toISOString(),session:key,start:$('#startTime').value,end:$('#endTime').value,duration:$('#duration').value,ex});if(/^G3/.test(key)){state.nextG=3;state.selected=null}else if(/^G[12]/.test(key)){state.nextG++;state.selected=null}else state.selected=null;save();render()}
+function complementary(){return ['ATH A','ATH B','Full Mix 1','Full Mix 2','Full Mix 3','Full Mix 4']}
+function program(){app.innerHTML=`<div class=eyebrow>FITNESS</div><h1>Programme</h1><div class=card><div class=row><b>Cycle G</b><span class=gold>Semaine ${state.week}</span></div></div><div class=grid>${Object.keys(SESSIONS).map(k=>`<div class="card session" onclick="openSession('${k}')"><small class=gold>${k.startsWith('G')?'GROUPE':k.startsWith('ATH')?'ATHLÉTIQUE':'FULL MIX'}</small><h2>${k}</h2><div class=muted>${SESSIONS[k].length} exercices</div></div>`).join('')}</div><div class=card><button class=btn onclick=advanceWeek()>Passer à la semaine suivante</button> <button class=btn onclick=backup()>Exporter les données</button></div>`}
+function openSession(k){app.innerHTML=`<div class=eyebrow>PROGRAMME</div><button class=btn onclick="tab='program';render()">← Retour</button><h1>${k}</h1><div class=card>${SESSIONS[k].map((x,i)=>`<div class=exercise><b>${i+1}. ${x}</b><div class=muted>Référence actuelle : ${state.refs[x]||'à définir'}</div><button class=btn onclick="sheet('${encodeURIComponent(x)}')">Voir la fiche</button></div>`).join('')}</div><button class="btn primary" onclick="state.selected='${k}';save();tab='today';render()">Saisir cette séance</button>`}
+function progress(){let all={};state.history.forEach(h=>h.ex.forEach(e=>{if(e.ref&&!all[e.name])all[e.name]=e.ref}));app.innerHTML=`<div class=eyebrow>FITNESS</div><h1>Progression</h1><div class=card><h2>${state.history.length} séances enregistrées</h2><div class=muted>Les références les plus récentes sont affichées ci-dessous.</div></div>${Object.entries(all).map(([n,v])=>`<div class=card><b>${n}</b><h2 class=gold>${v}</h2></div>`).join('')||'<div class=card>Aucune donnée de progression pour le moment.</div>'}`}
+function history(){app.innerHTML=`<div class=eyebrow>FITNESS</div><h1>Historique</h1>${state.history.map(h=>`<div class=card><div class=row><div><small class=gold>${new Date(h.date).toLocaleDateString('fr-FR')}</small><h2>${h.session}</h2></div><b>${h.duration? h.duration+' min':''}</b></div><div class=muted>${h.start||''}${h.end?' → '+h.end:''}</div><details><summary>Voir ${h.ex.length} exercices</summary>${h.ex.map(e=>`<p>${e.name} — ${e.ref||'—'} — ${e.status}</p>`).join('')}</details></div>`).join('')||'<div class=card>Aucune séance enregistrée.</div>'}`}
+function sheet(enc){let n=decodeURIComponent(enc);app.innerHTML=`<div class=eyebrow>FICHE TECHNIQUE</div><button class=btn onclick=render()>← Retour</button><h1>${n}</h1><div class=card><h2>Paramètres de l’exercice</h2><label>Référence actuelle</label><input id=sref class=time value="${state.refs[n]||''}" placeholder="kg, durée, niveau…"><button class="btn primary" onclick="state.refs[${JSON.stringify(n)}]=$('#sref').value;save();render()">Enregistrer</button></div><div class=card><h2>Illustration technique</h2><p class=muted>Emplacement préparé pour intégrer la fiche technique illustrée validée de cet exercice.</p></div>`}
+function advanceWeek(){state.week={A:'B',B:'C',C:'A'}[state.week];state.nextG=1;state.selected=null;save();render()}
+function backup(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));a.download='fitness-sauvegarde.json';a.click()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});
 render();
-if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
-</script>
-</body>
-</html>
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+</script></body></html>
