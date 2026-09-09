@@ -1,15 +1,91 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111111" />
-  <title>Fitness</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0c">
+<title>Fitness</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<style>
+:root{--bg:#09090a;--card:#151516;--card2:#1d1d1f;--gold:#d2a84a;--text:#f5f2ea;--muted:#aaa49a;--line:#34302a;--ok:#487c5b;--bad:#8a4c4c}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(#09090a,#111113);color:var(--text);font-family:Arial,sans-serif;min-height:100vh}
+button,select,input{font:inherit}.app{max-width:520px;margin:auto;min-height:100vh;padding:18px 16px 92px}
+.brand{color:var(--gold);letter-spacing:3px;font-weight:800;font-size:13px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+h1{font-size:28px;margin:4px 0 2px}h2{font-size:18px;margin:0 0 12px}.muted{color:var(--muted);font-size:13px}
+.card{background:linear-gradient(145deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 12px 28px #0005}
+.gold{color:var(--gold)}.row{display:flex;gap:9px;align-items:center}.between{justify-content:space-between}.grow{flex:1}
+.btn{border:1px solid #504936;background:#1b1b1c;color:var(--text);padding:11px 12px;border-radius:12px}.btn.goldbtn{background:var(--gold);color:#17130b;border-color:var(--gold);font-weight:800}
+.btn.ok{border-color:#426a4e}.btn.fail{border-color:#744646}.btn.nr{border-color:#555}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.exercise{padding:14px 0;border-bottom:1px solid #302d28}.exercise:last-child{border:0}
+.exname{font-weight:700;margin-bottom:7px}.ref{color:var(--gold);font-size:13px;margin-bottom:10px}
+.nav{position:fixed;bottom:0;left:0;right:0;background:#0d0d0ef2;border-top:1px solid #302c25;display:flex;justify-content:center;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.navin{width:min(520px,100%);display:grid;grid-template-columns:repeat(4,1fr);gap:3px;padding:8px}.tab{background:none;border:0;color:#8f8a82;padding:10px 2px;font-size:11px}.tab.active{color:var(--gold);font-weight:800}
+select,input{width:100%;background:#111;border:1px solid #4b4437;color:white;border-radius:12px;padding:12px;margin:5px 0 12px}
+.badge{border:1px solid #5a4c2c;color:var(--gold);border-radius:999px;padding:5px 9px;font-size:12px}.hidden{display:none}
+.stat{font-size:25px;font-weight:800;color:var(--gold)}.small{font-size:12px}.sessionline{padding:11px 0;border-bottom:1px solid #302d28}
+</style>
 </head>
 <body>
-  <div id="app"></div>
-  <script src="app.js"></script>
+<div id="app"></div>
+<script>
+const PROGRAM={
+ A:{G1:["Développé couché machine convergente","Écarté unilatéral poulie basse","Pec Deck / Butterfly","Dips lestés","Curl biceps barre EZ","Curl biceps haltères","Curl unilatéral pupitre vertical","Crunch abdominal","Abdominaux machine à crunch assis"],G2:["Tirage horizontal poulie double poignée","Tirage bras tendus poulie haute","Rowing unilatéral haltère","Tirage vertical prise serrée en V","Extension triceps poulie","Barre au front","Dips sur banc","Relevé de jambes","Flexions latérales du buste"],G3:["Développé épaules assis haltères","Tirage menton","Élévation latérale unilatérale poulie","Élévations latérales haltères","Hack Squat","Leg Extension","Leg Curl allongé","Mollets debout machine","Circuit abdos 8 min"]},
+ B:{G1:["Écarté poulie basse assis","Développé couché haltères","Écarté couché haltères","Pec Deck / Butterfly","Spider Curl","Curl marteau haltères","Curl biceps poulie basse en V","Circuit abdos 8 min"],G2:["Tirage vertical prise neutre","Tirage horizontal prise large","Seated Row","Tirage vertical prise serrée en V","Extension triceps corde","Extension triceps au-dessus tête haltère","Extension triceps couché haltères","Crunch lesté décliné","Flexion latérale banc décliné"],G3:["Développé militaire barre","Oiseau machine","Élévations latérales assis haltères","Squat libre","Leg Press","Mollets assis machine","Relevé de jambes","Crunch abdominal"]},
+ C:{G1:["Développé incliné haltères","Écarté incliné haltères","Écarté poulie basse","Chest Press","Curl incliné haltères","Curl barre EZ pronation","Curl biceps machine","Gainage"],G2:["Soulevé de terre barre","Rowing barre","Lat Pulldown","Rowing poulie basse prise large","Extension triceps poulie arrière","Extension triceps prise inversée","Dips assis machine","Circuit abdos 8 min"],G3:["Développé militaire debout barre","Oiseau poulie","Élévation latérale bilatérale poulie","Élévation latérale couchée banc incliné","Goblet Squat","Fentes marchées","Mollets assis machine","Relevé de jambes chaise romaine","Flexion latérale lestée banc décliné"]}
+};
+const COMPLEMENTS=["ATH A","ATH B","Full Mix 1","Full Mix 2","Full Mix 3","Full Mix 4"];
+let state=JSON.parse(localStorage.getItem("fitness-v01")||"null")||{setup:false,week:"A",nextG:"G1",history:[],refs:{},active:null};
+let view="today";
+function save(){localStorage.setItem("fitness-v01",JSON.stringify(state))}
+function el(s){return document.querySelector(s)}
+function app(html){el("#app").innerHTML=html}
+function setup(){
+app(`<main class="app"><div class="brand">FITNESS</div><h1>Première installation</h1><p class="muted">Positionne simplement ton cycle actuel.</p>
+<div class="card"><label>Semaine du cycle</label><select id="week"><option>A</option><option>B</option><option>C</option></select>
+<label>Prochaine séance G</label><select id="g"><option>G1</option><option>G2</option><option>G3</option></select>
+<button class="btn goldbtn" style="width:100%" id="start">Commencer</button></div></main>`);
+el("#week").value=state.week;el("#g").value=state.nextG;
+el("#start").onclick=()=>{state.week=el("#week").value;state.nextG=el("#g").value;state.setup=true;save();render()}
+}
+function nav(){
+return `<nav class="nav"><div class="navin">${[["today","Aujourd'hui"],["program","Programme"],["progress","Progression"],["history","Historique"]].map(x=>`<button class="tab ${view===x[0]?"active":""}" data-v="${x[0]}">${x[1]}</button>`).join("")}</div></nav>`
+}
+function shell(body,title){
+app(`<main class="app"><div class="top"><div><div class="brand">FITNESS</div><h1>${title}</h1></div><span class="badge">Semaine ${state.week}</span></div>${body}</main>${nav()}`);
+document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{view=b.dataset.v;render()})
+}
+function today(){
+let name=state.nextG+state.week, list=PROGRAM[state.week][state.nextG];
+let body=`<p class="muted">${new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</p>
+<div class="card"><div class="between row"><div><div class="gold small">SÉANCE PRIORITAIRE</div><h2>${name}</h2></div><button class="btn" id="begin">${state.active?"En cours":"Démarrer"}</button></div></div>`;
+if(state.active){
+body+=`<div class="card">${list.map((x,i)=>`<div class="exercise"><div class="exname">${i+1}. ${x}</div><div class="ref">Référence : ${state.refs[x]||"à définir"}</div><div class="grid3"><button class="btn ok status" data-i="${i}" data-s="Réussi">Réussi</button><button class="btn fail status" data-i="${i}" data-s="Échoué">Échoué</button><button class="btn nr status" data-i="${i}" data-s="Non réalisé">Non réalisé</button></div></div>`).join("")}</div>
+<div class="card"><div class="row"><button class="btn goldbtn grow" id="finish">Enregistrer la séance</button></div></div>`;
+}
+if(state.nextG==="DONE") body=`<div class="card"><div class="gold small">SOCLE HEBDOMADAIRE TERMINÉ</div><h2>Choisis une séance complémentaire</h2>${COMPLEMENTS.map(c=>`<button class="btn" style="width:100%;margin:5px 0">${c}</button>`).join("")}</div>`;
+shell(body,"Aujourd'hui");
+if(el("#begin"))el("#begin").onclick=()=>{if(!state.active)state.active={name,started:Date.now(),results:{}};save();render()}
+document.querySelectorAll(".status").forEach(b=>b.onclick=()=>{let ex=list[+b.dataset.i],s=b.dataset.s;state.active.results[ex]=s;if(s==="Réussi"){let n=prompt("Prochaine référence pour "+ex+" :",state.refs[ex]||"");if(n!==null&&n.trim())state.refs[ex]=n.trim()}save();b.style.background="#2d2a21"})
+if(el("#finish"))el("#finish").onclick=()=>{let end=Date.now(),dur=Math.max(1,Math.round((end-state.active.started)/60000));state.history.unshift({date:new Date().toISOString(),name:state.active.name,duration:dur,results:state.active.results});state.active=null;if(state.nextG==="G1")state.nextG="G2";else if(state.nextG==="G2")state.nextG="G3";else state.nextG="DONE";save();render()}
+}
+function program(){
+let body=`<div class="card"><h2>Cycle G</h2>${["A","B","C"].map(w=>`<div class="sessionline"><b>Semaine ${w}</b><div class="muted">G1${w} → G2${w} → G3${w}</div></div>`).join("")}</div>
+<div class="card"><h2>Complémentaires</h2><div class="muted">${COMPLEMENTS.join(" · ")}</div></div>
+<div class="card"><button class="btn" id="reset">Repositionner le cycle</button></div>`;
+shell(body,"Programme");el("#reset").onclick=()=>{state.setup=false;save();render()}
+}
+function progress(){
+let done=state.history.length;let body=`<div class="card"><div class="stat">${done}</div><div class="muted">séance${done>1?"s":""} enregistrée${done>1?"s":""}</div></div>
+<div class="card"><h2>Références actuelles</h2>${Object.keys(state.refs).length?Object.entries(state.refs).map(([k,v])=>`<div class="sessionline"><b>${k}</b><div class="gold">${v}</div></div>`).join(""):`<p class="muted">Les références apparaîtront après tes premières réussites.</p>`}</div>`;
+shell(body,"Progression")
+}
+function history(){
+let body=`<div class="card"><h2>Séances enregistrées</h2>${state.history.length?state.history.map(h=>`<div class="sessionline"><b>${h.name}</b><div class="muted">${new Date(h.date).toLocaleString("fr-FR")} · ${h.duration} min</div></div>`).join(""):`<p class="muted">Aucune séance enregistrée pour le moment.</p>`}</div>`;
+shell(body,"Historique")
+}
+function render(){if(!state.setup)return setup(); if(view==="today")today();if(view==="program")program();if(view==="progress")progress();if(view==="history")history()}
+render();
+if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js").catch(()=>{})}
+</script>
 </body>
 </html>
