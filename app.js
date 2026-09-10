@@ -5,18 +5,45 @@ const DATA = window.FITNESS_DATA || {sessions:{},paramType:{},ath:{}};
 const OCCURRENCE_SHEETS = window.FITNESS_OCCURRENCE_SHEETS || {};
 const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const KEY = "fitness-reconstruit-v2";
-const APP_REV = 4;
+const APP_REV = 5;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
 const $$=(q,r=document)=>[...r.querySelectorAll(q)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const clone=x=>JSON.parse(JSON.stringify(x));
+function icon(name){
+  const paths={
+    dumbbell:'<path d="M6 7v10M3.5 9v6M18 7v10M20.5 9v6M6 12h12M1.5 10.5v3M22.5 10.5v3"/>',
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><rect x="8" y="14" width="3" height="3" rx=".5"/>',
+    chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20V7"/>',
+    clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    list:'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
+    file:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/>',
+    swap:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
+    pencil:'<path d="M4 20l4.5-1 10-10-3.5-3.5-10 10zM13.8 6.7l3.5 3.5"/>',
+    flag:'<path d="M5 21V4M5 5c4-3 7 3 12 0v9c-5 3-8-3-12 0"/>',
+    save:'<path d="M5 3h12l3 3v15H4V3zM8 3v6h8V3M8 15h8v6H8z"/>',
+    chevron:'<path d="m9 5 7 7-7 7"/>',
+    arrowleft:'<path d="m15 18-6-6 6-6"/>',
+    rotate:'<path d="M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7"/>',
+    star:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    more:'<circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/>',
+    grip:'<path d="M8 7h8M8 12h8M8 17h8"/>',
+    check:'<path d="m5 12 4 4 10-10"/>',
+    x:'<path d="m7 7 10 10M17 7 7 17"/>',
+    ban:'<circle cx="12" cy="12" r="8"/><path d="m7 7 10 10"/>'
+  };
+  return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name]||paths.list}</svg>`;
+}
 const app=$("#app"), overlayRoot=$("#overlay-root");
 
 let tab="today";
 let view={type:"root"};
 let programMode="sessions";
+let programExerciseGroup="Tous";
 let progressionPeriod="all";
 let progressionGroup="Tous";
 let historyPeriod="year";
@@ -64,6 +91,9 @@ function migrate(){
   Object.entries(s.sessionOrder).forEach(([session,ids])=>{
     if(!s.programOverrides[session] && Array.isArray(ids) && ids.length) s.programOverrides[session]=ids.slice();
   });
+  if((raw?.appRev||0)<5 && s.today?.startedAt && !s.today?.manualTimes){
+    s.today.start="";s.today.end="";delete s.today.startedAt;
+  }
   s.appRev=APP_REV;
   localStorage.setItem(KEY,JSON.stringify(s));
   return s;
@@ -90,7 +120,7 @@ function groupLabel(s){
      s?.startsWith("G3")?"Épaules / Jambes / Abdos":
      s?.startsWith("ATH")?"Condition physique / Endurance":"Séance complète");
   return raw.replace(/PECTORAUX/gi,"Pectoraux").replace(/BICEPS/gi,"Biceps").replace(/ABDOS/gi,"Abdos")
-    .replace(/TRICEPS/gi,"Triceps").replace(/DOS/gi,"Dos").replace(/ÉPAULES|EPAULES/gi,"Épaules")
+    .replace(/TRICEPS/gi,"Triceps").replace(/\bDOS\b/gi,"Dos").replace(/ÉPAULES|EPAULES/gi,"Épaules")
     .replace(/JAMBES/gi,"Jambes").replace(/ADDUCTEURS/gi,"Adducteurs");
 }
 function baseIds(session){return (DATA.sessions?.[session]||[]).map(e=>e.id);}
@@ -115,12 +145,18 @@ function occurrenceList(id){
   return out;
 }
 function sheetPathForOccurrence(session,no){return OCCURRENCE_SHEETS[`${session}|${no}`]||"";}
+function canonicalSheetOccurrence(id){
+  return Object.entries(DATA.sessions||{}).flatMap(([s,es])=>es.map((e,i)=>({s,e,n:i+1}))).find(x=>x.e.id===id && sheetPathForOccurrence(x.s,x.n));
+}
 function sheetFor(id,session,no){
-  // Context-specific sheet first, then any known sheet for this canonical exercise.
-  let p=sheetPathForOccurrence(session,no); if(p) return pathUrl(p);
-  const originalOccurrence=Object.entries(DATA.sessions||{}).flatMap(([s,es])=>es.map((e,i)=>({s,e,n:i+1}))).find(x=>x.e.id===id && sheetPathForOccurrence(x.s,x.n));
-  if(originalOccurrence) return pathUrl(sheetPathForOccurrence(originalOccurrence.s,originalOccurrence.n));
-  const custom=state.customExercises?.[id]?.sheetPath; return custom?pathUrl(custom):"";
+  // A position-specific file is valid only while the same canonical exercise still occupies its original position.
+  // After drag/drop or transfer, fall back to the exercise's canonical sheet so identity never follows a slot number.
+  const originalId=DATA.sessions?.[session]?.[Math.max(0,(+no||1)-1)]?.id;
+  const contextual=sheetPathForOccurrence(session,no);
+  if(contextual && originalId===id)return pathUrl(contextual);
+  const originalOccurrence=canonicalSheetOccurrence(id);
+  if(originalOccurrence)return pathUrl(sheetPathForOccurrence(originalOccurrence.s,originalOccurrence.n));
+  const custom=state.customExercises?.[id]?.sheetPath;return custom?pathUrl(custom):"";
 }
 function groupForId(id){
   const occ=Object.entries(OCCURRENCE_SHEETS).find(([k])=>{
@@ -134,7 +170,7 @@ function groupForId(id){
   const n=exercise(id).name.toLowerCase();
   if(/abdo|crunch|gainage|pallof|wood chop|relevé de (jambes|genoux)/.test(n))return"Abdos";
   if(/curl|biceps/.test(n))return"Biceps"; if(/triceps|dips|barre au front/.test(n))return"Triceps";
-  if(/rowing|tirage|traction|soulevé de terre|lat pulldown/.test(n))return"Dos";
+  if(/rowing|tirage|traction|soulevé de terre|lat pulldown|lombaire/.test(n))return"Dos";
   if(/squat|leg |mollet|fente|adduction|abduction/.test(n))return"Jambes";
   if(/élévation|oiseau|épaule|militaire|face pull/.test(n))return"Épaules";
   if(/développé|écarté|pec|chest|presse/.test(n))return"Pectoraux";
@@ -159,9 +195,9 @@ function occKey(id,no){return `${id}@@${no}`;}
 function occurrenceStatus(cur,id,no){return cur?.status?.[occKey(id,no)] ?? cur?.status?.[id] ?? "";}
 function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.values?.[id] ?? referenceFor(id);}
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
-function navState(){return {tab,view,programMode,progressionPeriod,progressionGroup,historyPeriod,historyYear};}
+function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,historyPeriod,historyYear};}
 function applyNavState(st){
-  if(!st)return; tab=st.tab||"today"; view=st.view||{type:"root"}; programMode=st.programMode||programMode;
+  if(!st)return; tab=st.tab||"today"; view=st.view||{type:"root"}; programMode=st.programMode||programMode; programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
   progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;
 }
@@ -224,25 +260,20 @@ function renderInstall(){
 function renderToday(){
   const rawDate=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const date=rawDate.charAt(0).toUpperCase()+rawDate.slice(1);
-  const cur=state.today;
+  let cur=state.today;
   if(!cur){
     const g3done=state.completedG.includes(3);
     if(g3done){
       const ath=`ATHLÉTIQUE ${state.nextAth}`,fm=`FULL MIX ${state.nextFm}`;
       shell(`${header("Aujourd’hui",date,"","tall")}
-        <div class="card"><div class="row-between"><div><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">G1, G2 et G3 ont été enregistrées.</div></div><span class="cycle-chip"><b>Semaine ${state.cycle}</b><span>Complémentaires</span></span></div></div>
+        <div class="card comp-choice"><div class="row-between"><div><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez la séance complémentaire à ouvrir.</div></div><span class="cycle-chip"><b>Semaine ${state.cycle}</b><span>Complémentaires</span></span></div></div>
         <h2 class="section-title">Séances complémentaires</h2>
-        <div class="complement-grid">
-          ${complementChoiceCard(ath,"ATHLÉTIQUE",state.nextAth)}
-          ${complementChoiceCard(fm,"FULL MIX",String(state.nextFm))}
-        </div>`);
-      $$("[data-start-session]").forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);render();});
+        <div class="complement-grid">${complementChoiceCard(ath,"ATHLÉTIQUE",state.nextAth)}${complementChoiceCard(fm,"FULL MIX",String(state.nextFm))}</div>`);
+      $$('[data-start-session]').forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);render();});
       return;
     }
-    const s=sessionCode();
-    shell(`${header("Aujourd’hui",date,`<div class="session-code">${s}</div><div class="session-groups">${groupLabel(s)}</div>`,"tall")}
-      <div class="card"><div class="row-between"><div><div class="small serif gold">Prochaine séance</div><div class="tiny muted">Le cycle principal suit G1 → G2 → G3.</div></div><button class="btn gold" id="start-main">Démarrer ${s}</button></div></div>`);
-    $("#start-main").onclick=()=>{initToday(s);render();}; return;
+    initToday(sessionCode());
+    cur=state.today;
   }
   renderActiveToday(cur,date);
 }
@@ -255,40 +286,50 @@ function complementChoiceCard(session,title,variant){
 }
 function initToday(session){
   const snapshot={}; sessionIds(session).forEach((id,i)=>snapshot[occKey(id,i+1)]=referenceFor(id));
-  state.today={session,start:new Date().toTimeString().slice(0,5),startedAt:Date.now(),status:{},values:snapshot,nextRefs:{}};
+  state.today={session,start:"",end:"",manualTimes:true,status:{},values:snapshot,nextRefs:{}};
   save();
 }
+function minutesBetweenTimes(start,end){
+  if(!/^\d{2}:\d{2}$/.test(start||"")||!/^\d{2}:\d{2}$/.test(end||""))return null;
+  const [sh,sm]=start.split(":").map(Number),[eh,em]=end.split(":").map(Number);
+  let mins=(eh*60+em)-(sh*60+sm);if(mins<0)mins+=1440;return mins;
+}
+function durationClock(cur){
+  const mins=minutesBetweenTimes(cur?.start,cur?.end);if(mins==null)return"--:--:--";
+  return `${String(Math.floor(mins/60)).padStart(2,"0")}:${String(mins%60).padStart(2,"0")}:00`;
+}
+function timeButton(value,id){return `<button class="time-edit" id="${id}">${esc(value||"--:--")} ${icon("pencil")}</button>`;}
 function renderActiveToday(cur,date){
   if(cur.session.startsWith("ATHLÉTIQUE")){renderActiveAth(cur,date);return;}
   const ids=sessionIds(cur.session),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
     <div class="today-meta">
-      <div><div class="meta-label">Heure de début</div><div class="meta-value">${esc(cur.start)} <button class="backlink" id="edit-start">✎</button></div></div>
-      <div class="line"></div>
-      <div style="text-align:center"><div class="meta-label">Durée en cours</div><div class="timer" id="timer">00:00:00</div></div>
+      <div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div>
+      <div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div>
     </div>
     <div>${ids.map((id,i)=>todayExerciseCard(id,cur.session,i+1,cur)).join("")}</div>
     <div class="card finish-card">
-      <div class="finish-head"><div><div class="finish-title">⚑ Fin de séance</div><div class="tiny muted">Heure de fin</div><b id="end-time">${new Date().toTimeString().slice(0,5)}</b></div>
-      <div class="finish-stat"><span>Durée totale</span><b id="total-dur">—</b></div>
+      <div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div>
+      <div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div>
       <div><div class="tiny serif gold" style="text-align:center;margin-bottom:3px">Bilan</div><div class="bilan"><div><b>${success}</b><span>Réussis</span></div><div><b>${fail}</b><span>Échoués</span></div><div><b>${skip}</b><span>Non réalisés</span></div></div></div></div>
-      <button class="btn gold block" id="save-session" style="margin-top:8px">▣ Enregistrer la séance</button>
+      <div class="manual-hint">Les heures de début et de fin sont saisies manuellement.</div>
+      <button class="btn gold block" id="save-session">${icon("save")} Enregistrer la séance</button>
     </div>`);
-  $$("[data-status]").forEach(b=>b.onclick=()=>setExerciseStatus(b.dataset.id,b.dataset.status,+b.dataset.no));
-  $$("[data-sheet]").forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet,b.dataset.session,+b.dataset.no));
-  $("#edit-start").onclick=()=>editStartTime();
-  $("#save-session").onclick=saveCurrentSession; tickTimer();
+  $$('[data-status]').forEach(b=>b.onclick=()=>setExerciseStatus(b.dataset.id,b.dataset.status,+b.dataset.no));
+  $$('[data-sheet]').forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet,b.dataset.session,+b.dataset.no));
+  $("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");
+  $("#save-session").onclick=saveCurrentSession;
 }
 function todayExerciseCard(id,session,no,cur){
   const e=exercise(id),st=occurrenceStatus(cur,id,no),img=sheetFor(id,session,no),ref=occurrenceValue(cur,id,no);
   const firstPendingNo=sessionIds(session).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
   return `<div class="exercise-card ${firstPendingNo===no?"current":""}">
     <div class="num">${String(no).padStart(2,"0")}</div>
-    <div class="thumb"><img data-fallback src="${img||"./assets/hero-final.jpg"}" alt=""></div>
+    <div class="thumb"><img data-fallback src="${img||"./assets/hero-back.jpg"}" alt=""></div>
     <div class="ex-info"><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div></div>
-    <button class="backlink chev" data-sheet="${esc(id)}" data-session="${esc(session)}" data-no="${no}">›</button>
+    <button class="backlink chev" data-sheet="${esc(id)}" data-session="${esc(session)}" data-no="${no}" aria-label="Voir la fiche">${icon("chevron")}</button>
     <div class="status-actions">
-      ${["Réussi","Échoué","Non réalisé"].map(x=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}">${x==="Réussi"?"✓ ":x==="Échoué"?"× ":"⊘ "}${x}</button>`).join("")}
+      ${[["Réussi","check"],["Échoué","x"],["Non réalisé","ban"]].map(([x,ic])=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}">${icon(ic)} ${x}</button>`).join("")}
     </div>
   </div>`;
 }
@@ -314,27 +355,30 @@ function openNextRefModal(id,current,done){
       $("#confirm-next").onclick=()=>{const v=$("#next-ref").value.trim()||current;closeOverlay(true);done(v);};
     });
 }
-function editStartTime(){
-  const cur=state.today;openModal(`<h3>Heure de début</h3><div class="field"><label>Heure</label><input type="time" id="start-edit" value="${esc(cur.start)}"></div>
-    <div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-start">Enregistrer</button></div>`,()=>{
-      $("#save-start").onclick=()=>{const nv=$("#start-edit").value;if(nv){const [h,m]=nv.split(":").map(Number),now=new Date(),d=new Date(now);d.setHours(h,m,0,0);if(d>now)d.setDate(d.getDate()-1);cur.start=nv;cur.startedAt=d.getTime();save();}closeOverlay(true);render();};
+function editSessionTimes(focus="start"){
+  const cur=state.today;if(!cur)return;
+  openModal(`<h3>Horaires de la séance</h3><p>Saisissez vous-même l'heure de début et l'heure de fin. Aucun chronomètre ne démarre automatiquement.</p>
+    <div class="param-grid"><div class="field"><label>Heure de début</label><input type="time" id="start-edit" value="${esc(cur.start||"")}"></div><div class="field"><label>Heure de fin</label><input type="time" id="end-edit" value="${esc(cur.end||"")}"></div></div>
+    <div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-times">Enregistrer</button></div>`,()=>{
+      setTimeout(()=>$(focus==="end"?"#end-edit":"#start-edit")?.focus(),30);
+      $("#save-times").onclick=()=>{cur.start=$("#start-edit").value||"";cur.end=$("#end-edit").value||"";cur.manualTimes=true;save();closeOverlay(true);render();};
     });
-}
-function tickTimer(){
-  const t=$("#timer"); if(!t||!state.today)return;
-  const sec=Math.max(0,Math.floor((Date.now()-(state.today.startedAt||Date.now()))/1000));
-  const h=String(Math.floor(sec/3600)).padStart(2,"0"),m=String(Math.floor(sec%3600/60)).padStart(2,"0"),s=String(sec%60).padStart(2,"0");
-  t.textContent=`${h}:${m}:${s}`; const d=$("#total-dur");if(d)d.textContent=`${String(h).padStart(2,"0")}:${m}:${s}`;
-  const e=$("#end-time");if(e)e.textContent=new Date().toTimeString().slice(0,5);
-  setTimeout(tickTimer,1000);
 }
 function saveCurrentSession(){
   const cur=state.today;if(!cur)return;
+  if(minutesBetweenTimes(cur.start,cur.end)==null){
+    openModal(`<h3>Horaires à compléter</h3><p>Indiquez l'heure de début et l'heure de fin avant d'enregistrer la séance.</p>
+      <div class="param-grid"><div class="field"><label>Heure de début</label><input type="time" id="req-start" value="${esc(cur.start||"")}"></div><div class="field"><label>Heure de fin</label><input type="time" id="req-end" value="${esc(cur.end||"")}"></div></div>
+      <div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="req-save">Continuer</button></div>`,()=>{
+        $("#req-save").onclick=()=>{const a=$("#req-start").value,b=$("#req-end").value;if(!a||!b)return;cur.start=a;cur.end=b;cur.manualTimes=true;save();closeOverlay(true);setTimeout(saveCurrentSession,0);};
+      });
+    return;
+  }
   if(!cur.session.startsWith("ATHLÉTIQUE")){
     const ids=sessionIds(cur.session);
     const missing=ids.map((id,i)=>({id,no:i+1,key:occKey(id,i+1)})).filter(o=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,o.id,o.no)));
     if(missing.length){
-      openModal(`<h3>Statuts à compléter</h3><p>${missing.length} exercice(s) n’ont pas encore de statut. Pour enregistrer une séance, chaque exercice doit être Réussi, Échoué ou Non réalisé.</p>
+      openModal(`<h3>Statuts à compléter</h3><p>${missing.length} exercice(s) n'ont pas encore de statut. Chaque exercice doit être Réussi, Échoué ou Non réalisé.</p>
         <div class="modal-actions"><button class="btn ghost" data-close-modal>Revenir à la séance</button><button class="btn gold" id="mark-skipped">Marquer Non réalisé</button></div>`,()=>{
           $("#mark-skipped").onclick=()=>{missing.forEach(o=>cur.status[o.key]="Non réalisé");save();closeOverlay(true);setTimeout(saveCurrentSession,0);};
         });
@@ -345,32 +389,28 @@ function saveCurrentSession(){
 }
 function commitCurrentSession(){
   const cur=state.today;if(!cur)return;
-  const mins=Math.max(1,Math.round((Date.now()-(cur.startedAt||Date.now()))/60000));
+  const mins=minutesBetweenTimes(cur.start,cur.end);if(mins==null)return;
   const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:sessionIds(cur.session);
   const exRecords=ids.map((id,i)=>{const no=i+1,status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual;return{id,name:exercise(id).name,status,actual,next,no};}).filter(e=>e.status!=="Non réalisé");
-  state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.session,start:cur.start,end:new Date().toTimeString().slice(0,5),duration:mins,exercises:exRecords});
+  state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.session,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
   ids.forEach((id,i)=>{const v=occurrenceNext(cur,id,i+1);if(!v)return;state.refs[id]=v;const p=defaultParams(id);if(p.type==="strength"){p.charge=v;state.params[id]=p;}});
   if(/^G[123][ABC]$/.test(cur.session)){
-    const n=+cur.session[1]; if(!state.completedG.includes(n))state.completedG.push(n);
-    state.nextG=Math.min(3,n+1);
+    const n=+cur.session[1]; if(!state.completedG.includes(n))state.completedG.push(n);state.nextG=Math.min(3,n+1);
   }else if(cur.session.startsWith("ATHLÉTIQUE")){
-    state.lastComplement[cur.session]=new Date().toLocaleDateString("fr-FR");
-    state.nextAth=cur.session.endsWith("A")?"B":"A";
+    state.lastComplement[cur.session]=new Date().toLocaleDateString("fr-FR");state.nextAth=cur.session.endsWith("A")?"B":"A";
   }else if(cur.session.startsWith("FULL MIX")){
-    state.lastComplement[cur.session]=new Date().toLocaleDateString("fr-FR");
-    const n=Number(cur.session.match(/\d+/)?.[0]||1);state.nextFm=(n%4)+1;
+    state.lastComplement[cur.session]=new Date().toLocaleDateString("fr-FR");const n=Number(cur.session.match(/\d+/)?.[0]||1);state.nextFm=(n%4)+1;
   }
   state.today=null;save();render();
 }
 function renderActiveAth(cur,date){
   const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
-    <div class="today-meta"><div><div class="meta-label">Heure de début</div><div class="meta-value">${esc(cur.start)}</div></div><div class="line"></div><div style="text-align:center"><div class="meta-label">Durée en cours</div><div class="timer" id="timer">00:00:00</div></div></div>
-    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-final.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
+    <div class="today-meta"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div><div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div></div>
+    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-back.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
     <div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
-    <div class="card finish-card"><div class="row-between"><div><div class="finish-title">⚑ Fin de séance</div><div class="tiny muted">60 min + 15 min de mobilité / étirements</div></div><div class="timer" id="total-dur">—</div></div><button class="btn gold block" id="save-session" style="margin-top:8px">▣ Enregistrer la séance</button></div>`);
-  $("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);
-  $("#save-session").onclick=saveCurrentSession;tickTimer();
+    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><div class="manual-hint">Horaires saisis manuellement.</div><button class="btn gold block" id="save-session">${icon("save")} Enregistrer la séance</button></div>`);
+  $("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;
 }
 function athStepSummary(session,index,step){
   const values=state.athParams?.[session]?.[index]||{};
@@ -399,42 +439,48 @@ function renderProgram(){
   bindProgramContent();
 }
 function programSessions(){
-  return `<div class="row-between"><h2 class="section-title">Cycle principal G ⟳</h2><span class="tiny muted">Ordre du cycle : A → B → C</span></div>
+  return `<div class="row-between"><h2 class="section-title">Cycle principal G ${icon("rotate")}</h2><span class="tiny muted">Ordre du cycle : A → B → C</span></div>
     <div class="program-grid">${[1,2,3].map(n=>programGCard(n)).join("")}</div>
     <h2 class="section-title">Séances complémentaires</h2>
     <div class="complement-grid">${programCompCard("ATHLÉTIQUE",["A","B"],state.nextAth)}${programCompCard("FULL MIX",["1","2","3","4"],String(state.nextFm))}</div>
     <h2 class="section-title">Outils</h2>
     <div class="tools">
-      <button class="tool" data-tool="exercises"><span class="ico">↔</span>Liste des exercices<br><span class="muted">Tous les mouvements</span></button>
-      <button class="tool" data-tool="sheets"><span class="ico">▤</span>Fiches techniques<br><span class="muted">Images et conseils</span></button>
-      <button class="tool" data-tool="manage"><span class="ico">⚙</span>Paramètres<br><span class="muted">Réglages généraux</span></button>
-      <button class="tool" data-tool="progress"><span class="ico">▥</span>Statistiques<br><span class="muted">Suivi et progression</span></button>
+      <button class="tool" data-tool="exercises"><span class="ico">${icon("dumbbell")}</span>Liste des exercices<br><span class="muted">Classés par groupes</span></button>
+      <button class="tool" data-tool="sheets"><span class="ico">${icon("file")}</span>Fiches techniques<br><span class="muted">Images et conseils</span></button>
+      <button class="tool" data-tool="manage"><span class="ico">${icon("settings")}</span>Paramètres<br><span class="muted">Réglages généraux</span></button>
+      <button class="tool" data-tool="progress"><span class="ico">${icon("chart")}</span>Statistiques<br><span class="muted">Suivi et progression</span></button>
     </div>
     <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div>`;
 }
 function programGCard(n){
-  const s=`G${n}${state.cycle}`, groups=groupLabel(s).split(" / ").map(esc).join("<br>"),first=sessionIds(s)[0],img=first?sheetFor(first,s,1):"";
-  return `<div class="program-card" data-session-card="${s}" ${img?`style="--card-image:url('${img}')"`:""}><span class="code">G${n}</span><span class="groups">${groups}</span>
+  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=`./assets/card-g${n}.jpg`;
+  return `<div class="program-card" data-session-card="${s}" style="--card-image:url('${asset}')"><span class="code">G${n}</span><span class="groups">${groups}</span>
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="${c===state.cycle?"on":""}">${c}</button>`).join("")}</span></div>`;
 }
 function programCompCard(title,variants,next){
-  const session=title==="ATHLÉTIQUE"?`ATHLÉTIQUE ${next}`:`FULL MIX ${next}`, first=sessionIds(session)[0];
-  const img=title==="ATHLÉTIQUE"?pathUrl(ATH_SHEETS[session]||""):(first?sheetFor(first,session,1):"");
-  return `<div class="program-card comp-card" ${img?`style="--card-image:url('${img}')"`:""}><span class="code">${esc(title)}</span><span class="groups">${title==="ATHLÉTIQUE"?"Cardio / Endurance<br>Condition physique":"Séances complètes<br>Ciblées"}</span>
+  const asset=title==="ATHLÉTIQUE"?"./assets/card-ath.jpg":"./assets/card-fm.jpg";
+  return `<div class="program-card comp-card" style="--card-image:url('${asset}')"><span class="code">${esc(title)}</span><span class="groups">${title==="ATHLÉTIQUE"?"Cardio / Endurance<br>Condition physique":"Séances complètes<br>Ciblées"}</span>
     <span class="variant-row fm-row">${variants.map(v=>`<button data-open-comp="${title==="ATHLÉTIQUE"?`ATHLÉTIQUE ${v}`:`FULL MIX ${v}`}" class="${v===next?"on":""}">${v}</button>`).join("")}</span></div>`;
 }
 function programExercises(){
-  const reg=registry();const ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id));
-  return `<h2 class="section-title">Liste des exercices</h2><div class="card progress-list">${ids.map((id,i)=>{
-    const o=occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo};const img=sheetFor(id,o.s,o.n);
-    return `<div class="progress-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="num">${String(i+1).padStart(2,"0")}</div><div class="thumb"><img data-fallback src="${img||"./assets/hero-final.jpg"}"></div><div><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="trend">${occurrenceList(id).length} séance(s)</div><div class="chev">›</div></div>`;
-  }).join("")}</div>`;
+  const groups=["Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos","Cardio / ATH","Autre"],reg=registry();
+  const ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id));
+  const available=groups.filter(g=>g==="Cardio / ATH"?false:ids.some(id=>groupForId(id)===g));
+  const filters=["Tous",...available];
+  const visibleGroups=programExerciseGroup==="Tous"?available:[programExerciseGroup];
+  return `<div class="exercise-library-head"><h2 class="section-title">Exercices par groupe musculaire</h2></div>
+    <div class="filter-row">${filters.map(g=>`<button data-lib-group="${esc(g)}" class="${programExerciseGroup===g?"on":""}">${esc(g)}</button>`).join("")}</div>
+    ${visibleGroups.map(g=>{
+      const gids=ids.filter(id=>groupForId(id)===g).sort((a,b)=>reg[a].name.localeCompare(reg[b].name,"fr"));if(!gids.length)return"";
+      return `<section class="library-section"><div class="library-section-title">${esc(g)} <span>${gids.length} exercice${gids.length>1?"s":""}</span></div><div class="panel">${gids.map(id=>{
+        const o=occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo},img=sheetFor(id,o.s,o.n),count=occurrenceList(id).length;
+        return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img data-fallback src="${img||"./assets/hero-back.jpg"}"></div><div><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(g)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
+      }).join("")}</div></section>`;
+    }).join("")}`;
 }
 function programGroups(){
-  const groups=["Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos","Autre"];
-  const reg=registry();
-  return groups.map(g=>{const ids=Object.keys(reg).filter(id=>groupForId(id)===g&&!state.archivedExercises.includes(id));if(!ids.length)return"";
-    return `<h2 class="section-title">${g}</h2><div class="card">${ids.map(id=>`<div class="history-row" data-open-ex="${esc(id)}" data-s="${esc(occurrenceList(id)[0]?.s||reg[id].firstSession||"")}" data-n="${occurrenceList(id)[0]?.n||reg[id].firstNo||1}"><b>${esc(reg[id].name)}</b><span class="gold" style="float:right">›</span></div>`).join("")}</div>`}).join("");
+  const groups=["Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"],reg=registry();
+  return `<h2 class="section-title">Groupes musculaires</h2><div class="group-card-grid">${groups.map(g=>{const count=Object.keys(reg).filter(id=>groupForId(id)===g&&!state.archivedExercises.includes(id)).length;return `<button class="group-card" data-group-open="${esc(g)}"><b>${esc(g)}</b><span>${count} exercice${count>1?"s":""} dans la bibliothèque</span></button>`;}).join("")}</div>`;
 }
 function programManage(){
   return `<h2 class="section-title">Gestion</h2>
@@ -447,23 +493,26 @@ function programManage(){
     <h2 class="section-title">Exercices archivés</h2><div class="card">${state.archivedExercises.length?state.archivedExercises.map(id=>`<div class="history-row"><b>${esc(exercise(id).name)}</b><button class="backlink" data-unarchive="${esc(id)}" style="float:right">Restaurer</button></div>`).join(""):`<div class="empty">Aucun exercice archivé.</div>`}</div>`;
 }
 function bindProgramContent(){
-  $$("[data-open-g],[data-open-comp]").forEach(b=>b.onclick=e=>{e.stopPropagation();pushNav({type:"programDetail",session:b.dataset.openG||b.dataset.openComp});});
-  $$("[data-session-card]").forEach(b=>b.onclick=()=>pushNav({type:"programDetail",session:b.dataset.sessionCard}));
-  $$("[data-open-ex]").forEach(b=>b.onclick=()=>openSheet(b.dataset.openEx,b.dataset.s,+b.dataset.n));
-  $$("[data-tool]").forEach(b=>b.onclick=()=>{
+  $$('[data-open-g],[data-open-comp]').forEach(b=>b.onclick=e=>{e.stopPropagation();pushNav({type:"programDetail",session:b.dataset.openG||b.dataset.openComp});});
+  $$('[data-session-card]').forEach(b=>b.onclick=()=>pushNav({type:"programDetail",session:b.dataset.sessionCard}));
+  $$('[data-open-ex]').forEach(b=>b.onclick=()=>openSheet(b.dataset.openEx,b.dataset.s,+b.dataset.n));
+  $$('[data-lib-group]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.libGroup;history.replaceState(navState(),"");render();});
+  $$('[data-group-open]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.groupOpen;programMode="exercises";history.replaceState(navState(),"");render();});
+  $$('[data-tool]').forEach(b=>b.onclick=()=>{
     const t=b.dataset.tool;if(t==="progress"){pushNav(null,"progress");return;}
-    programMode=t==="manage"?"manage":"exercises";history.replaceState(navState(),"");render();
+    programMode=t==="manage"?"manage":"exercises";if(programMode==="exercises")programExerciseGroup="Tous";history.replaceState(navState(),"");render();
   });
   if($("#cycle-position"))$("#cycle-position").onclick=openCycleModal;
   if($("#backup"))$("#backup").onclick=backupJSON;
   if($("#restore"))$("#restore").onchange=restoreJSON;
   if($("#export"))$("#export").onclick=exportCSV;
-  $$("[data-unarchive]").forEach(b=>b.onclick=()=>{state.archivedExercises=state.archivedExercises.filter(x=>x!==b.dataset.unarchive);save();render();});
+  $$('[data-unarchive]').forEach(b=>b.onclick=()=>{state.archivedExercises=state.archivedExercises.filter(x=>x!==b.dataset.unarchive);save();render();});
 }
 function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
   const ids=sessionIds(session);
-  shell(`<header class="session-header"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">‹ Programme</button><button class="btn" id="edit-session">✎ Modifier</button></div>
+  const heroAsset=session.startsWith("G1")?"./assets/card-g1.jpg":session.startsWith("G2")?"./assets/card-g2.jpg":session.startsWith("G3")?"./assets/card-g3.jpg":"./assets/card-fm.jpg";
+  shell(`<header class="session-header" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button><button class="btn" id="edit-session">${icon("pencil")} Modifier</button></div>
     <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <div class="panel session-list" id="session-list">${ids.map((id,i)=>sessionRow(id,session,i+1)).join("")}</div>
     <button class="btn gold block add-exercise" id="add-exercise">＋ Ajouter un exercice</button>`);
@@ -478,8 +527,8 @@ function renderProgramDetail(session){
 function sessionRow(id,session,no){
   const e=exercise(id),img=sheetFor(id,session,no);
   return `<div class="session-row" data-session-row data-id="${esc(id)}" data-no="${no}">
-    <div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img data-fallback src="${img||"./assets/hero-final.jpg"}"></div>
-    <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">›</div><div><button class="row-menu">⋮</button><span class="handle">☷</span></div></div>`;
+    <div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img data-fallback src="${img||"./assets/hero-back.jpg"}"></div>
+    <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div></div>`;
 }
 function enableSort(list,session){
   let drag=null;
@@ -520,7 +569,7 @@ function openExerciseActionModal(session,id){
 }
 function renderAthProgram(session){
   const img=pathUrl(ATH_SHEETS[session]||"");
-  shell(`<header class="session-header"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">‹ Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
+  shell(`<header class="session-header" style="--session-image:url('./assets/card-ath.jpg')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-final.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
     <div class="card">${(DATA.ath?.[session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(session,i,x))}</div></div>`).join("")}</div>`);
   $("#back-program").onclick=()=>history.back();
@@ -571,7 +620,8 @@ function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
   const filtered=filterPerf(arr,progressionPeriod);const nums=filtered.map(x=>({x:x.date,y:parseNumber(x.value),raw:x})).filter(x=>Number.isFinite(x.y));
   const first=nums[0]?.y,last=nums.at(-1)?.y,delta=(Number.isFinite(first)&&Number.isFinite(last))?last-first:null,pct=(delta!=null&&first)?Math.round(delta/first*100):null,trend=trendFor(id,filtered);
-  shell(`<div class="detail-hero"><button class="backlink" id="back-progress">‹ Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">☆</button></div>
+  const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-back.jpg";
+  shell(`<div class="detail-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${sub==="evolution"?progressEvolutionContent(nums,delta,pct,trend):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}

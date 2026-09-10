@@ -1,4 +1,4 @@
-const CACHE = "fitness-design-final-v4-20260910-3";
+const CACHE = "fitness-ultime-v5-20260910-1";
 const ROOT = [
   "./",
   "./index.html",
@@ -8,7 +8,13 @@ const ROOT = [
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
-  "./assets/hero-final.jpg"
+  "./assets/hero-back.jpg",
+  "./assets/hero-final.jpg",
+  "./assets/card-g1.jpg",
+  "./assets/card-g2.jpg",
+  "./assets/card-g3.jpg",
+  "./assets/card-ath.jpg",
+  "./assets/card-fm.jpg"
 ];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ROOT)).then(() => self.skipWaiting()));

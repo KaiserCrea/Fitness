@@ -1,58 +1,57 @@
-FITNESS — VERSION DESIGN FINALE V4
+FITNESS — VERSION ULTIME V5
 Mise à jour : 10 septembre 2026
-Dépôt : KaiserCrea/Fitness
 
-OBJECTIF
-Cette version correspond à la reconstruction de l’interface finale de l’application Fitness à partir des maquettes validées et du cahier des charges V3.
+IMPORTANT — DEPLOIEMENT GITHUB
+==============================
+Le dossier fiches/ déjà présent sur GitHub contient la bibliothèque réelle des fiches techniques.
+IL NE DOIT PAS ETRE SUPPRIME, RECONSTRUIT OU REIMPORTE.
 
-IMPORTANT — DOSSIER FICHES
-Le dossier GitHub « fiches/ » contient la bibliothèque réelle des fiches techniques déjà classées et installées.
-NE PAS supprimer, remplacer, reconstruire ni réimporter ce dossier.
+Pour installer cette version :
+1. Conserver le dossier fiches/ existant à la racine du dépôt KaiserCrea/Fitness.
+2. Remplacer les autres fichiers racine par ceux de ce ZIP.
+3. Importer également le dossier assets/ fourni dans ce ZIP.
+4. Attendre la fin du déploiement GitHub Pages.
+5. Sur Android, ouvrir/relancer la PWA installée. Le cache V5 est différent de la V4.
 
-MISE À JOUR DU DÉPÔT
-À la racine du dépôt GitHub, conserver uniquement le dossier existant « fiches/ », puis remplacer les autres anciens fichiers par le contenu de ce package.
-
-Le dépôt doit ensuite contenir notamment :
-- assets/
-- fiches/  ← dossier existant à conserver intact
-- app.css
-- app.js
-- data.js
-- icon-192.png
-- icon-512.png
-- index.html
-- manifest.webmanifest
-- README.txt
-- sw.js
-
-PRINCIPES DE LA VERSION V4
-- PWA Android avec 4 onglets : Aujourd’hui / Programme / Progression / Historique.
-- Interface noir / anthracite / blanc / doré uniquement.
-- Aucun vert ni rouge dans les statuts ou indicateurs.
+CONTENU DE CETTE VERSION
+========================
+- Interface reconstruite à partir des maquettes finales noir / anthracite / blanc / doré.
+- Aucun code vert ou rouge dans les statuts ou la progression.
 - Aucun slogan décoratif ou motivationnel.
-- Navigation Android avec pile de retour interne.
-- Ouverture directe des vraies fiches techniques depuis les exercices.
-- Miniatures provenant des fiches réelles.
-- Identité unique des exercices réutilisés dans plusieurs séances.
-- Paramètres propres à chaque exercice intégrés à la partie basse de sa fiche.
-- Programme éditable avec réorganisation, ajout, retrait et transfert d’exercices sans perte d’historique.
-- Cycle principal G : A → B → C avec G1 → G2 → G3.
-- Rotations complémentaires indépendantes : ATH A/B et FM1 → FM2 → FM3 → FM4.
-- Statuts : Réussi / Échoué / Non réalisé.
+- 4 onglets principaux : Aujourd'hui / Programme / Progression / Historique.
+- En-têtes, cartes, proportions, bordures, navigation et densité rapprochés des maquettes.
+- Visuels d'ambiance dédiés pour G1/G2/G3, ATH et Full Mix.
+- Miniatures des exercices recadrées à partir des vraies fiches techniques.
+- Aujourd'hui affiche directement la prochaine séance G : aucun chronomètre et aucun démarrage automatique.
+- Heure de début et heure de fin saisies manuellement par l'utilisateur.
+- Durée calculée uniquement à partir des deux horaires saisis.
+- Réussi : demande la prochaine référence ; Échoué : conserve la référence ; Non réalisé : aucune performance.
+- Programme > Exercices classé par groupes musculaires, sans numéro permanent d'exercice.
+- Exercices canoniques : une seule identité, mêmes paramètres, même progression et même historique lorsqu'ils sont réutilisés.
+- Programme éditable : réorganisation, transfert, ajout, retrait et archivage sans perdre l'identité.
+- Fiches techniques ouvertes directement depuis les exercices ; paramètres dynamiques intégrés sous la fiche.
+- Pile de navigation navigateur/PWA compatible avec le bouton Retour Android.
+- Rotations indépendantes ATH A/B et FM1/FM2/FM3/FM4.
+- Sauvegarde JSON, restauration JSON et export CSV.
+- Service worker V5 avec nouvelle version de cache.
 
-DONNÉES LOCALES
-La clé localStorage historique reste « fitness-reconstruit-v2 » afin de préserver les données locales existantes lors de la mise à jour.
+FICHIERS FOURNIS
+================
+README.txt
+app.css
+app.js
+data.js
+assets/
+icon-192.png
+icon-512.png
+index.html
+manifest.webmanifest
+sw.js
 
-SERVICE WORKER
-Cache : « fitness-design-final-v4-20260910-3 ».
+DOSSIER A CONSERVER SUR GITHUB
+==============================
+fiches/
 
-APRÈS MISE EN LIGNE SUR GITHUB PAGES
-1. Attendre la fin du déploiement GitHub Pages.
-2. Ouvrir l’application avec une connexion réseau afin que le nouveau service worker soit chargé.
-3. Si une ancienne interface reste affichée, fermer complètement la PWA puis la rouvrir.
-4. Vérifier Aujourd’hui, Programme, Progression et Historique.
-5. Ouvrir plusieurs exercices afin de vérifier que leurs vraies fiches et miniatures sont bien utilisées.
-6. Ne modifier le dossier « fiches/ » que si une association précise est réellement incorrecte.
-
-STATUT
-Cette V4 est une version de validation du design final. Elle ne doit être considérée comme finale qu’après validation du rendu réel sur Android, des associations de fiches, de la navigation et du fonctionnement complet.
+REMARQUE
+========
+Cette archive est volontairement ROOT ONLY : elle ne contient pas fiches/ afin d'empêcher son remplacement accidentel.
