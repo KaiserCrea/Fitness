@@ -1,4 +1,4 @@
-const CACHE = "fitness-ultime-v5-20260910-1";
+const CACHE = "fitness-ultime-v7-final-20260911-1";
 const ROOT = [
   "./",
   "./index.html",
@@ -8,8 +8,10 @@ const ROOT = [
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
-  "./assets/hero-back.jpg",
-  "./assets/hero-final.jpg",
+  "./assets/hero-program.jpg",
+  "./assets/hero-today.jpg",
+  "./assets/hero-progress.jpg",
+  "./assets/hero-history.jpg",
   "./assets/card-g1.jpg",
   "./assets/card-g2.jpg",
   "./assets/card-g3.jpg",

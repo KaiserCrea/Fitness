@@ -5,7 +5,7 @@ const DATA = window.FITNESS_DATA || {sessions:{},paramType:{},ath:{}};
 const OCCURRENCE_SHEETS = window.FITNESS_OCCURRENCE_SHEETS || {};
 const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const KEY = "fitness-reconstruit-v2";
-const APP_REV = 5;
+const APP_REV = 7;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -158,6 +158,7 @@ function sheetFor(id,session,no){
   if(originalOccurrence)return pathUrl(sheetPathForOccurrence(originalOccurrence.s,originalOccurrence.n));
   const custom=state.customExercises?.[id]?.sheetPath;return custom?pathUrl(custom):"";
 }
+function thumbClass(img){return img?"fiche-thumb":"fallback-thumb";}
 function groupForId(id){
   const occ=Object.entries(OCCURRENCE_SHEETS).find(([k])=>{
     const [s,n]=k.split("|"); return DATA.sessions?.[s]?.[+n-1]?.id===id;
@@ -215,8 +216,16 @@ window.addEventListener("popstate",e=>{
 function nav(){
   $$(".bottom-nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
 }
+function headerAsset(title){
+  if(title==="Aujourd’hui")return "./assets/hero-today.jpg";
+  if(title==="Programme")return "./assets/hero-program.jpg";
+  if(title==="Progression")return "./assets/hero-progress.jpg";
+  if(title==="Historique")return "./assets/hero-history.jpg";
+  return "./assets/hero-program.jpg";
+}
 function header(title,subtitle="",extra="",cls=""){
-  return `<header class="header ${cls}">
+  const asset=headerAsset(title);
+  return `<header class="header ${cls}" style="--session-image:url('${asset}')">
     <div class="header__content">
       <div class="header__row">
         <div><h1>${esc(title)}</h1>${subtitle?`<div class="subtitle">${esc(subtitle)}</div>`:""}${extra}</div>
@@ -225,10 +234,10 @@ function header(title,subtitle="",extra="",cls=""){
     </div>
   </header>`;
 }
-function shell(content){app.innerHTML=`<main class="app"><section class="screen">${content}</section></main>`;nav();bindGlobalInView();}
+function shell(content,screenClass=""){app.innerHTML=`<main class="app"><section class="screen ${screenClass}">${content}</section></main>`;nav();bindGlobalInView();}
 function bindGlobalInView(){
-  $$("[data-cycle-menu]").forEach(b=>b.onclick=()=>openCycleModal());
-  $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.src="./assets/hero-final.jpg";});
+  $$('[data-cycle-menu]').forEach(b=>b.onclick=()=>openCycleModal());
+  $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program.jpg";});
 }
 function render(){
   ensureWeek();
@@ -302,7 +311,7 @@ function timeButton(value,id){return `<button class="time-edit" id="${id}">${esc
 function renderActiveToday(cur,date){
   if(cur.session.startsWith("ATHLÉTIQUE")){renderActiveAth(cur,date);return;}
   const ids=sessionIds(cur.session),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div><button class="header-cancel" id="cancel-session">${icon("x")} Annuler</button>`,"tall")}
     <div class="today-meta">
       <div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div>
       <div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div>
@@ -312,26 +321,35 @@ function renderActiveToday(cur,date){
       <div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div>
       <div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div>
       <div><div class="tiny serif gold" style="text-align:center;margin-bottom:3px">Bilan</div><div class="bilan"><div><b>${success}</b><span>Réussis</span></div><div><b>${fail}</b><span>Échoués</span></div><div><b>${skip}</b><span>Non réalisés</span></div></div></div></div>
-      <div class="manual-hint">Les heures de début et de fin sont saisies manuellement.</div>
-      <button class="btn gold block" id="save-session">${icon("save")} Enregistrer la séance</button>
-    </div>`);
+      <button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button>
+    </div>`,"today-screen");
   $$('[data-status]').forEach(b=>b.onclick=()=>setExerciseStatus(b.dataset.id,b.dataset.status,+b.dataset.no));
   $$('[data-sheet]').forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet,b.dataset.session,+b.dataset.no));
   $("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");
-  $("#save-session").onclick=saveCurrentSession;
+  $("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
 function todayExerciseCard(id,session,no,cur){
   const e=exercise(id),st=occurrenceStatus(cur,id,no),img=sheetFor(id,session,no),ref=occurrenceValue(cur,id,no);
   const firstPendingNo=sessionIds(session).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
   return `<div class="exercise-card ${firstPendingNo===no?"current":""}">
     <div class="num">${String(no).padStart(2,"0")}</div>
-    <div class="thumb"><img data-fallback src="${img||"./assets/hero-back.jpg"}" alt=""></div>
+    <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""></div>
     <div class="ex-info"><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div></div>
     <button class="backlink chev" data-sheet="${esc(id)}" data-session="${esc(session)}" data-no="${no}" aria-label="Voir la fiche">${icon("chevron")}</button>
     <div class="status-actions">
       ${[["Réussi","check"],["Échoué","x"],["Non réalisé","ban"]].map(([x,ic])=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}">${icon(ic)} ${x}</button>`).join("")}
     </div>
   </div>`;
+}
+function sessionHasDraftData(cur){
+  if(!cur)return false;
+  return !!(cur.start||cur.end||Object.keys(cur.status||{}).length||Object.keys(cur.nextRefs||{}).length);
+}
+function cancelCurrentSession(){
+  const cur=state.today;if(!cur)return;
+  const finish=()=>{state.today=null;save();tab="program";view={type:"root"};programMode="sessions";overlayRoot.innerHTML="";history.replaceState(navState(),"");render();};
+  if(!sessionHasDraftData(cur)){finish();return;}
+  openModal(`<h3>Annuler la séance ?</h3><p>Les informations saisies pour cette séance seront supprimées. Le cycle, l’historique et les statistiques ne seront pas modifiés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Continuer la séance</button><button class="btn gold" id="confirm-cancel-session">Annuler la séance</button></div>`,()=>{$("#confirm-cancel-session").onclick=finish;});
 }
 function setExerciseStatus(id,status,no){
   const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};
@@ -405,12 +423,12 @@ function commitCurrentSession(){
 }
 function renderActiveAth(cur,date){
   const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div><button class="header-cancel" id="cancel-session">${icon("x")} Annuler</button>`,"tall")}
     <div class="today-meta"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div><div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div></div>
-    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-back.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
+    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
     <div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
-    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><div class="manual-hint">Horaires saisis manuellement.</div><button class="btn gold block" id="save-session">${icon("save")} Enregistrer la séance</button></div>`);
-  $("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;
+    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div>`,"today-screen");
+  $("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
 function athStepSummary(session,index,step){
   const values=state.athParams?.[session]?.[index]||{};
@@ -434,12 +452,12 @@ function openAthSheet(session){
 function renderProgram(){
   shell(`${header("Programme","Organisation de vos séances","","compact")}
     <div class="tabs program-tabs">${["sessions","exercises","groups","manage"].map((m,i)=>`<button data-pmode="${m}" class="${programMode===m?"on":""}">${["Séances","Exercices","Groupes","Gestion"][i]}</button>`).join("")}</div>
-    ${programMode==="sessions"?programSessions():programMode==="exercises"?programExercises():programMode==="groups"?programGroups():programManage()}`);
-  $$("[data-pmode]").forEach(b=>b.onclick=()=>{programMode=b.dataset.pmode;history.replaceState(navState(),"");render();});
+    ${programMode==="sessions"?programSessions():programMode==="exercises"?programExercises():programMode==="groups"?programGroups():programManage()}`,programMode==="sessions"?"program-home-screen":"program-scroll-screen");
+  $$('[data-pmode]').forEach(b=>b.onclick=()=>{programMode=b.dataset.pmode;history.replaceState(navState(),"");render();});
   bindProgramContent();
 }
 function programSessions(){
-  return `<div class="row-between"><h2 class="section-title">Cycle principal G ${icon("rotate")}</h2><span class="tiny muted">Ordre du cycle : A → B → C</span></div>
+  return `<div class="program-home"><div class="row-between"><h2 class="section-title">Cycle principal G ${icon("rotate")}</h2><span class="tiny muted">Ordre du cycle : A → B → C</span></div>
     <div class="program-grid">${[1,2,3].map(n=>programGCard(n)).join("")}</div>
     <h2 class="section-title">Séances complémentaires</h2>
     <div class="complement-grid">${programCompCard("ATHLÉTIQUE",["A","B"],state.nextAth)}${programCompCard("FULL MIX",["1","2","3","4"],String(state.nextFm))}</div>
@@ -450,17 +468,18 @@ function programSessions(){
       <button class="tool" data-tool="manage"><span class="ico">${icon("settings")}</span>Paramètres<br><span class="muted">Réglages généraux</span></button>
       <button class="tool" data-tool="progress"><span class="ico">${icon("chart")}</span>Statistiques<br><span class="muted">Suivi et progression</span></button>
     </div>
-    <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div>`;
+    <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
 }
 function programGCard(n){
   const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=`./assets/card-g${n}.jpg`;
-  return `<div class="program-card" data-session-card="${s}" style="--card-image:url('${asset}')"><span class="code">G${n}</span><span class="groups">${groups}</span>
-    <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="${c===state.cycle?"on":""}">${c}</button>`).join("")}</span></div>`;
+  const positionMap={1:'65% center',2:'72% center',3:'78% 20%'};return `<div class="program-card" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
+    <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
 function programCompCard(title,variants,next){
   const asset=title==="ATHLÉTIQUE"?"./assets/card-ath.jpg":"./assets/card-fm.jpg";
-  return `<div class="program-card comp-card" style="--card-image:url('${asset}')"><span class="code">${esc(title)}</span><span class="groups">${title==="ATHLÉTIQUE"?"Cardio / Endurance<br>Condition physique":"Séances complètes<br>Ciblées"}</span>
-    <span class="variant-row fm-row">${variants.map(v=>`<button data-open-comp="${title==="ATHLÉTIQUE"?`ATHLÉTIQUE ${v}`:`FULL MIX ${v}`}" class="${v===next?"on":""}">${v}</button>`).join("")}</span></div>`;
+  const pos=title==="ATHLÉTIQUE"?'68% center':'76% 18%';
+  return `<div class="program-card comp-card" style="--card-image:url('${asset}');--card-position:${pos}"><span class="code">${esc(title)}</span><span class="groups">${title==="ATHLÉTIQUE"?"Cardio / Endurance<br>Condition physique":"Séances complètes<br>Ciblées"}</span>
+    <span class="variant-row fm-row">${variants.map(v=>`<button data-open-comp="${title==="ATHLÉTIQUE"?`ATHLÉTIQUE ${v}`:`FULL MIX ${v}`}" class="">${v}</button>`).join("")}</span></div>`;
 }
 function programExercises(){
   const groups=["Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos","Cardio / ATH","Autre"],reg=registry();
@@ -474,7 +493,7 @@ function programExercises(){
       const gids=ids.filter(id=>groupForId(id)===g).sort((a,b)=>reg[a].name.localeCompare(reg[b].name,"fr"));if(!gids.length)return"";
       return `<section class="library-section"><div class="library-section-title">${esc(g)} <span>${gids.length} exercice${gids.length>1?"s":""}</span></div><div class="panel">${gids.map(id=>{
         const o=occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo},img=sheetFor(id,o.s,o.n),count=occurrenceList(id).length;
-        return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img data-fallback src="${img||"./assets/hero-back.jpg"}"></div><div><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(g)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
+        return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program.jpg"}"></div><div><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(g)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
       }).join("")}</div></section>`;
     }).join("")}`;
 }
@@ -492,9 +511,26 @@ function programManage(){
     </div>
     <h2 class="section-title">Exercices archivés</h2><div class="card">${state.archivedExercises.length?state.archivedExercises.map(id=>`<div class="history-row"><b>${esc(exercise(id).name)}</b><button class="backlink" data-unarchive="${esc(id)}" style="float:right">Restaurer</button></div>`).join(""):`<div class="empty">Aucun exercice archivé.</div>`}</div>`;
 }
+function activateProgramVariant(btn){
+  const session=btn?.dataset?.openG||btn?.dataset?.openComp;if(session)pushNav({type:"programDetail",session});
+}
+function bindVariantScrub(){
+  $$(".variant-row").forEach(row=>{
+    const buttons=$$("button[data-open-g],button[data-open-comp]",row);if(!buttons.length)return;
+    let active=false,hovered=null,pointerId=null;
+    const clear=()=>{buttons.forEach(b=>b.classList.remove("preview"));hovered=null;};
+    const update=(x,y)=>{clear();const el=document.elementFromPoint(x,y)?.closest("button[data-open-g],button[data-open-comp]");if(el&&row.contains(el)){hovered=el;el.classList.add("preview");}};
+    row.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse"&&e.button!==0)return;active=true;pointerId=e.pointerId;row.setPointerCapture?.(pointerId);update(e.clientX,e.clientY);e.preventDefault();e.stopPropagation();});
+    row.addEventListener("pointermove",e=>{if(active&&e.pointerId===pointerId){update(e.clientX,e.clientY);e.preventDefault();}});
+    row.addEventListener("pointerup",e=>{if(!active||e.pointerId!==pointerId)return;update(e.clientX,e.clientY);const target=hovered;active=false;row.releasePointerCapture?.(pointerId);pointerId=null;clear();e.preventDefault();e.stopPropagation();if(target)activateProgramVariant(target);});
+    row.addEventListener("pointercancel",()=>{active=false;pointerId=null;clear();});
+    buttons.forEach(b=>b.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activateProgramVariant(b);}}));
+    row.addEventListener("click",e=>{if(e.target.closest("button[data-open-g],button[data-open-comp]")){e.preventDefault();e.stopPropagation();}},true);
+  });
+}
 function bindProgramContent(){
-  $$('[data-open-g],[data-open-comp]').forEach(b=>b.onclick=e=>{e.stopPropagation();pushNav({type:"programDetail",session:b.dataset.openG||b.dataset.openComp});});
-  $$('[data-session-card]').forEach(b=>b.onclick=()=>pushNav({type:"programDetail",session:b.dataset.sessionCard}));
+  bindVariantScrub();
+  $$('[data-session-card]').forEach(b=>b.onclick=e=>{if(e.target.closest('.variant-row'))return;pushNav({type:"programDetail",session:b.dataset.sessionCard});});
   $$('[data-open-ex]').forEach(b=>b.onclick=()=>openSheet(b.dataset.openEx,b.dataset.s,+b.dataset.n));
   $$('[data-lib-group]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.libGroup;history.replaceState(navState(),"");render();});
   $$('[data-group-open]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.groupOpen;programMode="exercises";history.replaceState(navState(),"");render();});
@@ -527,7 +563,7 @@ function renderProgramDetail(session){
 function sessionRow(id,session,no){
   const e=exercise(id),img=sheetFor(id,session,no);
   return `<div class="session-row" data-session-row data-id="${esc(id)}" data-no="${no}">
-    <div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img data-fallback src="${img||"./assets/hero-back.jpg"}"></div>
+    <div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program.jpg"}"></div>
     <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div></div>`;
 }
 function enableSort(list,session){
@@ -570,7 +606,7 @@ function openExerciseActionModal(session,id){
 function renderAthProgram(session){
   const img=pathUrl(ATH_SHEETS[session]||"");
   shell(`<header class="session-header" style="--session-image:url('./assets/card-ath.jpg')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
-    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-final.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
+    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-program.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
     <div class="card">${(DATA.ath?.[session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(session,i,x))}</div></div>`).join("")}</div>`);
   $("#back-program").onclick=()=>history.back();
   $("#open-ath-sheet").onclick=()=>openAthSheet(session);
@@ -601,7 +637,7 @@ function renderProgress(){
     <div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <div class="metrics"><div class="metric"><b>${active.length}</b><span>Exercices suivis</span></div><div class="metric"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></div><div class="metric"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></div></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
-    <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`);
+    <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`,"progress-screen");
   $$("[data-prog-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.progPeriod;history.replaceState(navState(),"");render();});
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
@@ -612,7 +648,7 @@ function averageIncrease(perf,ids){
 }
 function progressRow(id,no,arr){
   const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=sheetFor(id,o.s,o.n),trend=trendFor(id,arr),last=arr.at(-1);
-  return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img data-fallback src="${img||"./assets/hero-final.jpg"}"></div>
+  return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
     <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">Dernière séance ${formatDate(last.date)}</div>`:""}</div>
     <div class="trend ${trend.key==="slow"?"slow":trend.key==="flat"?"flat":trend.key==="down"?"down":""}">${trend.key==="up"?"↗ ":trend.key==="down"?"↘ ":trend.key==="flat"?"→ ":""}${trend.label}</div><div class="chev">›</div></div>`;
 }
@@ -620,12 +656,12 @@ function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
   const filtered=filterPerf(arr,progressionPeriod);const nums=filtered.map(x=>({x:x.date,y:parseNumber(x.value),raw:x})).filter(x=>Number.isFinite(x.y));
   const first=nums[0]?.y,last=nums.at(-1)?.y,delta=(Number.isFinite(first)&&Number.isFinite(last))?last-first:null,pct=(delta!=null&&first)?Math.round(delta/first*100):null,trend=trendFor(id,filtered);
-  const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-back.jpg";
-  shell(`<div class="detail-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
+  const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
+  shell(`<div class="detail-hero detail-sheet-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${sub==="evolution"?progressEvolutionContent(nums,delta,pct,trend):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
-    <div class="card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div>`);
+    <div class="card progress-settings-card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div>`,"progress-detail-screen");
   $("#back-progress").onclick=()=>history.back();
   $$("[data-detail-tab]").forEach(b=>b.onclick=()=>{view={type:"progressDetail",id,sub:b.dataset.detailTab};history.replaceState(navState(),"");render();});
   $$("[data-detail-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.detailPeriod;history.replaceState(navState(),"");render();});
@@ -674,7 +710,7 @@ function renderHistory(){
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Math.max(0,Object.values(weekDur).filter(v=>v>=300).length)}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
     <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row"><button class="on">Durée</button><button>Nombre de séances</button><button>Moyenne</button></div>${monthBars(hs)}</div>
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Répartition par groupe musculaire</div>${muscleDonut(hs)}<button class="btn block" id="month-detail">▣ Voir le détail par mois ›</button></div>`);
+    <div class="card"><div class="section-title" style="margin:0 0 4px">Répartition par groupe musculaire</div>${muscleDonut(hs)}<button class="btn block" id="month-detail">▣ Voir le détail par mois ›</button></div>`,"history-screen");
   $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;history.replaceState(navState(),"");render();});
   $("#prev-year").onclick=()=>{historyYear--;history.replaceState(navState(),"");render();};$("#next-year").onclick=()=>{historyYear++;history.replaceState(navState(),"");render();};
   $("#month-detail").onclick=()=>{const month=historyYear===new Date().getFullYear()?new Date().getMonth()+1:12;pushNav({type:"historyMonth",year:historyYear,month});};
@@ -732,11 +768,10 @@ function openSheet(id,session,no){
   const e=exercise(id),occ=occurrenceList(id),img=sheetFor(id,session,no),p=defaultParams(id);
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <div class="sheet-top"><div><div class="tiny gold">FICHE TECHNIQUE</div><b>${esc(e.name)}</b></div><button class="btn" data-close-sheet>Fermer</button></div>
-    <div class="sheet-canvas">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}
-      <div class="sheet-context"><div><label>Séance</label><select id="sheet-session">${(occ.length?occ:[{s:session,n:no}]).map(o=>`<option value="${esc(o.s)}" ${o.s===session?"selected":""}>${esc(niceSession(o.s))}</option>`).join("")}</select></div>
+    <div class="sheet-context"><div><label>Séance</label><select id="sheet-session">${(occ.length?occ:[{s:session,n:no}]).map(o=>`<option value="${esc(o.s)}" ${o.s===session?"selected":""}>${esc(niceSession(o.s))}</option>`).join("")}</select></div>
       <div><label>Exercice</label><input id="sheet-no" readonly value="${no||occ[0]?.n||1}"></div></div>
-    </div>
-    <div class="sheet-params"><h3>Paramètres de l’exercice</h3><div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:7px">Enregistrer</button></div>
+    <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
+    <div class="sheet-params"><h3>Paramètres de l’exercice</h3><div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
@@ -769,7 +804,7 @@ function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");r
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
 function round1(v){return Math.round(v*10)/10;}
 
-function backupJSON(){download("fitness-sauvegarde-v4.json",JSON.stringify(state,null,2),"application/json");}
+function backupJSON(){download("fitness-sauvegarde-v7.json",JSON.stringify(state,null,2),"application/json");}
 function exportCSV(){
   const rows=[["date","séance","début","fin","durée_min","exercice","valeur","statut","prochaine"]];
   (state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>rows.push([h.date,h.session,h.start,h.end,h.duration,e.name,e.actual,e.status,e.next])));
