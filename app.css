@@ -407,3 +407,181 @@ body{padding-bottom:0;background:#030303}
   .program-card .groups{bottom:41px;font-size:9.5px}
   .program-card .code{font-size:25px}
 }
+
+/* =====================================================================
+   V9 FINAL — alignement sur les deux maquettes visuelles validées
+   Aujourd'hui + Programme, correction miniatures et navigation persistante
+   ===================================================================== */
+:root{
+  --gold:#f4ce6b;
+  --gold-hi:#ffe6a1;
+  --gold-soft:#dfb356;
+  --gold-deep:#876627;
+}
+
+/* Le Programme/Séances est un véritable écran fixe : aucun vide scrollable. */
+body.lock-program-home{
+  overflow:hidden!important;
+  overscroll-behavior-y:none!important;
+}
+.app.app-program-home{
+  height:calc(100dvh - var(--nav-h) - var(--safe-bottom));
+  min-height:0!important;
+  overflow:hidden!important;
+  padding-bottom:0!important;
+}
+.app.app-program-home .program-home-screen{
+  height:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+  padding-bottom:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+}
+.program-home-screen>.header.compact{flex:0 0 150px;height:150px;margin-bottom:6px}
+.program-home-screen>.program-tabs{flex:0 0 50px;margin:5px 0 7px}
+.program-home-screen>.program-home{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  gap:3px;
+}
+.program-home .row-between{flex:0 0 auto}
+.program-home .program-grid,.program-home .complement-grid,.program-home .tools,.program-home .cycle-info{flex:0 0 auto}
+.program-home .section-title{flex:0 0 auto;margin:5px 3px 4px}
+
+/* Héros : mêmes proportions que les maquettes, avec davantage de corps visible. */
+.header::before,.session-header::before{
+  background-image:
+    linear-gradient(90deg,#030303f4 0%,#050505d9 27%,#0505056b 50%,transparent 75%),
+    linear-gradient(0deg,#050505ee 0%,transparent 54%),
+    var(--session-image,url('./assets/hero-program.jpg'));
+  background-size:100% 100%,100% 100%,auto 108%;
+  background-position:0 0,0 0,right 42%;
+  background-repeat:no-repeat;
+  filter:saturate(1.06) contrast(1.035) brightness(1.16);
+}
+.header::after,.session-header::after{
+  background:radial-gradient(circle at 74% 42%,#ffd66a55 0%,#e9ae3929 28%,transparent 48%);
+}
+.header.tall::before{background-size:100% 100%,100% 100%,auto 102%;background-position:0 0,0 0,right 44%}
+.header.compact::before{background-size:100% 100%,100% 100%,auto 110%;background-position:0 0,0 0,right 43%}
+
+/* Programme : tailles, espacements et luminosité calés sur la maquette validée. */
+.program-grid{gap:9px}
+.program-card{
+  min-height:154px;
+  border-radius:13px;
+  padding:10px;
+  border-color:#a07934;
+  background:#0b0c0d;
+  box-shadow:0 8px 22px #0009,inset 0 0 16px #e5b84b10;
+}
+.program-card::before{
+  background-size:100% 100%,auto 100%;
+  background-position:center,right center;
+  background-repeat:no-repeat;
+  opacity:1;
+  filter:brightness(1.20) saturate(1.08) contrast(1.025);
+}
+.program-card::after{
+  background:linear-gradient(0deg,#070707f5 0%,#08080887 45%,transparent 74%),linear-gradient(90deg,#05050594 0%,transparent 68%);
+}
+.program-card .code{font-size:31px;color:var(--gold-hi);text-shadow:0 2px 8px #000}
+.program-card .groups{left:10px;bottom:50px;font-size:11.5px;line-height:1.24}
+.comp-card{min-height:145px}
+.comp-card .code{font-size:24px}
+.variant-row{bottom:9px;gap:7px}
+.variant-row button,.variant-chip{width:35px;height:35px;border-radius:9px;font-size:13px}
+.variant-row button.preview{border-color:#e8bd5d;box-shadow:0 0 0 1px #d4a747 inset,0 0 14px #e6b9502c;background:#393226;color:#fff2ca}
+.tools{gap:8px}
+.tool{min-height:80px;border-radius:11px;border-color:#4c402d;background:linear-gradient(145deg,#17191a,#0d0f10)}
+.cycle-info{min-height:86px;border-color:#6c5733;margin:5px 0 0}
+
+/* Miniatures : recadrage de la zone CONTRACTION, sans bande mouvement ni jambes isolées.
+   Toutes partagent le même cadre sombre/doré. */
+.thumb{
+  width:96px;
+  height:78px;
+  border-radius:11px;
+  overflow:hidden;
+  border:1px solid #8d6d31;
+  background:
+    radial-gradient(circle at 50% 43%,#60451d 0%,#17191a 42%,#090a0b 78%),
+    #090a0b;
+  box-shadow:inset 0 0 20px #0008,0 0 0 1px #17130d,0 4px 12px #0008;
+}
+.thumb::after{
+  content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,#f5c86118,transparent 26%,transparent 72%,#0008),radial-gradient(circle at 52% 44%,transparent 52%,#0505056f 100%);
+}
+.thumb img.fiche-thumb{
+  position:absolute!important;
+  z-index:1!important;
+  width:300%!important;
+  max-width:none!important;
+  height:auto!important;
+  left:-200%!important;
+  top:-39%!important;
+  transform:none!important;
+  object-fit:initial!important;
+  object-position:initial!important;
+  filter:contrast(1.055) brightness(1.10) saturate(1.02)!important;
+}
+.thumb img.fallback-thumb{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  object-fit:cover!important;object-position:center!important;transform:none!important;
+  filter:brightness(1.12) saturate(1.06)!important;
+}
+.exercise-card{grid-template-columns:34px 96px minmax(0,1fr) 26px;column-gap:10px;min-height:126px}
+.progress-row{grid-template-columns:32px 92px minmax(0,1fr) 92px 20px;min-height:100px}
+.progress-row .thumb{width:92px;height:70px}
+.library-row .thumb{width:82px;height:64px}
+.session-row .thumb{width:84px;height:66px}
+
+/* Numéros encore plus discrets et premium. */
+.num{
+  width:30px!important;height:30px!important;font-size:11px!important;font-weight:650!important;
+  border:1px solid #8d6b2e!important;
+  background:radial-gradient(circle at 36% 30%,#594522,#211d16 74%)!important;
+  color:#f5e7c7!important;
+  box-shadow:inset 0 0 9px #0008,0 2px 8px #0007!important;
+}
+.exercise-card .num,.progress-row .num,.session-row .num{align-self:center;justify-self:center}
+
+/* Fiche technique : ne garder que la zone technique utile + paramètres dynamiques. */
+.sheet-canvas.fiche-visual{aspect-ratio:691/750;overflow:hidden}
+.sheet-canvas.fiche-visual>img{width:100%;height:auto;max-width:none;transform:translateY(-6.1%);transform-origin:top center}
+.sheet-params{margin:0 2.5% 14px;border-radius:0 0 13px 13px}
+
+/* Le reste des écrans n'hérite jamais du verrouillage Programme. */
+.program-scroll-screen,.progress-detail-screen{overflow:visible}
+
+/* Responsive : préserver les proportions plutôt que rétrécir excessivement les cartes. */
+@media(max-width:365px){
+  .program-home-screen>.header.compact{flex-basis:132px;height:132px}
+  .program-home-screen>.program-tabs{flex-basis:44px;min-height:44px}
+  .program-card{min-height:136px}.comp-card{min-height:126px}
+  .program-card .code{font-size:26px}.program-card .groups{bottom:43px;font-size:9.5px}
+  .variant-row button,.variant-chip{width:30px;height:30px;font-size:11px}
+  .tool{min-height:68px}.cycle-info{min-height:74px}
+  .exercise-card{grid-template-columns:30px 80px minmax(0,1fr) 22px;min-height:116px;column-gap:7px}
+  .thumb{width:80px;height:68px}
+  .progress-row{grid-template-columns:30px 70px minmax(0,1fr) 80px 16px;min-height:90px}
+  .progress-row .thumb{width:70px;height:58px}
+  .library-row .thumb{width:66px;height:54px}
+  .session-row .thumb{width:70px;height:56px}
+}
+@media(max-height:800px){
+  .program-home-screen>.header.compact{flex-basis:118px;height:118px}
+  .program-home-screen>.program-tabs{flex-basis:42px;min-height:42px;margin:4px 0 5px}
+  .program-home .section-title{font-size:17px;margin:3px 2px 2px}
+  .program-card{min-height:124px}.comp-card{min-height:112px}
+  .program-card .code{font-size:25px}.program-card .groups{bottom:40px;font-size:9px}
+  .variant-row{bottom:6px}.variant-row button,.variant-chip{width:29px;height:29px;font-size:10px}
+  .tool{min-height:61px;padding:5px 3px}.tool .ico{font-size:20px;margin-bottom:3px}
+  .cycle-info{min-height:68px;padding:6px;margin-top:3px}
+}

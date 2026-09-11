@@ -5,7 +5,7 @@ const DATA = window.FITNESS_DATA || {sessions:{},paramType:{},ath:{}};
 const OCCURRENCE_SHEETS = window.FITNESS_OCCURRENCE_SHEETS || {};
 const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const KEY = "fitness-reconstruit-v2";
-const APP_REV = 8;
+const APP_REV = 9;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -40,18 +40,30 @@ function icon(name){
 }
 const app=$("#app"), overlayRoot=$("#overlay-root");
 
-let tab="today";
+const UI_KEY="fitness-ui-v9";
+const SCROLL_KEY="fitness-tab-scroll-v9";
+let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
+let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
+let tab=tabs.includes(savedUI?.tab)?savedUI.tab:"today";
 let view={type:"root"};
-let programMode="sessions";
-let programExerciseGroup="Tous";
-let progressionPeriod="all";
-let progressionGroup="Tous";
-let historyPeriod="year";
-let historyYear=new Date().getFullYear();
-const tabScroll={today:0,program:0,progress:0,history:0};
+let programMode=["sessions","exercises","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:"sessions";
+let programExerciseGroup=savedUI?.programExerciseGroup||"Tous";
+let progressionPeriod=savedUI?.progressionPeriod||"all";
+let progressionGroup=savedUI?.progressionGroup||"Tous";
+let historyPeriod=savedUI?.historyPeriod||"year";
+let historyYear=Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
+const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
 let navTransitionClass="";
-function rememberTabScroll(){if(view?.type==="root"&&tabs.includes(tab))tabScroll[tab]=window.scrollY||0;}
+function rememberTabScroll(){
+  if(view?.type==="root"&&tabs.includes(tab)){
+    tabScroll[tab]=window.scrollY||0;
+    try{sessionStorage.setItem(SCROLL_KEY,JSON.stringify(tabScroll));}catch{}
+  }
+}
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
+function persistUI(){
+  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,historyPeriod,historyYear}));}catch{}
+}
 
 function localISODate(d=new Date()){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
@@ -202,9 +214,10 @@ function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
 function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,historyPeriod,historyYear};}
 function applyNavState(st){
-  if(!st)return; tab=st.tab||"today"; view=st.view||{type:"root"}; programMode=st.programMode||programMode; programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
+  if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=st.programMode||programMode; programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
   progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;
+  persistUI();
 }
 function pushNav(v=null,newTab=null){
   if(newTab){
@@ -213,10 +226,12 @@ function pushNav(v=null,newTab=null){
     navTransitionClass=to>from?"slide-from-right":"slide-from-left";
     tab=newTab;view={type:"root"};
   } else if(v){rememberTabScroll();view=v;}
+  persistUI();
   history.pushState(navState(),""); render();
   if(newTab){restoreTabScroll(newTab);setTimeout(()=>{navTransitionClass="";},220);}
 }
 history.replaceState(navState(),"");
+persistUI();
 window.addEventListener("popstate",e=>{
   const activeOverlay=overlayRoot.firstElementChild;
   if(activeOverlay){overlayRoot.innerHTML=""; return;}
@@ -249,7 +264,11 @@ function header(title,subtitle="",extra="",cls=""){
     </div>
   </header>`;
 }
-function shell(content,screenClass=""){app.innerHTML=`<main class="app"><section class="screen ${screenClass} ${navTransitionClass}">${content}</section></main>`;nav();bindGlobalInView();}
+function shell(content,screenClass=""){
+  document.body.classList.toggle("lock-program-home",screenClass==="program-home-screen");
+  app.innerHTML=`<main class="app ${screenClass==="program-home-screen"?"app-program-home":""}"><section class="screen ${screenClass} ${navTransitionClass}">${content}</section></main>`;
+  nav();bindGlobalInView();
+}
 function bindGlobalInView(){
   $$('[data-cycle-menu]').forEach(b=>b.onclick=()=>openCycleModal());
   $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program.jpg";});
@@ -267,6 +286,7 @@ function render(){
   else renderHistory();
 }
 function renderInstall(){
+  document.body.classList.remove("lock-program-home");
   nav();
   app.innerHTML="";
   if($("#install-screen"))return;
@@ -370,7 +390,16 @@ function sessionHasDraftData(cur){
 }
 function cancelCurrentSession(){
   const cur=state.today;if(!cur)return;
-  const finish=()=>{state.todayDismissed={date:localISODate(),session:cur.session};state.today=null;save();rememberTabScroll();tab="program";view={type:"root"};programMode="sessions";overlayRoot.innerHTML="";history.replaceState(navState(),"");render();restoreTabScroll("program");};
+  const finish=()=>{
+    state.todayDismissed={date:localISODate(),session:cur.session};
+    state.today=null;
+    save();
+    rememberTabScroll();
+    tab="today";view={type:"root"};overlayRoot.innerHTML="";
+    tabScroll.today=0;persistUI();
+    history.replaceState(navState(),"");
+    render();restoreTabScroll("today");
+  };
   if(!sessionHasDraftData(cur)){finish();return;}
   openModal(`<h3>Annuler la séance ?</h3><p>Les informations saisies pour cette séance seront supprimées. Le cycle, l’historique et les statistiques ne seront pas modifiés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Continuer la séance</button><button class="btn gold" id="confirm-cancel-session">Annuler la séance</button></div>`,()=>{$("#confirm-cancel-session").onclick=finish;});
 }
@@ -476,7 +505,7 @@ function renderProgram(){
   shell(`${header("Programme","Organisation de vos séances","","compact")}
     <div class="tabs program-tabs">${["sessions","exercises","groups","manage"].map((m,i)=>`<button data-pmode="${m}" class="${programMode===m?"on":""}">${["Séances","Exercices","Groupes","Gestion"][i]}</button>`).join("")}</div>
     ${programMode==="sessions"?programSessions():programMode==="exercises"?programExercises():programMode==="groups"?programGroups():programManage()}`,programMode==="sessions"?"program-home-screen":"program-scroll-screen");
-  $$('[data-pmode]').forEach(b=>b.onclick=()=>{programMode=b.dataset.pmode;history.replaceState(navState(),"");render();});
+  $$('[data-pmode]').forEach(b=>b.onclick=()=>{programMode=b.dataset.pmode;persistUI();history.replaceState(navState(),"");render();});
   bindProgramContent();
 }
 function programSessions(){
@@ -555,11 +584,11 @@ function bindProgramContent(){
   bindVariantScrub();
   $$('[data-session-card]').forEach(b=>b.onclick=e=>{if(e.target.closest('.variant-row'))return;pushNav({type:"programDetail",session:b.dataset.sessionCard});});
   $$('[data-open-ex]').forEach(b=>b.onclick=()=>openSheet(b.dataset.openEx,b.dataset.s,+b.dataset.n));
-  $$('[data-lib-group]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.libGroup;history.replaceState(navState(),"");render();});
-  $$('[data-group-open]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.groupOpen;programMode="exercises";history.replaceState(navState(),"");render();});
+  $$('[data-lib-group]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.libGroup;persistUI();history.replaceState(navState(),"");render();});
+  $$('[data-group-open]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.groupOpen;programMode="exercises";persistUI();history.replaceState(navState(),"");render();});
   $$('[data-tool]').forEach(b=>b.onclick=()=>{
     const t=b.dataset.tool;if(t==="progress"){pushNav(null,"progress");return;}
-    programMode=t==="manage"?"manage":"exercises";if(programMode==="exercises")programExerciseGroup="Tous";history.replaceState(navState(),"");render();
+    programMode=t==="manage"?"manage":"exercises";if(programMode==="exercises")programExerciseGroup="Tous";persistUI();history.replaceState(navState(),"");render();
   });
   if($("#cycle-position"))$("#cycle-position").onclick=openCycleModal;
   if($("#backup"))$("#backup").onclick=backupJSON;
@@ -735,7 +764,7 @@ function renderHistory(){
     <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row"><button class="on">Durée</button><button>Nombre de séances</button><button>Moyenne</button></div>${monthBars(hs)}</div>
     <div class="card"><div class="section-title" style="margin:0 0 4px">Répartition par groupe musculaire</div>${muscleDonut(hs)}<button class="btn block" id="month-detail">▣ Voir le détail par mois ›</button></div>`,"history-screen");
   $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;history.replaceState(navState(),"");render();});
-  $("#prev-year").onclick=()=>{historyYear--;history.replaceState(navState(),"");render();};$("#next-year").onclick=()=>{historyYear++;history.replaceState(navState(),"");render();};
+  $("#prev-year").onclick=()=>{historyYear--;persistUI();history.replaceState(navState(),"");render();};$("#next-year").onclick=()=>{historyYear++;persistUI();history.replaceState(navState(),"");render();};
   $("#month-detail").onclick=()=>{const month=historyYear===new Date().getFullYear()?new Date().getMonth()+1:12;pushNav({type:"historyMonth",year:historyYear,month});};
 }
 function historyScope(period,year){
@@ -824,7 +853,7 @@ function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");r
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
 function round1(v){return Math.round(v*10)/10;}
 
-function backupJSON(){download("fitness-sauvegarde-v8.json",JSON.stringify(state,null,2),"application/json");}
+function backupJSON(){download("fitness-sauvegarde-v9.json",JSON.stringify(state,null,2),"application/json");}
 function exportCSV(){
   const rows=[["date","séance","début","fin","durée_min","exercice","valeur","statut","prochaine"]];
   (state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>rows.push([h.date,h.session,h.start,h.end,h.duration,e.name,e.actual,e.status,e.next])));
@@ -853,6 +882,9 @@ document.addEventListener("pointercancel",()=>{tabSwipe=null;},{passive:true});
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-tab]");if(!b)return;const next=b.dataset.tab;if(!tabs.includes(next)||next===tab&&view.type==="root")return;pushNav(null,next);
 });
+window.addEventListener("pagehide",()=>{rememberTabScroll();persistUI();});
+window.addEventListener("beforeunload",()=>{rememberTabScroll();persistUI();});
 render();
+if(view.type==="root")restoreTabScroll(tab);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
 })();
