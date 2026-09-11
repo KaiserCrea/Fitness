@@ -1,103 +1,78 @@
-FITNESS — VERSION ULTIME V7 FINAL
+FITNESS — VERSION ULTIME V8 FINAL
 Mise à jour : 11 septembre 2026
 
 IMPORTANT — DEPLOIEMENT GITHUB
 ==============================
-Le dossier fiches/ déjà présent sur GitHub contient la bibliothèque réelle des fiches techniques.
-IL NE DOIT PAS ETRE SUPPRIME, RECONSTRUIT OU REIMPORTE.
+Le dossier fiches/ déjà présent sur GitHub reste la bibliothèque source.
+NE PAS LE SUPPRIMER, NE PAS LE RECONSTRUIRE, NE PAS LE REIMPORTER.
 
-Pour installer cette version :
-1. Conserver impérativement le dossier fiches/ existant à la racine de KaiserCrea/Fitness.
+Installation :
+1. Conserver fiches/ à la racine de KaiserCrea/Fitness.
 2. Remplacer les autres fichiers racine par ceux de ce ZIP.
-3. Remplacer aussi le dossier assets/ par celui fourni dans ce ZIP.
-4. Attendre la fin du déploiement GitHub Pages.
-5. Relancer la PWA Android. Le service worker V7 utilise un nouveau cache.
+3. Remplacer le dossier assets/ par celui fourni.
+4. Attendre le déploiement GitHub Pages.
+5. Relancer la PWA Android. Le service worker V8 utilise un nouveau cache.
 
-DESIGN FINAL
-============
-- Maquettes utilisées comme référence visuelle principale et non comme simple inspiration.
-- Palette : noir / anthracite / blanc / doré uniquement.
-- Doré éclairci et plus lumineux.
-- Aucun vert ni rouge pour Réussi / Échoué / progression / historique.
-- Aucun slogan décoratif ou motivationnel ajouté dans l'application.
-- Personnage visuel unifié : homme très musclé, cheveux brun clair plus longs plaqués vers l'arrière, barbe soignée légèrement plus longue, débardeur noir sans inscription.
-- Aura dorée douce autour de toutes les représentations de personnages.
-- Personnage davantage visible dans les cadrages ; vues variées selon l'écran (face/3-4, dos, profil, athlétique).
-- Nouveaux visuels dédiés Aujourd'hui / Programme / Progression / Historique et G1 / G2 / G3 / ATH / Full Mix.
-- Rectangles, cartes, champs, boutons, modales et listes agrandis globalement pour une meilleure lisibilité.
-- Recadrage et équilibre de l'interface revus globalement.
-- Suppression des espaces morts et des scrolls artificiels, notamment sur Programme > Séances.
+REFERENCES VISUELLES VALIDÉES
+============================
+- Les deux maquettes validées « Aujourd’hui » et « Programme » sont les références officielles.
+- Palette noir / anthracite / blanc / doré clair.
+- Personnage de référence : homme très musclé, cheveux brun clair assez longs plaqués vers l’arrière, barbe soignée légèrement plus longue, débardeur noir col V sans inscription, aura dorée.
+- Aujourd’hui : fond plus lumineux, personnage moins zoomé, davantage de haut du corps visible.
+- Programme : même personnage, davantage vu de dos / trois-quarts dos, cartes plus lumineuses et mieux cadrées.
+- Cartes et rectangles agrandis globalement quand nécessaire.
+- Numéros 01/02/03… réduits et repositionnés pour un rendu plus premium.
 
 AUJOURD'HUI
 ============
 - Aucun chronomètre automatique.
-- Heure de début saisie manuellement.
-- Heure de fin saisie manuellement.
-- Durée calculée uniquement à partir des deux horaires saisis.
-- Cartes d'exercices agrandies afin de retrouver la densité des maquettes.
-- Réussi : demande la prochaine charge/référence.
-- Échoué : conserve la référence actuelle.
-- Non réalisé : ne crée aucune performance.
-- Bouton Annuler la séance accessible dans l'en-tête.
-- Une séance annulée ne modifie ni le cycle, ni l'historique, ni les statistiques.
-- Confirmation d'annulation lorsque des informations ont déjà été saisies.
+- Heure de début et heure de fin saisies manuellement.
+- Durée calculée à partir des horaires saisis.
+- Annuler la séance supprime réellement la séance provisoire du jour.
+- Une annulation ne modifie ni cycle, ni historique, ni progression.
+- Après annulation, la même séance reste la prochaine séance prévue et peut être rouverte.
 
 PROGRAMME
 =========
 - Onglets : Séances / Exercices / Groupes / Gestion.
-- Exercices classés par groupes musculaires dans la bibliothèque.
-- Aucun A/B/C, ATH A/B ou FM1/2/3/4 n'est mis en surbrillance automatiquement dans Programme.
-- Interaction tactile des variantes : appui maintenu + glissement = surbrillance temporaire ; sélection uniquement au relâchement sur un bouton.
-- Un relâchement hors d'un bouton n'effectue aucune sélection.
-- Appui simple sur une variante = ouverture de cette séance.
-- Réorganisation des exercices par glisser-déposer en mode Modifier.
-- Transfert, ajout, retrait et archivage sans perdre l'identité, les paramètres ou l'historique de l'exercice.
+- Bibliothèque classée par groupes musculaires.
+- Variantes A/B/C, ATH A/B, FM1-4 : aucune surbrillance automatique.
+- Appui maintenu + glissement = prévisualisation dorée temporaire ; sélection au relâchement seulement.
+- Cartes G1/G2/G3/ATH/FULL MIX agrandies et recadrées comme les maquettes.
+- Réorganisation, transfert, ajout, retrait et archivage conservent l’identité/historique de l’exercice.
 
-FICHES TECHNIQUES ET MINIATURES
-===============================
-- Les vraies fiches du dossier fiches/ restent la source unique.
-- Miniatures issues des vraies fiches avec recadrage prioritaire sur la position CONTRACTION.
-- Même logique de miniature dans Aujourd'hui, Programme, listes de séance et Progression.
-- Une même fiche reste attachée à l'identité de l'exercice, même après réorganisation ou transfert.
-- Le bandeau Séance / Exercice a été déplacé au-dessus de la fiche pour ne plus masquer son contenu.
-- Numéro d'exercice dynamique selon la séance sélectionnée.
-- La zone imprimée « Notes personnelles » est masquée dans l'affichage de l'application sans modifier les fichiers du dossier fiches/.
-- Paramètres de l'exercice intégrés immédiatement sous la fiche, dans la continuité visuelle de celle-ci.
+FICHES TECHNIQUES
+==================
+- Suppression du bloc de sélection Séance / Exercice ajouté au-dessus de la fiche.
+- Affichage de la fiche recadré pour retirer le bandeau G1A imprimé devenu inutile.
+- Affichage recadré pour retirer la bande fixe Charge / Séries / Répétitions / Repos et la zone Notes personnelles.
+- Les fichiers originaux dans fiches/ ne sont pas modifiés.
+- Les paramètres dynamiques de l’exercice restent sous la fiche.
 
-PROGRESSION / HISTORIQUE
-========================
-- Cartes et lignes agrandies.
-- Personnages et fonds mieux cadrés.
-- Graphiques et tendances dans la palette noir / blanc / doré.
-- Répartition musculaire convertie en nuances dorées / grises uniquement.
-- Sous-pages dimensionnées pour éviter les grands espaces vides artificiels.
+MINIATURES
+==========
+- Source unique : vraies fiches techniques.
+- Recadrage prioritaire sur la position CONTRACTION.
+- Cadrage plus bas pour garder tête + buste + mouvement sans coupes gênantes.
+- Traitement commun sombre/premium/doré sur toutes les miniatures.
+- Même miniature et même traitement pour un même exercice partout dans l’application.
 
-NAVIGATION ANDROID / PWA
-========================
-- 4 onglets principaux : Aujourd'hui / Programme / Progression / Historique.
-- Pile de navigation interne conservée pour le bouton Retour Android.
-- Une fiche revient à son écran parent ; un détail de séance revient à Programme ; l'application ne doit pas se fermer tant qu'un écran interne peut être quitté.
-- Rotations indépendantes ATH A/B et Full Mix 1/2/3/4.
-- Sauvegarde locale existante conservée via la même clé localStorage.
-- Sauvegarde JSON, restauration JSON et export CSV conservés.
+NAVIGATION
+==========
+- 4 onglets : Aujourd’hui / Programme / Progression / Historique.
+- Navigation par boutons du bas + swipe gauche/droite.
+- Le swipe est désactivé sur les composants qui ont leur propre geste horizontal.
+- Chaque onglet mémorise sa propre position de défilement.
+- Un nouvel onglet s’ouvre à sa propre position (0 lors de la première ouverture), pas à la hauteur de l’onglet précédent.
+- Retour Android conserve la pile de navigation interne.
 
-FICHIERS FOURNIS
-================
-README.txt
-app.css
-app.js
-data.js
-assets/
-icon-192.png
-icon-512.png
-index.html
-manifest.webmanifest
-sw.js
+MISE EN PAGE
+============
+- Suppression des espaces morts et scrolls artificiels.
+- Les pages courtes n’ajoutent pas de vide inutile.
+- Les modales sont plus grandes, plus hautes et mieux centrées.
+- Recadrage global de l’interface à chaque endroit où nécessaire.
 
-DOSSIER A CONSERVER SUR GITHUB
-==============================
-fiches/
-
-REMARQUE
-========
-Cette archive est volontairement ROOT ONLY : elle ne contient pas fiches/ afin d'empêcher son remplacement accidentel.
+ARCHIVE ROOT ONLY
+=================
+Cette archive ne contient volontairement aucun dossier fiches/.

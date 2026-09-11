@@ -5,7 +5,7 @@ const DATA = window.FITNESS_DATA || {sessions:{},paramType:{},ath:{}};
 const OCCURRENCE_SHEETS = window.FITNESS_OCCURRENCE_SHEETS || {};
 const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const KEY = "fitness-reconstruit-v2";
-const APP_REV = 7;
+const APP_REV = 8;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -48,6 +48,10 @@ let progressionPeriod="all";
 let progressionGroup="Tous";
 let historyPeriod="year";
 let historyYear=new Date().getFullYear();
+const tabScroll={today:0,program:0,progress:0,history:0};
+let navTransitionClass="";
+function rememberTabScroll(){if(view?.type==="root"&&tabs.includes(tab))tabScroll[tab]=window.scrollY||0;}
+function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 
 function localISODate(d=new Date()){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
@@ -66,7 +70,7 @@ function defaultState(){
     installed:false,cycle:"A",nextG:1,weekKey:currentWeekKey(),completedG:[],
     history:[],oldWeeks:[],refs:{},params:{},progressionSettings:{},
     sessionOrder:{},programOverrides:{},customExercises:{},archivedExercises:[],
-    today:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},appRev:APP_REV
+    today:null,todayDismissed:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},appRev:APP_REV
   };
 }
 function inferRotations(s){
@@ -203,14 +207,25 @@ function applyNavState(st){
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;
 }
 function pushNav(v=null,newTab=null){
-  if(newTab){tab=newTab;view={type:"root"};} else if(v)view=v;
+  if(newTab){
+    rememberTabScroll();
+    const from=tabs.indexOf(tab),to=tabs.indexOf(newTab);
+    navTransitionClass=to>from?"slide-from-right":"slide-from-left";
+    tab=newTab;view={type:"root"};
+  } else if(v){rememberTabScroll();view=v;}
   history.pushState(navState(),""); render();
+  if(newTab){restoreTabScroll(newTab);setTimeout(()=>{navTransitionClass="";},220);}
 }
 history.replaceState(navState(),"");
 window.addEventListener("popstate",e=>{
   const activeOverlay=overlayRoot.firstElementChild;
   if(activeOverlay){overlayRoot.innerHTML=""; return;}
-  applyNavState(e.state||{tab:"today",view:{type:"root"}}); render();
+  rememberTabScroll();
+  const prev=tab;applyNavState(e.state||{tab:"today",view:{type:"root"}});
+  if(tab!==prev){navTransitionClass=tabs.indexOf(tab)>tabs.indexOf(prev)?"slide-from-right":"slide-from-left";}
+  render();
+  if(view?.type==="root")restoreTabScroll(tab);
+  setTimeout(()=>{navTransitionClass="";},220);
 });
 
 function nav(){
@@ -234,7 +249,7 @@ function header(title,subtitle="",extra="",cls=""){
     </div>
   </header>`;
 }
-function shell(content,screenClass=""){app.innerHTML=`<main class="app"><section class="screen ${screenClass}">${content}</section></main>`;nav();bindGlobalInView();}
+function shell(content,screenClass=""){app.innerHTML=`<main class="app"><section class="screen ${screenClass} ${navTransitionClass}">${content}</section></main>`;nav();bindGlobalInView();}
 function bindGlobalInView(){
   $$('[data-cycle-menu]').forEach(b=>b.onclick=()=>openCycleModal());
   $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program.jpg";});
@@ -281,7 +296,14 @@ function renderToday(){
       $$('[data-start-session]').forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);render();});
       return;
     }
-    initToday(sessionCode());
+    const expected=sessionCode();
+    if(state.todayDismissed?.date===localISODate()&&state.todayDismissed?.session===expected){
+      shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(expected)}</div><div class="session-groups">${groupLabel(expected)}</div>`,"tall")}
+        <div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">Séance annulée</div><div class="small muted">${esc(niceSession(expected))} reste la prochaine séance prévue. Elle n’a créé aucune performance et le cycle n’a pas avancé.</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`);
+      $("#resume-session").onclick=()=>{initToday(expected);render();};
+      return;
+    }
+    initToday(expected);
     cur=state.today;
   }
   renderActiveToday(cur,date);
@@ -296,6 +318,7 @@ function complementChoiceCard(session,title,variant){
 function initToday(session){
   const snapshot={}; sessionIds(session).forEach((id,i)=>snapshot[occKey(id,i+1)]=referenceFor(id));
   state.today={session,start:"",end:"",manualTimes:true,status:{},values:snapshot,nextRefs:{}};
+  state.todayDismissed=null;
   save();
 }
 function minutesBetweenTimes(start,end){
@@ -347,7 +370,7 @@ function sessionHasDraftData(cur){
 }
 function cancelCurrentSession(){
   const cur=state.today;if(!cur)return;
-  const finish=()=>{state.today=null;save();tab="program";view={type:"root"};programMode="sessions";overlayRoot.innerHTML="";history.replaceState(navState(),"");render();};
+  const finish=()=>{state.todayDismissed={date:localISODate(),session:cur.session};state.today=null;save();rememberTabScroll();tab="program";view={type:"root"};programMode="sessions";overlayRoot.innerHTML="";history.replaceState(navState(),"");render();restoreTabScroll("program");};
   if(!sessionHasDraftData(cur)){finish();return;}
   openModal(`<h3>Annuler la séance ?</h3><p>Les informations saisies pour cette séance seront supprimées. Le cycle, l’historique et les statistiques ne seront pas modifiés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Continuer la séance</button><button class="btn gold" id="confirm-cancel-session">Annuler la séance</button></div>`,()=>{$("#confirm-cancel-session").onclick=finish;});
 }
@@ -419,7 +442,7 @@ function commitCurrentSession(){
   }else if(cur.session.startsWith("FULL MIX")){
     state.lastComplement[cur.session]=new Date().toLocaleDateString("fr-FR");const n=Number(cur.session.match(/\d+/)?.[0]||1);state.nextFm=(n%4)+1;
   }
-  state.today=null;save();render();
+  state.todayDismissed=null;state.today=null;save();render();
 }
 function renderActiveAth(cur,date){
   const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
@@ -765,17 +788,14 @@ function renderHistoryDetail(id){
 }
 
 function openSheet(id,session,no){
-  const e=exercise(id),occ=occurrenceList(id),img=sheetFor(id,session,no),p=defaultParams(id);
+  const e=exercise(id),img=sheetFor(id,session,no),p=defaultParams(id);
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <div class="sheet-top"><div><div class="tiny gold">FICHE TECHNIQUE</div><b>${esc(e.name)}</b></div><button class="btn" data-close-sheet>Fermer</button></div>
-    <div class="sheet-context"><div><label>Séance</label><select id="sheet-session">${(occ.length?occ:[{s:session,n:no}]).map(o=>`<option value="${esc(o.s)}" ${o.s===session?"selected":""}>${esc(niceSession(o.s))}</option>`).join("")}</select></div>
-      <div><label>Exercice</label><input id="sheet-no" readonly value="${no||occ[0]?.n||1}"></div></div>
     <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
     <div class="sheet-params"><h3>Paramètres de l’exercice</h3><div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
-  $("#sheet-session",overlay).onchange=()=>{const o=occ.find(x=>x.s===$("#sheet-session",overlay).value);if(o)$("#sheet-no",overlay).value=o.n;};
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=i.value);state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
 function paramInputs(p){
@@ -804,7 +824,7 @@ function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");r
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
 function round1(v){return Math.round(v*10)/10;}
 
-function backupJSON(){download("fitness-sauvegarde-v7.json",JSON.stringify(state,null,2),"application/json");}
+function backupJSON(){download("fitness-sauvegarde-v8.json",JSON.stringify(state,null,2),"application/json");}
 function exportCSV(){
   const rows=[["date","séance","début","fin","durée_min","exercice","valeur","statut","prochaine"]];
   (state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>rows.push([h.date,h.session,h.start,h.end,h.duration,e.name,e.actual,e.status,e.next])));
@@ -814,6 +834,21 @@ function download(name,content,type){const a=document.createElement("a");a.href=
 function restoreJSON(e){
   const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const incoming=JSON.parse(r.result);state=Object.assign(defaultState(),incoming,{appRev:APP_REV});save();alert("Sauvegarde restaurée.");render();}catch{alert("Sauvegarde invalide.");}};r.readAsText(f);
 }
+
+let tabSwipe=null;
+document.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="mouse"||view.type!=="root"||overlayRoot.firstElementChild)return;
+  if(e.target.closest("input,select,textarea,.variant-row,.modal,.sheet,.chart,.handle,.program-tabs,.filter-row"))return;
+  tabSwipe={id:e.pointerId,x:e.clientX,y:e.clientY};
+},{passive:true});
+document.addEventListener("pointerup",e=>{
+  if(!tabSwipe||tabSwipe.id!==e.pointerId)return;
+  const dx=e.clientX-tabSwipe.x,dy=e.clientY-tabSwipe.y;tabSwipe=null;
+  if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.25)return;
+  const i=tabs.indexOf(tab),next=dx<0?tabs[i+1]:tabs[i-1];
+  if(next)pushNav(null,next);
+},{passive:true});
+document.addEventListener("pointercancel",()=>{tabSwipe=null;},{passive:true});
 
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-tab]");if(!b)return;const next=b.dataset.tab;if(!tabs.includes(next)||next===tab&&view.type==="root")return;pushNav(null,next);

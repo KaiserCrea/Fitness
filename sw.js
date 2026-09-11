@@ -1,4 +1,4 @@
-const CACHE = "fitness-ultime-v7-final-20260911-1";
+const CACHE = "fitness-ultime-v8-final-20260911-1";
 const ROOT = [
   "./",
   "./index.html",
