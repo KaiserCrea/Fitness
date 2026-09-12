@@ -1,4 +1,4 @@
-const CACHE = "fitness-ultime-v9-grouped-ux-fixes-20260912-6";
+const CACHE = "fitness-ultime-v15-progression-overview-20260912-1";
 const ROOT = [
   "./",
   "./index.html",

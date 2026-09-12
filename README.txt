@@ -86,3 +86,8 @@ MISE EN PAGE
 ARCHIVE ROOT ONLY
 =================
 Cette archive ne contient volontairement aucun dossier fiches/.
+MISE À JOUR V15 — 12/09/2026
+- Fusion complète de la V14 avec la nouvelle Vue d’ensemble de Progression.
+- Progression propose désormais : Vue d’ensemble, Performances et Historique.
+- Le résumé global, les 6 dernières semaines et la répartition musculaire utilisent les données réelles enregistrées.
+- Toutes les corrections V14 et les images validées sont conservées.

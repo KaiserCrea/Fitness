@@ -236,6 +236,59 @@ body{padding-bottom:0;background:#030303}
   .program-home-screen .header.compact{height:112px}.program-home-screen .program-tabs{min-height:40px;margin:4px 0}.program-home .section-title{font-size:17px;margin:5px 2px 4px}.program-card{min-height:112px}.comp-card{min-height:100px}.tool{min-height:62px;padding:6px 3px}.cycle-info{min-height:70px;margin-top:5px;padding:7px}.variant-row button{width:29px;height:29px}.program-card .groups{bottom:39px;font-size:9px}.program-card .code{font-size:24px}
 }
 
+/* ===== V15 — Progression : vue d'ensemble fusionnée ===== */
+.progress-screen .header.compact{
+  height:148px;
+  background-image:linear-gradient(90deg,#050505 0%,#050505c9 32%,#05050542 62%,#00000010 100%),var(--session-image);
+  background-size:auto,cover;
+  background-position:0 0,center 38%;
+  box-shadow:inset 0 -26px 40px #0007;
+}
+.progress-screen .header.compact::after{background:linear-gradient(180deg,transparent 42%,#050505b8 100%)}
+.progress-home-tabs{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:0;margin:8px 0 11px;border:1px solid #70572d;border-radius:12px;background:#0d0f10;overflow:hidden}
+.progress-home-tabs button{min-width:0;height:48px;border:0;border-right:1px solid #373228;background:transparent;color:#c9c4bb;display:flex;align-items:center;justify-content:center;gap:6px;font-size:9px;padding:0 5px}
+.progress-home-tabs button:last-child{border-right:0}
+.progress-home-tabs button.on{background:linear-gradient(180deg,#f7d77b,#e4b64c);color:#16120b;font-weight:800}
+.progress-home-tabs .icon{width:18px;height:18px}
+.overview-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:9px 2px 8px}
+.overview-title-row h2,.overview-section-head h2{font-family:Georgia,serif;font-size:20px;color:#f0d287;margin:0}
+.overview-title-row>div{text-align:right}
+.overview-title-row span,.overview-section-head span{display:block;font-size:8px;color:#aaa59c}
+.overview-title-row b{display:block;margin-top:3px;font-size:10px;color:#eac663}
+.overview-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.overview-metric{min-height:116px;border:1px solid #604b2b;border-radius:10px;background:linear-gradient(145deg,#151718,#0b0c0d);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px 3px}
+.overview-metric-icon{color:#edc864;height:23px;display:grid;place-items:center}
+.overview-metric-icon .icon{width:20px;height:20px}
+.overview-metric>b{font-family:Georgia,serif;font-size:22px;line-height:1.05;color:#f1d27c;margin:6px 0}
+.overview-metric>span:last-child{font-size:8px;color:#eee9df;line-height:1.15}
+.overview-section-head{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:11px 2px 7px}
+.overview-panel{border:1px solid #604b2b;border-radius:10px;background:linear-gradient(145deg,#151718,#0b0c0d);padding:10px;margin-bottom:12px}
+.overview-bars{height:155px;display:flex;align-items:flex-end;gap:9px;padding:18px 10px 22px;border-left:1px solid #33312b;border-bottom:1px solid #33312b}
+.overview-bar-col{position:relative;flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center}
+.overview-bar-col i{display:block;width:70%;min-height:4px;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#f1cd70,#b98327);box-shadow:0 0 10px #d8a53a24}
+.overview-bar-col span{position:absolute;bottom:-17px;font-size:8px;color:#d6d1c8}
+.overview-bar-value{position:absolute;bottom:calc(var(--h,0) + 3px);top:auto;font-size:7px;color:#9d978d;display:none}
+.overview-donut-wrap{display:grid;grid-template-columns:128px 1fr;gap:12px;align-items:center;min-height:156px}
+.overview-donut{width:120px;height:120px;border-radius:50%;position:relative;display:grid;place-items:center}
+.overview-donut::after{content:"";position:absolute;inset:29px;border-radius:50%;background:#0c0d0e}
+.overview-donut>div{position:relative;z-index:2;text-align:center}
+.overview-donut b{display:block;font-family:Georgia,serif;font-size:21px;color:#edcb6d}
+.overview-donut span{font-size:8px;color:#edcb6d}
+.overview-legend div{display:flex;justify-content:space-between;gap:8px;font-size:8px;padding:4px 0;color:#ebe6dd}
+.overview-legend span{white-space:nowrap}
+.overview-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.overview-legend b{font-weight:500;color:#fff}
+.progress-history-row{display:flex;justify-content:space-between;gap:8px;padding:10px 9px;border-bottom:1px solid #2d2d29}
+.progress-history-row:last-child{border-bottom:0}
+.progress-history-row>div:last-child{text-align:right}
+.progress-history-row b{display:block;font-size:10px;color:#f0eadf}
+.progress-history-row span{display:block;font-size:8px;color:#aaa59b;margin-top:2px}
+@media(max-width:365px){
+  .overview-metrics{gap:4px}.overview-metric{min-height:106px;padding:6px 2px}.overview-metric>b{font-size:19px}
+  .overview-donut-wrap{grid-template-columns:112px 1fr}.overview-donut{width:104px;height:104px}.overview-donut::after{inset:25px}
+  .progress-home-tabs button{font-size:8px}
+}
+
 /* =====================================================================
    V14 — corrections groupées d'ergonomie mobile
    ===================================================================== */

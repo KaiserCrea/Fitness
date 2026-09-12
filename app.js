@@ -50,6 +50,7 @@ let programMode=["sessions","groups","manage"].includes(savedUI?.programMode)?sa
 let programExerciseGroup=savedUI?.programExerciseGroup||"Tous";
 let progressionPeriod=savedUI?.progressionPeriod||"all";
 let progressionGroup=savedUI?.progressionGroup||"Tous";
+let progressionView=savedUI?.progressionView||"overview";
 let historyPeriod=savedUI?.historyPeriod||"year";
 let historyYear=Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
@@ -62,7 +63,7 @@ function rememberTabScroll(){
 }
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 function persistUI(){
-  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,historyPeriod,historyYear}));}catch{}
+  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,historyPeriod,historyYear}));}catch{}
 }
 
 function localISODate(d=new Date()){
@@ -218,10 +219,10 @@ function occKey(id,no){return `${id}@@${no}`;}
 function occurrenceStatus(cur,id,no){return cur?.status?.[occKey(id,no)] ?? cur?.status?.[id] ?? "";}
 function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.values?.[id] ?? referenceFor(id);}
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
-function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,historyPeriod,historyYear};}
+function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,historyPeriod,historyYear};}
 function applyNavState(st){
   if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
-  progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup;
+  progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionView=st.progressionView||progressionView;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;
   persistUI();
 }
@@ -681,18 +682,94 @@ function trendFor(id,arr){
 }
 function normalizeRef(v){return String(v??"").trim().toLowerCase();}
 function parseNumber(v){const m=String(v??"").replace(",",".").match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):NaN;}
-function renderProgress(){
+function progressHomeTabs(){
+  return `<div class="progress-home-tabs">
+    <button data-prog-view="overview" class="${progressionView==="overview"?"on":""}">${icon("chart")}<span>Vue d’ensemble</span></button>
+    <button data-prog-view="performance" class="${progressionView==="performance"?"on":""}">${icon("trend")}<span>Performances</span></button>
+    <button data-prog-view="history" class="${progressionView==="history"?"on":""}">${icon("clock")}<span>Historique</span></button>
+  </div>`;
+}
+function weekKeyFromDate(date){
+  const d=new Date(`${date||localISODate()}T12:00:00`);const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day);
+  return localISODate(d);
+}
+function progressionGlobalPercent(perf){
+  const deltas=[];
+  Object.values(perf).forEach(arr=>{
+    const nums=(arr||[]).map(x=>parseNumber(x.value)).filter(Number.isFinite);
+    if(nums.length<2||nums[0]===0)return;
+    deltas.push((nums.at(-1)-nums[0])/Math.abs(nums[0])*100);
+  });
+  return deltas.length?Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length):0;
+}
+function progressOverviewData(){
+  const hist=state.history||[],perf=allPerf();
+  const sessions=hist.length;
+  const exercises=hist.reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0);
+  const minutes=hist.reduce((n,h)=>n+(Number(h.duration)||0),0);
+  const global=progressionGlobalPercent(perf);
+  const now=new Date(),weeks=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now);d.setDate(d.getDate()-i*7);const wk=weekKeyFromDate(localISODate(d));
+    const count=hist.filter(h=>weekKeyFromDate(h.date)===wk).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0);
+    weeks.push({label:`S${6-i}`,value:count});
+  }
+  const groups={Pectoraux:0,Dos:0,"Épaules":0,Bras:0,Jambes:0,Abdos:0};
+  hist.forEach(h=>(h.exercises||[]).forEach(e=>{
+    if(e.status==="Non réalisé")return;
+    let g=groupForId(e.id);if(g==="Biceps"||g==="Triceps")g="Bras";if(g==="Mollets")g="Jambes";if(g==="Abdominaux")g="Abdos";
+    if(groups[g]!==undefined)groups[g]++;
+  }));
+  const total=Object.values(groups).reduce((a,b)=>a+b,0)||1;
+  const distribution=Object.entries(groups).map(([name,value])=>({name,value,pct:Math.round(value/total*100)}));
+  return{sessions,exercises,minutes,global,weeks,distribution};
+}
+function overviewBars(weeks){
+  const max=Math.max(1,...weeks.map(x=>x.value));
+  return `<div class="overview-bars">${weeks.map(x=>`<div class="overview-bar-col"><div class="overview-bar-value">${x.value}</div><i style="height:${Math.max(4,Math.round(x.value/max*100))}%"></i><span>${x.label}</span></div>`).join("")}</div>`;
+}
+function overviewDonut(distribution,total){
+  const palette=["#f2cf72","#d7ad50","#f0d596","#9e8655","#c9973d","#b9934b"];
+  let cursor=0,stops=[];
+  distribution.forEach((x,i)=>{const from=cursor,to=cursor+x.pct;stops.push(`${palette[i]} ${from}% ${to}%`);cursor=to;});
+  if(cursor<100)stops.push(`#2b2924 ${cursor}% 100%`);
+  return `<div class="overview-donut-wrap"><div class="overview-donut" style="background:conic-gradient(${stops.join(",")})"><div><b>${total}</b><span>exercices</span></div></div><div class="overview-legend">${distribution.map((x,i)=>`<div><span><i style="background:${palette[i]}"></i>${x.name}</span><b>${x.pct}%</b></div>`).join("")}</div></div>`;
+}
+function renderProgressOverview(){
+  const d=progressOverviewData(),hours=Math.floor(d.minutes/60),mins=d.minutes%60;
+  return `${progressHomeTabs()}
+    <div class="overview-title-row"><h2>Résumé global</h2><div><span>Cycle actuel</span><b>Cycle G - Semaine ${state.cycle}</b></div></div>
+    <div class="overview-metrics">
+      <div class="overview-metric"><span class="overview-metric-icon">${icon("dumbbell")}</span><b>${d.sessions}</b><span>Séances<br>réalisées</span></div>
+      <div class="overview-metric"><span class="overview-metric-icon">${icon("chart")}</span><b>${d.exercises}</b><span>Exercices<br>effectués</span></div>
+      <div class="overview-metric"><span class="overview-metric-icon">${icon("clock")}</span><b>${hours}h ${String(mins).padStart(2,"0")}</b><span>Temps total</span></div>
+      <div class="overview-metric"><span class="overview-metric-icon">${icon("trend")}</span><b>${d.global>0?"+":""}${d.global}%</b><span>Progression<br>globale</span></div>
+    </div>
+    <div class="overview-section-head"><h2>Évolution du volume</h2><span>6 dernières semaines</span></div>
+    <div class="overview-panel">${overviewBars(d.weeks)}</div>
+    <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
+    <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
+}
+function renderProgressPerformance(){
   const perf=allPerf(),reg=registry();let ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id));
   if(progressionGroup!=="Tous")ids=ids.filter(id=>groupForId(id)===progressionGroup);
   const start=periodStart(progressionPeriod);if(start)ids=ids.filter(id=>(perf[id]||[]).some(x=>x.date>=start));
   const active=ids.filter(id=>(perf[id]||[]).length),progressing=active.filter(id=>["up","slow"].includes(trendFor(id,perf[id]).key)).length;
-  shell(`${header("Progression","Suivi de vos performances","","compact")}
-    <div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
+  return `${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <div class="metrics"><div class="metric"><b>${active.length}</b><span>Exercices suivis</span></div><div class="metric"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></div><div class="metric"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></div></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
-    <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`,"progress-screen");
-  $$("[data-prog-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.progPeriod;history.replaceState(navState(),"");render();});
-  $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;history.replaceState(navState(),"");render();});
+    <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`;
+}
+function renderProgressHistoryHome(){
+  const recent=[...(state.history||[])].slice().reverse().slice(0,20);
+  return `${progressHomeTabs()}<div class="overview-section-head"><h2>Historique des séances</h2><span>${recent.length} dernières</span></div><div class="panel progress-history-home">${recent.map(h=>`<div class="progress-history-row"><div><b>${esc(h.session||"Séance")}</b><span>${esc(h.date||"")}</span></div><div><b>${Number(h.duration)||0} min</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div></div>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`}</div>`;
+}
+function renderProgress(){
+  const body=progressionView==="overview"?renderProgressOverview():progressionView==="history"?renderProgressHistoryHome():renderProgressPerformance();
+  shell(`${header("Progression","Suivi de vos performances","","compact")}${body}`,"progress-screen");
+  $$('[data-prog-view]').forEach(b=>b.onclick=()=>{progressionView=b.dataset.progView;persistUI();history.replaceState(navState(),"");render();});
+  $$("[data-prog-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.progPeriod;persistUI();history.replaceState(navState(),"");render();});
+  $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
 function averageIncrease(perf,ids){
