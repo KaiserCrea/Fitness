@@ -1,4 +1,4 @@
-const CACHE = "fitness-ultime-v16-history-compatibility-20260912-1";
+const CACHE = "fitness-ultime-v17-navigation-history-20260913-1";
 const ROOT = [
   "./",
   "./index.html",

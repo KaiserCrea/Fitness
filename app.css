@@ -709,3 +709,16 @@ body.lock-program-home{
   .tool{min-height:61px;padding:5px 3px}.tool .ico{font-size:20px;margin-bottom:3px}
   .cycle-info{min-height:68px;padding:6px;margin-top:3px}
 }
+
+/* ===== V17 — cartes Aujourd'hui et navigation tactile ===== */
+.bottom-nav,.bottom-nav__inner,.bottom-nav button{pointer-events:auto!important}
+.bottom-nav button{position:relative;z-index:2;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.exercise-card{grid-template-columns:116px minmax(0,1fr) 27px;grid-template-rows:auto auto;column-gap:11px;min-height:132px}
+.exercise-card>.thumb{grid-column:1;grid-row:1/3;width:116px;height:104px}
+.exercise-card>.ex-info{grid-column:2;grid-row:1;align-self:center}
+.exercise-card>.chev{grid-column:3;grid-row:1}
+.exercise-card>.status-actions{grid-column:2/4;grid-row:2;margin-top:8px}
+@media(max-width:365px){
+  .exercise-card{grid-template-columns:96px minmax(0,1fr) 22px;column-gap:8px;min-height:122px}
+  .exercise-card>.thumb{width:96px;height:90px}
+}

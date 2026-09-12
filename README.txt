@@ -95,3 +95,7 @@ CORRECTIF V16 — 12/09/2026
 - Compatibilité renforcée avec les anciennes données d’historique : Progression et Historique restent accessibles sans supprimer les données utilisateur.
 - Le badge Cycle G est retiré du bandeau Programme.
 - Le bouton « Annuler la séance » est placé sous la liste des exercices dans Aujourd’hui.
+CORRECTIF V17 — 13/09/2026
+- Compatibilité avec les anciennes performances qui possèdent un nom d’exercice mais aucun identifiant technique.
+- Navigation inférieure reliée directement à chaque bouton et zones tactiles renforcées.
+- Cartes Aujourd’hui réalignées : grande miniature à gauche, numéro intégré au titre et boutons correctement placés.

@@ -98,7 +98,8 @@ function migrate(){
   const s=Object.assign(defaultState(),raw||{});
   s.history=(Array.isArray(s.history)?s.history:[]).filter(h=>h&&typeof h==="object").map((h,i)=>{
     const exercises=Array.isArray(h.exercises)?h.exercises:(h.exercises&&typeof h.exercises==="object"?Object.values(h.exercises):[]);
-    return Object.assign({},h,{id:h.id||`legacy-${i}-${String(h.date||"")}`,date:String(h.date||"").slice(0,10),exercises:exercises.filter(e=>e&&typeof e==="object")});
+    const safeExercises=exercises.filter(e=>e&&typeof e==="object").map((e,j)=>Object.assign({},e,{id:e.id||e.name||`ancien-exercice-${i+1}-${j+1}`}));
+    return Object.assign({},h,{id:h.id||`legacy-${i}-${String(h.date||"")}`,date:String(h.date||"").slice(0,10),exercises:safeExercises});
   });
   s.completedG=Array.isArray(s.completedG)?s.completedG:[];
   s.oldWeeks=(Array.isArray(s.oldWeeks)?s.oldWeeks:[]).filter(w=>w&&typeof w==="object");
@@ -188,7 +189,7 @@ function groupForId(id){
   if(p.includes("A_DOS"))return"Dos"; if(p.includes("B_TRICEPS"))return"Triceps";
   if(p.includes("A_EPAULES"))return"Épaules"; if(p.includes("B_JAMBES"))return"Jambes";
   if(p.includes("/ABDOS/"))return"Abdos";
-  const n=exercise(id).name.toLowerCase();
+  const n=String(exercise(id).name||id||"").toLowerCase();
   if(/abdo|crunch|gainage|pallof|wood chop|relevé de (jambes|genoux)/.test(n))return"Abdos";
   if(/curl|biceps/.test(n))return"Biceps"; if(/triceps|dips|barre au front/.test(n))return"Triceps";
   if(/rowing|tirage|traction|soulevé de terre|lat pulldown|lombaire/.test(n))return"Dos";
@@ -254,7 +255,10 @@ window.addEventListener("popstate",e=>{
 });
 
 function nav(){
-  $$(".bottom-nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
+  $$(".bottom-nav button").forEach(b=>{
+    b.classList.toggle("on",b.dataset.tab===tab);
+    b.onclick=e=>{e.preventDefault();const next=b.dataset.tab;if(tabs.includes(next)&&!(next===tab&&view.type==="root"))pushNav(null,next);};
+  });
 }
 function headerAsset(title){
   if(title==="Aujourd’hui")return "./assets/hero-today-official.png";
@@ -979,7 +983,7 @@ document.addEventListener("pointerup",e=>{
 document.addEventListener("pointercancel",()=>{tabSwipe=null;},{passive:true});
 
 document.addEventListener("click",e=>{
-  const b=e.target.closest("[data-tab]");if(!b)return;const next=b.dataset.tab;if(!tabs.includes(next)||next===tab&&view.type==="root")return;pushNav(null,next);
+  const b=e.target.closest("[data-tab]");if(!b||b.onclick)return;const next=b.dataset.tab;if(!tabs.includes(next)||next===tab&&view.type==="root")return;pushNav(null,next);
 });
 window.addEventListener("pagehide",()=>{rememberTabScroll();persistUI();});
 window.addEventListener("beforeunload",()=>{rememberTabScroll();persistUI();});
