@@ -673,6 +673,8 @@ body.lock-program-home{
   box-shadow:inset 0 0 9px #0008,0 2px 8px #0007!important;
 }
 .exercise-card .num,.progress-row .num,.session-row .num{align-self:center;justify-self:center}
+.session-cancel-bottom{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin:10px 0 8px;border:1px solid #665535;background:#111313;color:#d8d1c5}
+.session-cancel-bottom .icon{width:17px;height:17px;color:var(--gold)}
 
 /* Fiche technique : ne garder que la zone technique utile + paramètres dynamiques. */
 .sheet-canvas.fiche-visual{aspect-ratio:691/750;overflow:hidden}

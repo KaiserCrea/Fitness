@@ -91,3 +91,7 @@ MISE À JOUR V15 — 12/09/2026
 - Progression propose désormais : Vue d’ensemble, Performances et Historique.
 - Le résumé global, les 6 dernières semaines et la répartition musculaire utilisent les données réelles enregistrées.
 - Toutes les corrections V14 et les images validées sont conservées.
+CORRECTIF V16 — 12/09/2026
+- Compatibilité renforcée avec les anciennes données d’historique : Progression et Historique restent accessibles sans supprimer les données utilisateur.
+- Le badge Cycle G est retiré du bandeau Programme.
+- Le bouton « Annuler la séance » est placé sous la liste des exercices dans Aujourd’hui.

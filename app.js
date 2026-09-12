@@ -96,9 +96,12 @@ function inferRotations(s){
 function migrate(){
   let raw=null; try{raw=JSON.parse(localStorage.getItem(KEY)||"null")}catch{}
   const s=Object.assign(defaultState(),raw||{});
-  s.history=Array.isArray(s.history)?s.history:[];
+  s.history=(Array.isArray(s.history)?s.history:[]).filter(h=>h&&typeof h==="object").map((h,i)=>{
+    const exercises=Array.isArray(h.exercises)?h.exercises:(h.exercises&&typeof h.exercises==="object"?Object.values(h.exercises):[]);
+    return Object.assign({},h,{id:h.id||`legacy-${i}-${String(h.date||"")}`,date:String(h.date||"").slice(0,10),exercises:exercises.filter(e=>e&&typeof e==="object")});
+  });
   s.completedG=Array.isArray(s.completedG)?s.completedG:[];
-  s.oldWeeks=Array.isArray(s.oldWeeks)?s.oldWeeks:[];
+  s.oldWeeks=(Array.isArray(s.oldWeeks)?s.oldWeeks:[]).filter(w=>w&&typeof w==="object");
   s.refs=s.refs||{}; s.params=s.params||{}; s.sessionOrder=s.sessionOrder||{};
   s.programOverrides=s.programOverrides||{}; s.customExercises=s.customExercises||{};
   s.archivedExercises=Array.isArray(s.archivedExercises)?s.archivedExercises:[];
@@ -266,7 +269,7 @@ function header(title,subtitle="",extra="",cls=""){
     <div class="header__content">
       <div class="header__row">
         <div><h1>${esc(title)}</h1>${subtitle?`<div class="subtitle">${esc(subtitle)}</div>`:""}${extra}</div>
-        ${title==="Aujourd’hui"||title==="Programme"?`<button class="cycle-chip" data-cycle-menu><b>Cycle G</b><span>Semaine ${state.cycle}</span></button>`:""}
+        ${title==="Aujourd’hui"?`<button class="cycle-chip" data-cycle-menu><b>Cycle G</b><span>Semaine ${state.cycle}</span></button>`:""}
       </div>
     </div>
   </header>`;
@@ -362,12 +365,13 @@ function timeButton(value,id){return `<button class="time-edit" id="${id}">${esc
 function renderActiveToday(cur,date){
   if(cur.session.startsWith("ATHLÉTIQUE")){renderActiveAth(cur,date);return;}
   const ids=sessionIds(cur.session),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div><button class="header-cancel" id="cancel-session">${icon("x")} Annuler</button>`,"tall")}
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
     <div class="today-meta">
       <div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div>
       <div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div>
     </div>
     <div>${ids.map((id,i)=>todayExerciseCard(id,cur.session,i+1,cur)).join("")}</div>
+    <button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>
     <div class="card finish-card">
       <div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div>
       <div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div>
