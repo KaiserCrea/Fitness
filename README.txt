@@ -21,6 +21,10 @@ REFERENCES VISUELLES VALIDÉES
 - Aujourd’hui : fond plus lumineux, personnage moins zoomé, davantage de haut du corps visible.
 - Programme : même personnage, davantage vu de dos / trois-quarts dos, cartes plus lumineuses et mieux cadrées.
 - Les assets hero-today / hero-program et les cartes G1/G2/G3/ATH/FULL MIX ont été reconstruits à partir des deux modèles visuels validés, avec fond salle sombre et aura dorée commune.
+- Les visuels officiels PNG validés le 12 septembre 2026 sont maintenant utilisés directement pour hero-program et les cartes G1/G2/G3/ATH/FULL MIX. Le service worker les précharge et force un nouveau cache.
+- Le bandeau officiel Aujourd'hui avec le personnage réalisant un curl simultané aux haltères est également intégré et préchargé hors ligne.
+- Le bandeau officiel Progression avec le personnage réalisant un curl à la barre EZ est intégré et préchargé hors ligne.
+- Le bandeau officiel Historique avec le personnage assis après l'effort et tenant deux haltères est intégré et préchargé hors ligne.
 - Cartes et rectangles agrandis globalement quand nécessaire.
 - Numéros 01/02/03… réduits et repositionnés pour un rendu plus premium.
 
@@ -36,8 +40,8 @@ AUJOURD'HUI
 
 PROGRAMME
 =========
-- Onglets : Séances / Exercices / Groupes / Gestion.
-- Bibliothèque classée par groupes musculaires.
+- Onglets : Séances / Groupes / Paramètres.
+- Chaque groupe ouvre une page dédiée contenant uniquement ses propres exercices.
 - Variantes A/B/C, ATH A/B, FM1-4 : aucune surbrillance automatique.
 - Appui maintenu + glissement = prévisualisation dorée temporaire ; sélection au relâchement seulement.
 - Cartes G1/G2/G3/ATH/FULL MIX agrandies et recadrées comme les maquettes.
@@ -46,11 +50,10 @@ PROGRAMME
 
 FICHES TECHNIQUES
 ==================
-- Suppression du bloc de sélection Séance / Exercice ajouté au-dessus de la fiche.
-- Affichage de la fiche recadré pour retirer le bandeau G1A imprimé devenu inutile.
-- Affichage recadré pour retirer la bande fixe Charge / Séries / Répétitions / Repos et la zone Notes personnelles.
+- Suppression du grand en-tête Fiche technique / nom de l'exercice ; bouton Fermer discret conservé.
+- Chaque image est analysée lors de son chargement pour repérer sa zone inférieure Notes personnelles / Résultat.
+- Les informations techniques utiles restent visibles et le panneau des paramètres dynamiques remplace cette seule zone inférieure.
 - Les fichiers originaux dans fiches/ ne sont pas modifiés.
-- Les paramètres dynamiques de l’exercice restent sous la fiche.
 
 MINIATURES
 ==========
@@ -68,6 +71,8 @@ NAVIGATION
 - Le swipe est désactivé sur les composants qui ont leur propre geste horizontal.
 - Chaque onglet mémorise sa propre position de défilement.
 - L’onglet actif est mémorisé : actualiser Programme / Progression / Historique ne renvoie plus vers Aujourd’hui.
+- Sur Android, l'ouverture d'une variante de séance est différée de quelques millisecondes afin d'absorber le clic tactile synthétique : la séance s'affiche directement et sa première fiche technique ne s'ouvre plus automatiquement.
+- Mise à jour groupée de l'ergonomie : Programme réduit à Séances / Groupes / Paramètres, suppression des Outils redondants, filtrage strict des groupes, titres multilignes, miniatures agrandies, numéros intégrés aux noms, saisie directe des horaires, kilogrammes automatiques, fond d'attente premium Aujourd'hui et cadrage adaptatif des fiches techniques.
 - Un nouvel onglet s’ouvre à sa propre position (0 lors de la première ouverture), pas à la hauteur de l’onglet précédent.
 - Retour Android conserve la pile de navigation interne.
 

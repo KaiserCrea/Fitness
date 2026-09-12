@@ -90,7 +90,7 @@ body{padding-bottom:0;background:#030303}
 .header.compact{height:148px}
 .header.tall{height:222px}
 .header::before,.session-header::before{
-  background-image:linear-gradient(90deg,#030303 0%,#040404ec 31%,#05050578 49%,transparent 73%),linear-gradient(0deg,#050505 0%,transparent 54%),var(--session-image,url('./assets/hero-program.jpg'));
+  background-image:linear-gradient(90deg,#030303 0%,#040404ec 31%,#05050578 49%,transparent 73%),linear-gradient(0deg,#050505 0%,transparent 54%),var(--session-image,url('./assets/hero-program-official.png'));
   background-size:cover;
   background-position:center center;
   filter:saturate(.96) contrast(1.08) brightness(.98);
@@ -236,7 +236,76 @@ body{padding-bottom:0;background:#030303}
   .program-home-screen .header.compact{height:112px}.program-home-screen .program-tabs{min-height:40px;margin:4px 0}.program-home .section-title{font-size:17px;margin:5px 2px 4px}.program-card{min-height:112px}.comp-card{min-height:100px}.tool{min-height:62px;padding:6px 3px}.cycle-info{min-height:70px;margin-top:5px;padding:7px}.variant-row button{width:29px;height:29px}.program-card .groups{bottom:39px;font-size:9px}.program-card .code{font-size:24px}
 }
 
-.install{background-image:linear-gradient(90deg,#050505ef,#050505a8),url('./assets/hero-program.jpg');}
+/* =====================================================================
+   V14 — corrections groupées d'ergonomie mobile
+   ===================================================================== */
+
+/* Aujourd'hui : badge mieux placé et véritable fond d'attente premium. */
+.header.tall .header__content{inset:0;left:0;right:0;bottom:0}
+.header.tall .header__row{position:absolute;inset:0 14px 16px 16px;align-items:flex-end}
+.header.tall .cycle-chip{position:absolute;top:14px;right:0;min-width:96px;padding:7px 10px;border-radius:11px}
+.header.tall .cycle-chip b{font-size:14px}.header.tall .cycle-chip span{font-size:9px}
+.today-waiting-screen{position:relative;min-height:calc(100dvh - var(--nav-h));overflow:hidden}
+.today-waiting-gym{position:absolute;z-index:0;left:-8px;right:-8px;top:216px;bottom:-22px;background:linear-gradient(180deg,#030303 0%,#03030390 10%,transparent 27%,#02020270 80%,#020202 100%),linear-gradient(90deg,#0008,transparent 28%,transparent 72%,#0008),url('./assets/today-waiting-gym-official.png') center top/cover no-repeat;filter:brightness(.73) saturate(.9) contrast(1.08)}
+.today-waiting-screen .header,.today-waiting-screen .cancelled-session-card{position:relative;z-index:2}
+.today-waiting-screen .cancelled-session-card{background:#101213ed;backdrop-filter:blur(5px)}
+
+/* Programme : trois entrées utiles et aucun doublon Outils. */
+.program-tabs{grid-template-columns:repeat(3,1fr);grid-auto-flow:initial}
+.program-home-screen>.program-tabs{flex-basis:50px}
+.program-home-screen>.program-home{justify-content:flex-start;gap:8px}
+.program-home .cycle-info{margin-top:4px}
+.group-detail-head{display:grid;grid-template-columns:1fr auto;align-items:end;gap:4px 10px;margin:7px 2px}
+.group-detail-head .backlink{grid-column:1/-1;justify-self:start}
+.group-detail-head .section-title{margin:3px 0 0;font-size:27px}
+.group-detail-head>span{font-size:10px;color:var(--muted);padding-bottom:4px}
+
+/* Cartes de séance : numéro intégré au titre et miniature agrandie. */
+.inline-no{color:var(--gold-hi);font-family:Georgia,"Times New Roman",serif;font-weight:700;white-space:nowrap}
+.exercise-card{grid-template-columns:116px minmax(0,1fr) 27px;grid-template-rows:auto auto;column-gap:11px;min-height:132px}
+.exercise-card>.thumb{grid-column:1;grid-row:1/3;width:116px;height:104px}
+.exercise-card>.ex-info{grid-column:2;grid-row:1;align-self:center}
+.exercise-card>.chev{grid-column:3;grid-row:1}
+.exercise-card>.status-actions{grid-column:2/4;grid-row:2;margin-top:8px}
+.exercise-card .ex-name{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.exercise-card .ex-ref{white-space:normal;overflow:visible;text-overflow:clip}
+.session-row{grid-template-columns:112px minmax(0,1fr) 22px 26px;gap:10px;min-height:104px;padding:9px}
+.session-row .thumb{width:112px;height:86px}
+.session-row .session-copy{min-width:0}
+
+/* Toutes les listes laissent les noms se développer sans découpe. */
+.library-row{grid-template-columns:92px minmax(0,1fr) 74px 20px;gap:10px;min-height:98px;padding:9px}
+.library-row .thumb{width:92px;height:72px}
+.library-copy,.progress-row>div:nth-child(3),.session-copy,.ex-info{min-width:0}
+.library-row .ex-name,.session-row .ex-name,.progress-row .ex-name,.history-row,.last-row{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:normal}
+.library-row .trend{max-width:74px;white-space:normal}
+.progress-row{grid-template-columns:32px 82px minmax(0,1fr) 82px 20px}
+.progress-row .thumb{width:82px;height:66px}
+
+/* Saisie des heures au clavier. */
+.time-error{min-height:17px;padding-top:5px;color:#f0c96a;font-size:10px;text-align:center}
+.modal input[inputmode="numeric"]{font-size:18px;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+
+/* Fiches : fermeture discrète et cadrage calculé fiche par fiche. */
+.sheet{position:relative}
+.sheet-close{position:sticky;float:right;top:9px;z-index:12;margin:9px 9px -49px 0;min-height:40px;padding:8px 13px;border:1px solid #675433;border-radius:10px;background:#101213e8;color:#e8e2d8;backdrop-filter:blur(8px)}
+.sheet-canvas.fiche-visual{clear:both;width:100%;height:auto;aspect-ratio:auto;overflow:hidden;background:#070707}
+.sheet-canvas.fiche-visual>img{display:block;width:100%;height:auto;max-width:none;transform:none!important;object-fit:initial}
+.sheet-canvas.fiche-visual.sheet-analyzed{overflow:hidden}
+.sheet-params{position:relative;margin:0 2.5% 14px;border-radius:0 0 13px 13px}
+
+@media(max-width:365px){
+  .today-waiting-gym{left:-6px;right:-6px;top:196px}
+  .exercise-card{grid-template-columns:96px minmax(0,1fr) 22px;column-gap:8px;min-height:122px}
+  .exercise-card>.thumb{width:96px;height:90px}
+  .status-btn{font-size:8px}
+  .session-row{grid-template-columns:92px minmax(0,1fr) 18px 22px;gap:7px}
+  .session-row .thumb{width:92px;height:74px}
+  .library-row{grid-template-columns:76px minmax(0,1fr) 62px 17px;gap:7px}
+  .library-row .thumb{width:76px;height:62px}
+}
+
+.install{background-image:linear-gradient(90deg,#050505ef,#050505a8),url('./assets/hero-program-official.png');}
 .program-home-screen{display:flex;flex-direction:column}
 .program-home-screen>.header{flex:0 0 auto}
 .program-home-screen>.program-tabs{flex:0 0 auto}
@@ -458,7 +527,7 @@ body.lock-program-home{
   background-image:
     linear-gradient(90deg,#030303f4 0%,#050505d9 27%,#0505056b 50%,transparent 75%),
     linear-gradient(0deg,#050505ee 0%,transparent 54%),
-    var(--session-image,url('./assets/hero-program.jpg'));
+    var(--session-image,url('./assets/hero-program-official.png'));
   background-size:100% 100%,100% 100%,auto 108%;
   background-position:0 0,0 0,right 42%;
   background-repeat:no-repeat;

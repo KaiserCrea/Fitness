@@ -1,4 +1,4 @@
-const CACHE = "fitness-ultime-v9-final-20260911-1";
+const CACHE = "fitness-ultime-v9-grouped-ux-fixes-20260912-6";
 const ROOT = [
   "./",
   "./index.html",
@@ -8,15 +8,16 @@ const ROOT = [
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
-  "./assets/hero-program.jpg",
-  "./assets/hero-today.jpg",
-  "./assets/hero-progress.jpg",
-  "./assets/hero-history.jpg",
-  "./assets/card-g1.jpg",
-  "./assets/card-g2.jpg",
-  "./assets/card-g3.jpg",
-  "./assets/card-ath.jpg",
-  "./assets/card-fm.jpg"
+  "./assets/hero-program-official.png",
+  "./assets/hero-today-official.png",
+  "./assets/hero-progress-official.png",
+  "./assets/hero-history-official.png",
+  "./assets/today-waiting-gym-official.png",
+  "./assets/card-g1-official.png",
+  "./assets/card-g2-official.png",
+  "./assets/card-g3-official.png",
+  "./assets/card-ath-official.png",
+  "./assets/card-fm-official.png"
 ];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ROOT)).then(() => self.skipWaiting()));
