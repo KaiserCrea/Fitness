@@ -721,11 +721,11 @@ body.lock-program-home{
   .exercise-card>.thumb{width:96px;height:90px}
 }
 
-/* V18 — hauteur commune et navigation intégrée au bandeau Programme. */
+/* V19 — hauteur commune et navigation immédiatement sous le bandeau. */
 :root{--main-hero-height:228px}
 .header.tall,.header.program-header{height:var(--main-hero-height)}
 .program-home-screen>.header.program-header{flex:0 0 var(--main-hero-height)}
-.header.program-header{margin-bottom:8px}
+.header.program-header{margin-bottom:0}
 .header.program-header::before{
   background-image:linear-gradient(90deg,#05050570,transparent 75%),url('./assets/today-waiting-gym-official.png');
   background-size:cover;background-position:center,center 38%;
@@ -737,15 +737,45 @@ body.lock-program-home{
   -webkit-mask-image:linear-gradient(90deg,transparent 0%,transparent 20%,#000 58%);
 }
 .header.program-header .header__content{left:16px;right:14px;bottom:78px;text-shadow:0 2px 8px #000}
-.header.program-header .program-tabs{
-  position:absolute;z-index:3;left:10px;right:10px;bottom:10px;margin:0;
+.screen>.program-tabs.program-tabs-under{
+  position:relative;flex:0 0 auto;margin:0 0 8px;
   min-height:46px;padding:3px;border-color:#a18146;background:#080909df;
 }
-.header.program-header .program-tabs button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:38px;font-size:11px}
-.header.program-header .program-tabs .icon{width:19px;height:19px;flex-shrink:0}
+.program-tabs-under button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:38px;font-size:11px}
+.program-tabs-under .icon{width:19px;height:19px;flex-shrink:0}
 .program-home>.section-title{margin-top:8px}
 .program-home>.cycle-info{margin-top:8px}
 @media(max-width:365px){
-  .header.program-header .program-tabs{left:8px;right:8px}
-  .header.program-header .program-tabs button{font-size:10px;gap:5px}
+  .program-tabs-under button{font-size:10px;gap:5px}
 }
+
+/* V20 — visuels validés et états de l’accueil */
+.header.premium-header{height:var(--main-hero-height);margin-bottom:0}
+.header.premium-header::before{background-image:linear-gradient(90deg,#0008,transparent 78%),linear-gradient(0deg,#0008,transparent 65%),var(--session-image);background-size:cover;background-position:center;filter:none}
+.header.premium-header::after{background:none;mask-image:none;-webkit-mask-image:none}
+.header.premium-header .header__content{text-shadow:0 2px 8px #000}
+.header.premium-header.tall .header__row>div{width:100%;min-width:0}
+.header.premium-header.tall .cycle-chip{position:absolute;top:auto;right:0;bottom:0;width:96px;min-width:0;padding:8px 6px;z-index:3}
+.header.premium-header.tall .cycle-chip b{font-size:17px}
+.header.premium-header.tall .cycle-chip span{font-size:11px}
+.header.premium-header.tall .session-groups{max-width:calc(100% - 110px);font-size:18px;line-height:1.15;min-height:44px;display:flex;align-items:center}
+.app.app-today-waiting{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px))}
+.today-waiting-screen{isolation:isolate;position:relative;min-height:calc(100svh - var(--nav-h) - env(safe-area-inset-bottom,0px));padding:36px 0 105px;overflow:visible}
+.today-waiting-screen>.today-waiting-gym{position:absolute;z-index:-1;inset:0 -10px;background:linear-gradient(180deg,#0005,transparent 65%),url('./assets/today-waiting-v20.png') center center/cover no-repeat;filter:none;pointer-events:none}
+.waiting-copy{position:relative;padding:0 6px 20px;text-shadow:0 2px 8px #000}
+.waiting-copy h1{font-family:Georgia,serif;font-size:38px;line-height:1.1;margin:0 0 8px;color:#fff;font-weight:400}
+.waiting-copy .session-code{margin-top:16px;font-size:46px}
+.waiting-copy .session-groups{font-size:19px}
+.today-waiting-screen>.waiting-cycle-chip{position:absolute;top:auto;left:6px;right:auto;bottom:16px;z-index:3;background:#080908d9;border-color:#a58b50;backdrop-filter:blur(3px)}
+.today-waiting-screen .cancelled-session-card,.today-waiting-screen .comp-choice{background:#10110fd6;border-color:#a58b50;backdrop-filter:blur(3px)}
+.program-card.program-card-shaded::before{filter:brightness(.90) saturate(.96) contrast(1.12)}
+.program-card.program-card-shaded::after{background:linear-gradient(0deg,#070707f5 0%,#080808aa 45%,transparent 80%),linear-gradient(90deg,#050505aa 0%,transparent 78%)}
+.progress-screen>.header.premium-header::after{background:none}
+.progress-screen>.tabs{margin-top:0}
+@media(max-width:365px){
+  .today-waiting-screen>.today-waiting-gym{left:-6px;right:-6px}
+  .waiting-copy h1{font-size:32px}
+  .header.premium-header.tall .session-groups{font-size:16px}
+}
+.progress-screen>.header.premium-header,.history-screen>.header.premium-header{height:var(--main-hero-height)}
+.progress-screen>.progress-home-tabs{margin-top:0}

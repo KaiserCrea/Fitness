@@ -1,5 +1,9 @@
-const CACHE = "fitness-v18-programme-20260913-1";
+const CACHE = "fitness-v20-visuels-accueil-20260913-1";
 const ROOT = [
+  "./assets/hero-today-v20.png",
+  "./assets/hero-progress-v20.png",
+  "./assets/hero-history-v20.png",
+  "./assets/today-waiting-v20.png",
   "./",
   "./index.html",
   "./app.css",

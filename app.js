@@ -261,15 +261,15 @@ function nav(){
   });
 }
 function headerAsset(title){
-  if(title==="Aujourd’hui")return "./assets/hero-today-official.png";
+  if(title==="Aujourd’hui")return "./assets/hero-today-v20.png";
   if(title==="Programme")return "./assets/hero-program-official.png";
-  if(title==="Progression")return "./assets/hero-progress-official.png";
-  if(title==="Historique")return "./assets/hero-history-official.png";
+  if(title==="Progression")return "./assets/hero-progress-v20.png";
+  if(title==="Historique")return "./assets/hero-history-v20.png";
   return "./assets/hero-program-official.png";
 }
 function header(title,subtitle="",extra="",cls=""){
   const asset=headerAsset(title);
-  return `<header class="header ${cls}" style="--session-image:url('${asset}')">
+  return `<header class="header premium-header ${cls}" style="--session-image:url('${asset}')">
     <div class="header__content">
       <div class="header__row">
         <div><h1>${esc(title)}</h1>${subtitle?`<div class="subtitle">${esc(subtitle)}</div>`:""}${extra}</div>
@@ -280,7 +280,7 @@ function header(title,subtitle="",extra="",cls=""){
 }
 function shell(content,screenClass=""){
   document.body.classList.toggle("lock-program-home",screenClass==="program-home-screen");
-  app.innerHTML=`<main class="app ${screenClass==="program-home-screen"?"app-program-home":""}"><section class="screen ${screenClass} ${navTransitionClass}">${content}</section></main>`;
+  app.innerHTML=`<main class="app ${screenClass==="program-home-screen"?"app-program-home":screenClass==="today-waiting-screen"?"app-today-waiting":""}"><section class="screen ${screenClass} ${navTransitionClass}">${content}</section></main>`;
   nav();bindGlobalInView();
 }
 function bindGlobalInView(){
@@ -315,31 +315,32 @@ function renderInstall(){
   $("#install-go",el).onclick=()=>{state.installed=true;state.cycle=$("#install-cycle",el).value;state.nextG=+$("#install-g",el).value;state.weekKey=currentWeekKey();save();el.remove();render();};
 }
 
+function waitingTodayHeader(date,session=""){
+  return `<div class="today-waiting-gym" aria-hidden="true"></div>
+    <div class="waiting-copy"><h1>Aujourd’hui</h1><div class="subtitle">${esc(date)}</div>
+    ${session?`<div class="session-code">${esc(niceSession(session))}</div><div class="session-groups">${esc(groupLabel(session))}</div>`:""}</div>
+    <button class="cycle-chip waiting-cycle-chip" data-cycle-menu aria-label="Réglages du cycle G, semaine ${state.cycle}"><b>Cycle G</b><span>Semaine ${state.cycle}</span></button>`;
+}
 function renderToday(){
   const rawDate=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
   const date=rawDate.charAt(0).toUpperCase()+rawDate.slice(1);
-  let cur=state.today;
+  const cur=state.today;
   if(!cur){
-    const g3done=state.completedG.includes(3);
-    if(g3done){
+    if(state.completedG.includes(3)){
       const ath=`ATHLÉTIQUE ${state.nextAth}`,fm=`FULL MIX ${state.nextFm}`;
-      shell(`${header("Aujourd’hui",date,"","tall")}
-        <div class="card comp-choice"><div class="row-between"><div><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez la séance complémentaire à ouvrir.</div></div><span class="cycle-chip"><b>Semaine ${state.cycle}</b><span>Complémentaires</span></span></div></div>
+      shell(`${waitingTodayHeader(date)}
+        <div class="card comp-choice"><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez la séance complémentaire à ouvrir.</div></div>
         <h2 class="section-title">Séances complémentaires</h2>
-        <div class="complement-grid">${complementChoiceCard(ath,"ATHLÉTIQUE",state.nextAth)}${complementChoiceCard(fm,"FULL MIX",String(state.nextFm))}</div>`);
+        <div class="complement-grid">${complementChoiceCard(ath,"ATHLÉTIQUE",state.nextAth)}${complementChoiceCard(fm,"FULL MIX",String(state.nextFm))}</div>`,"today-waiting-screen");
       $$('[data-start-session]').forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);render();});
       return;
     }
     const expected=sessionCode();
-    if(state.todayDismissed?.date===localISODate()&&state.todayDismissed?.session===expected){
-      shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(expected)}</div><div class="session-groups">${groupLabel(expected)}</div>`,"tall")}
-        <div class="today-waiting-gym" aria-hidden="true"></div>
-        <div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">Séance annulée</div><div class="small muted">${esc(niceSession(expected))} reste la prochaine séance prévue. Elle n’a créé aucune performance et le cycle n’a pas avancé.</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`,"today-waiting-screen");
-      $("#resume-session").onclick=()=>{initToday(expected);render();};
-      return;
-    }
-    initToday(expected);
-    cur=state.today;
+    const cancelled=state.todayDismissed?.date===localISODate()&&state.todayDismissed?.session===expected;
+    shell(`${waitingTodayHeader(date,expected)}
+      <div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">${cancelled?"Séance annulée":"Prêt à s’entraîner"}</div><div class="small muted">${cancelled?`${esc(niceSession(expected))} reste la prochaine séance prévue. Le cycle n’a pas avancé.`:"Ouvrez votre prochaine séance pour commencer."}</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`,"today-waiting-screen");
+    $("#resume-session").onclick=()=>{initToday(expected);render();};
+    return;
   }
   renderActiveToday(cur,date);
 }
@@ -499,11 +500,11 @@ function commitCurrentSession(){
 }
 function renderActiveAth(cur,date){
   const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div><button class="header-cancel" id="cancel-session">${icon("x")} Annuler</button>`,"tall")}
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
     <div class="today-meta"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div><div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div></div>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
     <div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
-    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div>`,"today-screen");
+    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
   $("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
 function athStepSummary(session,index,step){
@@ -529,8 +530,8 @@ function renderProgram(){
   const groupIcon='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3H3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3h-3"/></svg>';
   shell(`<header class="header program-header" style="--session-image:url('${headerAsset("Programme")}')">
     <div class="header__content"><h1>Programme</h1><div class="subtitle">Organisation de vos séances</div></div>
-    <div class="tabs program-tabs" aria-label="Rubriques du programme">${["sessions","groups","manage"].map((m,i)=>`<button data-pmode="${m}" aria-pressed="${programMode===m}" class="${programMode===m?"on":""}">${[icon("dumbbell"),groupIcon,icon("settings")][i]}<span>${["Séances","Groupes","Paramètres"][i]}</span></button>`).join("")}</div>
     </header>
+    <div class="tabs program-tabs program-tabs-under" aria-label="Rubriques du programme">${["sessions","groups","manage"].map((m,i)=>`<button data-pmode="${m}" aria-pressed="${programMode===m}" class="${programMode===m?"on":""}">${[icon("dumbbell"),groupIcon,icon("settings")][i]}<span>${["Séances","Groupes","Paramètres"][i]}</span></button>`).join("")}</div>
     ${programMode==="sessions"?programSessions():programMode==="groups"?programGroups():programManage()}`,programMode==="sessions"?"program-home-screen":"program-scroll-screen");
   $$('[data-pmode]').forEach(b=>b.onclick=()=>{const next=b.dataset.pmode;if(next==="groups"&&programMode!=="groups")programExerciseGroup="Tous";programMode=next;persistUI();history.replaceState(navState(),"");render();});
   bindProgramContent();
@@ -544,7 +545,7 @@ function programSessions(){
 }
 function programGCard(n){
   const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=`./assets/card-g${n}-official.png`;
-  const positionMap={1:'right center',2:'right center',3:'right center'};return `<div class="program-card" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
+  const positionMap={1:'right center',2:'right center',3:'right center'};return `<div class="program-card ${n<3?"program-card-shaded":""}" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
 function programCompCard(title,variants,next){
