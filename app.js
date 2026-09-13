@@ -526,8 +526,11 @@ function openAthSheet(session){
 }
 
 function renderProgram(){
-  shell(`${header("Programme","Organisation de vos séances","","compact")}
-    <div class="tabs program-tabs">${["sessions","groups","manage"].map((m,i)=>`<button data-pmode="${m}" class="${programMode===m?"on":""}">${["Séances","Groupes","Paramètres"][i]}</button>`).join("")}</div>
+  const groupIcon='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3H3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3h-3"/></svg>';
+  shell(`<header class="header program-header" style="--session-image:url('${headerAsset("Programme")}')">
+    <div class="header__content"><h1>Programme</h1><div class="subtitle">Organisation de vos séances</div></div>
+    <div class="tabs program-tabs" aria-label="Rubriques du programme">${["sessions","groups","manage"].map((m,i)=>`<button data-pmode="${m}" aria-pressed="${programMode===m}" class="${programMode===m?"on":""}">${[icon("dumbbell"),groupIcon,icon("settings")][i]}<span>${["Séances","Groupes","Paramètres"][i]}</span></button>`).join("")}</div>
+    </header>
     ${programMode==="sessions"?programSessions():programMode==="groups"?programGroups():programManage()}`,programMode==="sessions"?"program-home-screen":"program-scroll-screen");
   $$('[data-pmode]').forEach(b=>b.onclick=()=>{const next=b.dataset.pmode;if(next==="groups"&&programMode!=="groups")programExerciseGroup="Tous";programMode=next;persistUI();history.replaceState(navState(),"");render();});
   bindProgramContent();

@@ -83,6 +83,13 @@ MISE EN PAGE
 - Les modales sont plus grandes, plus hautes et mieux centrées.
 - Recadrage global de l’interface à chaque endroit où nécessaire.
 
+MISE À JOUR V18 — 13/09/2026
+- Bandeau Programme à la même hauteur qu’Aujourd’hui (228 pixels CSS).
+- Salle premium en fond avec le personnage Programme officiel.
+- Rubriques avec icônes intégrées en bas du bandeau.
+- Espacements réguliers et défilement normal, sans étirement vertical.
+- Base V17 conservée, avec Progression et Historique.
+
 ARCHIVE ROOT ONLY
 =================
 Cette archive ne contient volontairement aucun dossier fiches/.
