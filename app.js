@@ -650,7 +650,7 @@ function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
   const ids=sessionIds(session);
   const heroAsset=session.startsWith("G1")?"./assets/card-g1-v22.png":session.startsWith("G2")?"./assets/card-g2-v22.png":session.startsWith("G3")?"./assets/card-g3-official.png":"./assets/card-fm-official.png";
-  const heroClass=session.startsWith("G1")?" session-hero-g1":session.startsWith("G2")?" session-hero-g2":"";
+  const heroClass=session.startsWith("G1")?" session-hero-g1":session.startsWith("G2")?" session-hero-g2":session.startsWith("G3")?" session-hero-g3":"";
   shell(`<header class="session-header${heroClass}" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div>
     <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <div class="panel session-list" id="session-list">${ids.map((id,i)=>sessionRow(id,session,i+1)).join("")}</div>
@@ -1035,9 +1035,38 @@ function openSheet(id,session,no){
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
-  const sheetImg=$(".fiche-visual img",overlay);if(sheetImg)prepareSheetLayout(sheetImg,$(".fiche-visual",overlay));
+  const sheetCanvas=$(".fiche-visual",overlay);
+  const sheetImg=$(".fiche-visual img",overlay);
+  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);bindSheetDoubleTapZoom(sheetImg,sheetCanvas);}
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
+function bindSheetDoubleTapZoom(img,canvas){
+  if(!img||!canvas)return;
+  let lastTap=0,lastX=.5,lastY=.5;
+  const toggle=(clientX,clientY)=>{
+    const r=canvas.getBoundingClientRect();
+    const x=Math.max(0,Math.min(1,(clientX-r.left)/Math.max(1,r.width)));
+    const y=Math.max(0,Math.min(1,(clientY-r.top)/Math.max(1,r.height)));
+    const zooming=!canvas.classList.contains("sheet-zoomed");
+    canvas.classList.toggle("sheet-zoomed",zooming);
+    if(zooming){
+      requestAnimationFrame(()=>{
+        canvas.scrollLeft=x*Math.max(0,canvas.scrollWidth-canvas.clientWidth);
+        canvas.scrollTop=y*Math.max(0,canvas.scrollHeight-canvas.clientHeight);
+      });
+    }else{
+      canvas.scrollTo({left:0,top:0,behavior:"smooth"});
+    }
+  };
+  img.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();toggle(e.clientX,e.clientY);});
+  img.addEventListener("pointerup",e=>{
+    if(e.pointerType==="mouse")return;
+    const now=Date.now();
+    if(now-lastTap<330){e.preventDefault();e.stopPropagation();toggle(e.clientX,e.clientY);lastTap=0;return;}
+    lastTap=now;lastX=e.clientX;lastY=e.clientY;
+  },{passive:false});
+}
+
 function prepareSheetLayout(img,canvas){
   const apply=()=>{
     if(!img.naturalWidth||!img.naturalHeight)return;

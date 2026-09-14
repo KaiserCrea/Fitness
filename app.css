@@ -1007,3 +1007,69 @@ body.lock-program-home{
 }
 /* La fenêtre d'agrandissement reste inchangée et affiche la vraie miniature. */
 .thumb-preview-card img{object-fit:contain!important;object-position:center!important}
+
+
+/* =====================================================================
+   V24.3 — harmonisation finale G1/G2/G3 + zoom fiches + hero Progression
+   ===================================================================== */
+/* Référence visuelle commune : cadrage respirant, ambiance sombre,
+   halo doré arrière et fondu progressif vers le noir à gauche/bas. */
+.program-card-g1::before,
+.program-card-g2::before,
+.program-card-g3::before{
+  background-size:cover!important;
+  background-position:right center!important;
+  background-repeat:no-repeat!important;
+  background-color:#050505!important;
+  filter:brightness(.86) contrast(1.14) saturate(.96)!important;
+}
+.program-card-g1::after,
+.program-card-g2::after,
+.program-card-g3::after{
+  background:
+    radial-gradient(circle at 78% 34%,#e6b24b38 0%,#c68d1a16 24%,transparent 47%),
+    linear-gradient(90deg,#020202f5 0%,#030303d6 28%,#05050572 52%,transparent 78%),
+    linear-gradient(0deg,#040404f5 0%,#050505b7 24%,transparent 62%)!important;
+}
+.session-header.session-hero-g1::before,
+.session-header.session-hero-g2::before,
+.session-header.session-hero-g3::before{
+  background-image:
+    linear-gradient(90deg,#020202f7 0%,#030303d9 30%,#05050579 51%,transparent 78%),
+    linear-gradient(0deg,#040404f4 0%,#050505b5 25%,transparent 60%),
+    var(--session-image)!important;
+  background-size:auto 100%!important;
+  background-position:right center!important;
+  background-repeat:no-repeat!important;
+  background-color:#050505!important;
+  filter:brightness(.86) contrast(1.14) saturate(.96)!important;
+}
+.session-header::after{
+  background:radial-gradient(circle at 78% 34%,#f0bd523b 0%,#c78f2218 25%,transparent 48%)!important;
+}
+
+/* Progression : même hauteur visuelle exacte que Programme / Historique. */
+.progress-screen>.header.premium-header{
+  height:var(--main-hero-height)!important;
+  min-height:var(--main-hero-height)!important;
+  flex:0 0 var(--main-hero-height)!important;
+}
+
+/* Double tap sur la fiche technique : zoom local, puis déplacement au doigt. */
+.sheet-canvas.fiche-visual{
+  overscroll-behavior:contain;
+  touch-action:manipulation;
+}
+.sheet-canvas.fiche-visual.sheet-zoomed{
+  overflow:auto!important;
+  touch-action:pan-x pan-y!important;
+  cursor:zoom-out;
+}
+.sheet-canvas.fiche-visual.sheet-zoomed>img{
+  width:200%!important;
+  max-width:none!important;
+  height:auto!important;
+  clip-path:none!important;
+  cursor:zoom-out;
+}
+.sheet-canvas.fiche-visual:not(.sheet-zoomed)>img{cursor:zoom-in}

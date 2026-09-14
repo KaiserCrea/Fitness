@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-2-correctif-miniatures-cadrage-20260914-1";
+const CACHE = "fitness-v24-3-harmonisation-zoom-fiches-20260914-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
