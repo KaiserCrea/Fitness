@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 26;
+const APP_REV = 27;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -60,6 +60,7 @@ let periodAnchor=!needsCleanReset&&savedUI?.periodAnchor||localISODate();
 let historyPeriod=!needsCleanReset&&savedUI?.historyPeriod||"week";
 let historyYear=!needsCleanReset&&Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
 let historyAnchor=!needsCleanReset&&savedUI?.historyAnchor||localISODate();
+let historyVolumeMode=!needsCleanReset&&savedUI?.historyVolumeMode||"duration";
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
 let navTransitionClass="";
 function rememberTabScroll(){
@@ -70,7 +71,7 @@ function rememberTabScroll(){
 }
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 function persistUI(){
-  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor}));}catch{}
+  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor,historyVolumeMode}));}catch{}
 }
 
 function localISODate(d=new Date()){
@@ -955,9 +956,10 @@ function renderHistory(){
       <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${formatMinutes(avgWeek)}</b><span>Moyenne / semaine</span></div>
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row"><button class="on">Durée</button><button>Nombre de séances</button><button>Moyenne</button></div>${monthBars(hs)}</div>
+    <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row history-volume-tabs">${[["duration","Durée"],["sessions","Nombre de séances"],["average","Moyenne"]].map(([m,l])=>`<button data-volume-mode="${m}" class="${historyVolumeMode===m?"on":""}">${l}</button>`).join("")}</div>${historyVolumeChart(hs,old)}</div>
     <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>`,"history-screen");
-  $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
+  $$("[data-volume-mode]").forEach(b=>b.onclick=()=>{historyVolumeMode=b.dataset.volumeMode;persistUI();history.replaceState(navState(),"");render();});
+  $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;if(historyPeriod==="year")historyYear=new Date(`${historyAnchor}T12:00:00`).getFullYear();persistUI();history.pushState(navState(),"");render();});
   $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
   $("#history-period-picker").onclick=()=>openPeriodPicker("history");
   $("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
@@ -998,9 +1000,29 @@ function attendancePct(y,hs,old){
   const keys=Object.keys(weeks);if(!keys.length)return 0;
   let got=0,target=0;keys.forEach(k=>{const oldItem=old.find(w=>(w.week||w.date)===k),t=oldItem?3:5;got+=Math.min(weeks[k],t);target+=t;});return Math.round(got/target*100);
 }
-function monthBars(hs){
-  const vals=Array(12).fill(0);hs.forEach(h=>{const m=Number(h.date.slice(5,7))-1;if(m>=0)vals[m]+=+h.duration||0;});const max=Math.max(1,...vals);
-  return `<div class="bar-chart">${vals.map((v,i)=>`<div class="bar" style="height:${Math.max(1,v/max*100)}%"><label>${"JFMAMJJASOND"[i]}</label></div>`).join("")}</div>`;
+function historyVolumeChart(hs,old=[]){
+  const anchor=new Date(`${historyAnchor}T12:00:00`), rows=[];
+  const add=(key,label,start,end)=>{
+    const detailed=hs.filter(h=>h.date>=start&&h.date<end), duration=detailed.reduce((a,h)=>a+(+h.duration||0),0);
+    const oldCount=old.filter(w=>{const d=String(w.week||w.date||"").slice(0,10);return d>=start&&d<end;}).reduce((a,w)=>a+(+w.count||0),0);
+    const sessions=detailed.length+oldCount;
+    const value=historyVolumeMode==="sessions"?sessions:historyVolumeMode==="average"?(sessions?Math.round(duration/sessions):0):duration;
+    rows.push({key,label,value,duration,sessions});
+  };
+  if(historyPeriod==="week"){
+    const st=mondayOf(anchor);for(let i=0;i<7;i++){const a=new Date(st);a.setDate(a.getDate()+i);const b=new Date(a);b.setDate(b.getDate()+1);add(i,a.toLocaleDateString("fr-FR",{weekday:"short"}).replace(".",""),localISODate(a),localISODate(b));}
+  }else if(historyPeriod==="month"){
+    const y=anchor.getFullYear(),m=anchor.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,1);let i=1;
+    for(let a=mondayOf(first);a<last;a.setDate(a.getDate()+7)){const b=new Date(a);b.setDate(b.getDate()+7);add(i,`S${i}`,localISODate(a),localISODate(b));i++;}
+  }else if(historyPeriod==="year"){
+    const y=historyYear;for(let m=0;m<12;m++){const a=new Date(y,m,1),b=new Date(y,m+1,1);add(m,a.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""),localISODate(a),localISODate(b));}
+  }else{
+    const years=[...new Set([...(state.history||[]).map(h=>+String(h.date).slice(0,4)),...(state.oldWeeks||[]).map(w=>+String(w.week||w.date||"").slice(0,4))])].filter(Boolean).sort();
+    years.forEach(y=>add(y,String(y),`${y}-01-01`,`${y+1}-01-01`));
+  }
+  const max=Math.max(1,...rows.map(r=>r.value));
+  const unit=historyVolumeMode==="duration"?"min":historyVolumeMode==="sessions"?"séance":"min/séance";
+  return `<div class="volume-axis-label">${historyVolumeMode==="duration"?"Durée":historyVolumeMode==="sessions"?"Nombre de séances":"Durée moyenne par séance"}</div><div class="bar-chart volume-chart">${rows.map(r=>`<div class="bar-wrap"><span class="bar-value">${r.value}${historyVolumeMode==="duration"?" min":""}</span><div class="bar" style="height:${r.value?Math.max(5,r.value/max*100):1}%"></div><label>${esc(r.label)}</label></div>`).join("")}</div><div class="volume-unit">${unit}</div>`;
 }
 function muscleDonut(hs){
   const counts={Pectoraux:0,Dos:0,Épaules:0,Biceps:0,Triceps:0,Jambes:0,Abdos:0};
@@ -1037,7 +1059,7 @@ function openSheet(id,session,no){
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
   const sheetCanvas=$(".fiche-visual",overlay);
   const sheetImg=$(".fiche-visual img",overlay);
-  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);bindSheetDoubleTapZoom(sheetImg,sheetCanvas);}
+  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);bindSheetDoubleTapZoom(sheetImg,sheetCanvas);bindSheetPinchZoom(sheetImg,sheetCanvas);}
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
 function bindSheetDoubleTapZoom(img,canvas){
@@ -1065,6 +1087,14 @@ function bindSheetDoubleTapZoom(img,canvas){
     if(now-lastTap<330){e.preventDefault();e.stopPropagation();toggle(e.clientX,e.clientY);lastTap=0;return;}
     lastTap=now;lastX=e.clientX;lastY=e.clientY;
   },{passive:false});
+}
+
+function bindSheetPinchZoom(img,canvas){
+  const pts=new Map();let startDist=0,startScale=1,scale=1;
+  const apply=()=>{if(scale<=1.02){scale=1;canvas.classList.remove("sheet-zoomed");img.style.width="";}else{canvas.classList.add("sheet-zoomed");img.style.width=`${scale*100}%`;}};
+  canvas.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse")return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture?.(e.pointerId);if(pts.size===2){const a=[...pts.values()];startDist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);startScale=scale;}} ,{passive:true});
+  canvas.addEventListener("pointermove",e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pts.size===2&&startDist){const a=[...pts.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=Math.max(1,Math.min(4,startScale*d/startDist));apply();e.preventDefault();}}, {passive:false});
+  const end=e=>{pts.delete(e.pointerId);if(pts.size<2)startDist=0;};canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel",end);
 }
 
 function prepareSheetLayout(img,canvas){
@@ -1117,8 +1147,8 @@ function openPeriodPicker(target){
   if(period==="all"){historyPeriod="year";historyYear=new Date().getFullYear();historyAnchor=localISODate();persistUI();render();return;}
   const d=new Date(`${anchor}T12:00:00`),type=period==="month"?"month":period==="year"?"number":"date";
   const value=period==="month"?anchor.slice(0,7):period==="year"?String(d.getFullYear()):anchor;
-  openModal(`<h3>Choisir ${period==="week"?"une semaine":period==="month"?"un mois":"une année"}</h3><div class="field"><label>Période</label><input id="period-choice" type="${type}" ${type==="number"?'min="2000" max="2100"':''} value="${esc(value)}"></div><button class="btn block" id="period-now" style="margin-top:8px">Aujourd’hui</button><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="period-confirm">Afficher</button></div>`,()=>{
-    $("#period-now").onclick=()=>{$("#period-choice").value=type==="month"?localISODate().slice(0,7):type==="number"?String(new Date().getFullYear()):localISODate();};
+  openModal(`<h3>Choisir ${period==="week"?"une semaine":period==="month"?"un mois":"une année"}</h3><div class="field"><label>Période</label><input id="period-choice" type="${type}" ${type==="number"?'min="2000" max="2100"':''} value="${esc(value)}"></div>${target==="history"?"":`<button class="btn block" id="period-now" style="margin-top:8px">Aujourd’hui</button>`}<div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="period-confirm">Afficher</button></div>`,()=>{
+    if($("#period-now"))$("#period-now").onclick=()=>{$("#period-choice").value=type==="month"?localISODate().slice(0,7):type==="number"?String(new Date().getFullYear()):localISODate();};
     $("#period-confirm").onclick=()=>{const raw=$("#period-choice").value;if(!raw)return;let next=raw;if(type==="month")next=`${raw}-01`;if(type==="number")next=`${raw}-01-01`;if(target==="history"){historyAnchor=next;historyYear=+next.slice(0,4);}else periodAnchor=next;persistUI();closeOverlay(true);render();};
   });
 }

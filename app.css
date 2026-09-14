@@ -1073,3 +1073,29 @@ body.lock-program-home{
   cursor:zoom-out;
 }
 .sheet-canvas.fiche-visual:not(.sheet-zoomed)>img{cursor:zoom-in}
+
+/* V24.4 — finitions validées : héros G alignés sur Full Mix/ATH, historique dynamique, pinch zoom */
+.session-header.session-hero-g1::before,
+.session-header.session-hero-g2::before,
+.session-header.session-hero-g3::before{
+  background-size:auto 100%!important;
+  background-position:right bottom!important;
+  background-repeat:no-repeat!important;
+  background-color:#050505!important;
+  filter:brightness(.88) contrast(1.12) saturate(.96)!important;
+}
+.session-header.session-hero-g1::after,
+.session-header.session-hero-g2::after,
+.session-header.session-hero-g3::after{
+  background:linear-gradient(90deg,#030303 0%,#030303e8 25%,#0505058a 49%,transparent 76%),linear-gradient(0deg,#050505 0%,#050505b8 18%,transparent 55%),radial-gradient(circle at 79% 35%,#e9b64b38 0%,#b77a1718 26%,transparent 50%)!important;
+}
+.history-volume-tabs button{min-width:0}
+.volume-axis-label{margin:7px 2px 0;color:#d8c48f;font-size:10px}
+.volume-chart{height:205px!important;align-items:flex-end!important;gap:4px;padding:28px 5px 22px!important}
+.volume-chart .bar-wrap{height:100%;min-width:0;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+.volume-chart .bar-wrap .bar{width:min(28px,72%);min-height:2px;position:relative;left:auto;bottom:auto}
+.volume-chart .bar-wrap label{position:absolute;bottom:-18px;font-size:8px;color:#aaa;white-space:nowrap}
+.volume-chart .bar-value{font-size:8px;color:#f2d274;margin-bottom:4px;min-height:10px;white-space:nowrap}
+.volume-unit{text-align:right;color:#8f887b;font-size:8px;margin-top:3px}
+.sheet-canvas.fiche-visual{touch-action:none}
+.sheet-canvas.fiche-visual.sheet-zoomed{touch-action:none!important}
