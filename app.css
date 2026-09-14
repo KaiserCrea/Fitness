@@ -875,3 +875,52 @@ body.lock-program-home{
 }
 .program-card.program-card-shaded::before{filter:none}
 .program-card.program-card-shaded::after{background:linear-gradient(0deg,#070707f5 0%,#08080887 45%,transparent 74%),linear-gradient(90deg,#05050594 0%,transparent 68%)}
+
+/* =====================================================================
+   V24 — Bouquet final : mesures, graphiques et harmonisation visuelle
+   ===================================================================== */
+/* Dans une séance ouverte, le cycle est déjà connu : on libère le bandeau. */
+.today-screen .header.premium-header.tall .cycle-chip{display:none!important}
+.today-screen .header.premium-header.tall .session-groups{max-width:100%!important}
+
+/* Valeurs numériques au-dessus de chaque barre, y compris 0. */
+.overview-bar-value{display:block!important;position:absolute!important;z-index:3;left:50%;transform:translateX(-50%);font-size:9px!important;font-weight:800;color:#f6dfa0!important;line-height:1;text-shadow:0 1px 4px #000;white-space:nowrap}
+
+/* Quatre rubriques dans Progression. */
+.progress-home-tabs{grid-template-columns:1.15fr 1fr .88fr .92fr}
+.progress-home-tabs button{gap:4px;padding:0 3px;font-size:8px}
+.progress-home-tabs .icon{width:17px;height:17px}
+
+/* G1/G2 : cadrage et contraste alignés sur G3. */
+.program-card-g1::before,.program-card-g2::before{background-size:cover!important;background-position:right center!important;filter:brightness(1.02) contrast(1.12) saturate(1.02)!important}
+.program-card-g1::after,.program-card-g2::after{background:linear-gradient(0deg,#070707f4 0%,#07070775 42%,transparent 73%),linear-gradient(90deg,#0008 0%,transparent 68%)!important}
+
+/* Mesures corporelles. */
+.measure-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 2px 6px}
+.measure-head h2{margin:0;font-family:Georgia,serif;color:#f0d287;font-size:21px;font-weight:500}
+.measure-head span{display:block;margin-top:3px;color:#aaa59c;font-size:8px}
+.measure-head .btn{flex:0 0 auto;min-height:38px;padding:8px 10px}
+.measure-period-tabs{margin:7px 0 9px}
+.measure-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:11px}
+.measure-metrics>div{min-height:92px;border:1px solid #604b2b;border-radius:11px;background:linear-gradient(145deg,#151718,#0b0c0d);padding:11px;display:flex;flex-direction:column;justify-content:center}
+.measure-metrics span{font-size:8px;color:#aaa59c}
+.measure-metrics b{display:block;margin:5px 0 3px;font-family:Georgia,serif;color:#f1d27c;font-size:23px;font-weight:500}
+.measure-metrics em{font-size:9px;color:#e6dfd0;font-style:normal}
+.measure-chart{padding:8px 7px 4px;overflow:hidden}
+.measure-svg{display:block;width:100%;height:190px;overflow:visible}
+.measure-line{fill:none;stroke:#efc967;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px #dba83c55)}
+.measure-point{fill:#f5d87f;stroke:#171717;stroke-width:1.5}
+.measure-calculated{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 11px}
+.measure-calculated>div{min-height:72px;border:1px solid #4e432f;border-radius:10px;background:#111313;padding:8px 4px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.measure-calculated span{font-size:7.5px;color:#aaa59c}
+.measure-calculated b{font-family:Georgia,serif;color:#efd075;font-size:16px;margin-top:5px;font-weight:500}
+.measure-history{padding:10px}
+.measure-row{width:100%;display:grid;grid-template-columns:1.15fr .9fr .9fr .75fr;gap:5px;align-items:center;border:0;border-bottom:1px solid #302e28;background:transparent;color:#e9e5dc;padding:9px 2px;text-align:left;font-size:9px}
+.measure-row:last-child{border-bottom:0}
+.measure-row b{color:#f1d27c;font-size:10px}
+.measure-row span:nth-child(n+3){text-align:right;color:#bbb5aa}
+@media(max-width:365px){
+  .progress-home-tabs button{font-size:7px;gap:2px}.progress-home-tabs .icon{width:15px;height:15px}
+  .measure-calculated{grid-template-columns:repeat(2,1fr)}
+  .measure-row{font-size:8px}.measure-row b{font-size:9px}
+}

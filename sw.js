@@ -1,9 +1,9 @@
-const CACHE = "fitness-v23-1-correctif-affichage-20260914-1";
+const CACHE = "fitness-v24-bouquet-final-20260914-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
-  "./assets/card-g1-v22.png",
-  "./assets/card-g2-v22.png",
+  "./assets/card-g1-v24.png",
+  "./assets/card-g2-v24.png",
   "./assets/hero-today-v20.png",
   "./assets/hero-progress-v20.png",
   "./assets/hero-history-v20.png",
