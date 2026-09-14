@@ -544,7 +544,7 @@ function programSessions(){
     <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
 }
 function programGCard(n){
-  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=`./assets/card-g${n}-official.png`;
+  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=`./assets/card-g${n}-${n<3?"v22":"official"}.png`;
   const positionMap={1:'right center',2:'right center',3:'right center'};return `<div class="program-card ${n<3?"program-card-shaded":""}" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
@@ -613,7 +613,7 @@ function bindProgramContent(){
 function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
   const ids=sessionIds(session);
-  const heroAsset=session.startsWith("G1")?"./assets/card-g1-official.png":session.startsWith("G2")?"./assets/card-g2-official.png":session.startsWith("G3")?"./assets/card-g3-official.png":"./assets/card-fm-official.png";
+  const heroAsset=session.startsWith("G1")?"./assets/card-g1-v22.png":session.startsWith("G2")?"./assets/card-g2-v22.png":session.startsWith("G3")?"./assets/card-g3-official.png":"./assets/card-fm-official.png";
   shell(`<header class="session-header" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button><button class="btn" id="edit-session">${icon("pencil")} Modifier</button></div>
     <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <div class="panel session-list" id="session-list">${ids.map((id,i)=>sessionRow(id,session,i+1)).join("")}</div>
@@ -919,20 +919,20 @@ function openSheet(id,session,no){
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&["charge","increment"].includes(i.dataset.param)?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
 function prepareSheetLayout(img,canvas){
-  const apply=()=>{const ratio=detectSheetNotesRatio(img),setHeight=()=>{canvas.style.height=`${Math.round(canvas.clientWidth*img.naturalHeight/img.naturalWidth*ratio)}px`;};setHeight();canvas.classList.add("sheet-analyzed");window.addEventListener("resize",setHeight,{once:true});};
+  const apply=()=>{
+    if(!img.naturalWidth||!img.naturalHeight)return;
+    const path=decodeURIComponent(new URL(img.currentSrc||img.src,document.baseURI).pathname);
+    const key=path.includes('/fiches/')?'fiches/'+path.split('/fiches/').pop():'';
+    const layout=window.FITNESS_SHEET_LAYOUTS?.[key];
+    const matches=layout&&layout.width===img.naturalWidth&&layout.height===img.naturalHeight;
+    const cut=matches?layout.cutY:img.naturalHeight,left=matches?(layout.leftX||0):0;
+    canvas.style.height='auto';canvas.style.aspectRatio=`${img.naturalWidth} / ${cut}`;
+    canvas.classList.add('sheet-analyzed');canvas.classList.toggle('sheet-with-sidebar',left>0);
+    const params=canvas.nextElementSibling;
+    if(params){params.style.marginLeft=`${left/img.naturalWidth*100}%`;params.style.marginRight='0';}
+    img.style.clipPath=left?`polygon(0 0,100% 0,100% ${cut/img.naturalHeight*100}%,${left/img.naturalWidth*100}% ${cut/img.naturalHeight*100}%,${left/img.naturalWidth*100}% ${layout.sidebarBottom/img.naturalHeight*100}%,0 ${layout.sidebarBottom/img.naturalHeight*100}%)`:'';
+  };
   if(img.complete&&img.naturalWidth)apply();else img.addEventListener("load",apply,{once:true});
-}
-function detectSheetNotesRatio(img){
-  try{
-    const w=320,h=Math.max(1,Math.round(img.naturalHeight*w/img.naturalWidth)),c=document.createElement("canvas");c.width=w;c.height=h;
-    const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(img,0,0,w,h);const px=ctx.getImageData(0,0,w,h).data;
-    const rows=[];for(let y=Math.floor(h*.72);y<Math.floor(h*.94);y++){
-      let orange=0,bright=0;for(let x=3;x<w-3;x++){const i=(y*w+x)*4,r=px[i],g=px[i+1],b=px[i+2];if(r>120&&g>45&&g<190&&b<105&&r>g*1.15)orange++;if(r>115&&g>90&&b<90)bright++;}
-      if(orange>w*.035||bright>w*.055)rows.push(y);
-    }
-    if(rows.length){const clusters=[];let a=rows[0],z=a;for(const y of rows.slice(1)){if(y-z>3){clusters.push([a,z]);a=y;}z=y;}clusters.push([a,z]);const candidates=clusters.filter(([a,z])=>a/h>.76&&a/h<.93&&(z-a)>=1);if(candidates.length)return Math.max(.76,Math.min(.93,(candidates.at(-1)[0]-3)/h));}
-  }catch{}
-  return .875;
 }
 function paramInputs(p){
   const labels={series:"Séries",repetitions:"Répétitions",charge:"Charge / référence",increment:"Incrément",reposSeries:"Repos entre séries",reposExercices:"Repos entre exercices",tours:"Tours",normal:"Gainage normal",gauche:"Latéral gauche",droite:"Latéral droit",repos:"Repos",duree:"Durée totale"};
