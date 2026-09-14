@@ -2,9 +2,9 @@
   "name": "Fitness",
   "short_name": "Fitness",
   "description": "Application personnelle de suivi d'entraînement",
-  "start_url": "./?v=24.3",
+  "start_url": "./?v=24.4",
   "scope": "./",
-  "id": "./fitness-v24-3",
+  "id": "./fitness-v24-4",
   "display": "standalone",
   "display_override": [
     "standalone"
@@ -14,13 +14,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "./icon-192-v244.png",
+      "src": "./icon-192-v245.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./icon-512-v244.png",
+      "src": "./icon-512-v245.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
