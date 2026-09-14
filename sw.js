@@ -1,6 +1,7 @@
-const CACHE = "fitness-v22-fiches-g1-g2-20260913-1";
+const CACHE = "fitness-v23-bouquet-final-20260914-1";
 const ROOT = [
   "./sheet-layouts.js",
+  "./thumbnail-map.js",
   "./assets/card-g1-v22.png",
   "./assets/card-g2-v22.png",
   "./assets/hero-today-v20.png",

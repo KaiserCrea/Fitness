@@ -27,3 +27,7 @@ Copier tout le contenu de cette archive à la racine du dépôt GitHub Fitness e
 Conserver le dossier fiches déjà présent sur GitHub : il n'est pas inclus dans l'archive légère d'installation.
 Attendre la fin du déploiement GitHub Pages, puis fermer et rouvrir l'application.
 Ne pas effacer les données de l'application : cette mise à jour conserve l'historique et les réglages existants.
+VERSION 23 — BOUQUET FINAL — 14/09/2026
+- 118 miniatures officielles intégrées dans miniatures/ et associées par thumbnail-map.js.
+- Filtres temporels, navigation, charges, statuts et écrans Programme/Progression/Historique finalisés.
+- Nettoyage unique des données d’essai lors du premier lancement V23.

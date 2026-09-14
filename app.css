@@ -743,6 +743,17 @@ body.lock-program-home{
 }
 .program-tabs-under button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:38px;font-size:11px}
 .program-tabs-under .icon{width:19px;height:19px;flex-shrink:0}
+.today-meta-single{display:block;text-align:left;padding-left:18px}
+.session-bottom-actions{display:grid;grid-template-columns:minmax(112px,.7fr) minmax(0,1.3fr);gap:9px;margin-top:10px}
+.session-bottom-actions .add-exercise{margin-top:0;min-width:0}
+.overview-period-tabs{margin-top:8px}
+.period-picker-button,.history-period-title{border:1px solid #705a31;background:#111313;color:#f2d37a;border-radius:10px;font-family:Georgia,serif;font-weight:700}
+.period-picker-button{display:block;width:calc(100% - 4px);margin:7px 2px 2px;padding:9px;font-size:17px}
+.history-period-title{padding:8px 14px;font-size:18px;min-width:190px}
+.today-period-btn{display:block;margin:0 auto 8px;border:1px solid #665535;background:#151616;color:#e7c66c;border-radius:9px;padding:7px 15px}
+.weekly-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px}
+.weekly-result{min-height:67px;border:1px solid #3e3a31;border-radius:10px;padding:9px 10px;background:#111313;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:3px 10px}
+.weekly-result b{font-family:Georgia,serif;color:#f0ce70;font-size:22px}.weekly-result span{color:#ddd;text-align:right}.weekly-result em{grid-column:1/-1;color:#b9ae96;font-style:normal;font-size:11px}.weekly-result.over-goal{border-color:#b58a38;box-shadow:inset 0 0 18px #b9891714}
 .program-home>.section-title{margin-top:8px}
 .program-home>.cycle-info{margin-top:8px}
 @media(max-width:365px){

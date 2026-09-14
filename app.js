@@ -4,8 +4,10 @@
 const DATA = window.FITNESS_DATA || {sessions:{},paramType:{},ath:{}};
 const OCCURRENCE_SHEETS = window.FITNESS_OCCURRENCE_SHEETS || {};
 const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
+const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
-const APP_REV = 9;
+const RESET_KEY = "fitness-v23-clean-reset";
+const APP_REV = 23;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -42,17 +44,21 @@ const app=$("#app"), overlayRoot=$("#overlay-root");
 
 const UI_KEY="fitness-ui-v9";
 const SCROLL_KEY="fitness-tab-scroll-v9";
+const needsCleanReset=!localStorage.getItem(RESET_KEY);
 let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
 let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
-let tab=tabs.includes(savedUI?.tab)?savedUI.tab:"today";
+let tab=!needsCleanReset&&tabs.includes(savedUI?.tab)?savedUI.tab:"today";
 let view={type:"root"};
-let programMode=["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(savedUI?.programMode==="exercises"?"groups":"sessions");
-let programExerciseGroup=savedUI?.programExerciseGroup||"Tous";
-let progressionPeriod=savedUI?.progressionPeriod||"all";
+let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(!needsCleanReset&&savedUI?.programMode==="exercises"?"groups":"sessions");
+let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
+let progressionPeriod=savedUI?.progressionPeriod||"1m";
 let progressionGroup=savedUI?.progressionGroup||"Tous";
-let progressionView=savedUI?.progressionView||"overview";
-let historyPeriod=savedUI?.historyPeriod||"year";
-let historyYear=Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
+let progressionView=!needsCleanReset&&savedUI?.progressionView||"overview";
+let overviewPeriod=!needsCleanReset&&savedUI?.overviewPeriod||"week";
+let periodAnchor=!needsCleanReset&&savedUI?.periodAnchor||localISODate();
+let historyPeriod=!needsCleanReset&&savedUI?.historyPeriod||"week";
+let historyYear=!needsCleanReset&&Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
+let historyAnchor=!needsCleanReset&&savedUI?.historyAnchor||localISODate();
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
 let navTransitionClass="";
 function rememberTabScroll(){
@@ -63,7 +69,7 @@ function rememberTabScroll(){
 }
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 function persistUI(){
-  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,historyPeriod,historyYear}));}catch{}
+  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor}));}catch{}
 }
 
 function localISODate(d=new Date()){
@@ -95,6 +101,10 @@ function inferRotations(s){
 }
 function migrate(){
   let raw=null; try{raw=JSON.parse(localStorage.getItem(KEY)||"null")}catch{}
+  if(raw&&needsCleanReset){
+    raw={installed:raw.installed!==false,cycle:cycles.includes(raw.cycle)?raw.cycle:"A",nextG:Math.min(3,Math.max(1,+raw.nextG||1)),weekKey:currentWeekKey()};
+  }
+  if(needsCleanReset)localStorage.setItem(RESET_KEY,"done");
   const s=Object.assign(defaultState(),raw||{});
   s.history=(Array.isArray(s.history)?s.history:[]).filter(h=>h&&typeof h==="object").map((h,i)=>{
     const exercises=Array.isArray(h.exercises)?h.exercises:(h.exercises&&typeof h.exercises==="object"?Object.values(h.exercises):[]);
@@ -179,6 +189,12 @@ function sheetFor(id,session,no){
   if(originalOccurrence)return pathUrl(sheetPathForOccurrence(originalOccurrence.s,originalOccurrence.n));
   const custom=state.customExercises?.[id]?.sheetPath;return custom?pathUrl(custom):"";
 }
+function thumbnailFor(id,session,no){
+  const direct=THUMBNAILS[`${session}|${no}`];
+  if(direct&&DATA.sessions?.[session]?.[Math.max(0,(+no||1)-1)]?.id===id)return pathUrl(direct);
+  const occurrence=occurrenceList(id).find(x=>THUMBNAILS[`${x.s}|${x.n}`]);
+  return occurrence?pathUrl(THUMBNAILS[`${occurrence.s}|${occurrence.n}`]):"";
+}
 function thumbClass(img){return img?"fiche-thumb":"fallback-thumb";}
 function groupForId(id){
   const occ=Object.entries(OCCURRENCE_SHEETS).find(([k])=>{
@@ -204,7 +220,7 @@ function defaultParams(id){
   const t=paramType(id);
   if(t==="gainage") return {type:t,tours:"5",normal:"1 min",gauche:"30 s",droite:"30 s",repos:"15–20 s"};
   if(t==="circuit") return {type:t,duree:"8 min",tours:"1"};
-  return {type:t,series:"4",repetitions:"10",charge:state.refs[id]||"",increment:"2,5 kg",reposSeries:"60 s",reposExercices:"60 s"};
+  return {type:t,series:"4",repetitions:"10",charge:state.refs[id]||"",reposSeries:"60 s",reposExercices:"60 s"};
 }
 function referenceFor(id){
   const p=defaultParams(id), t=p.type;
@@ -214,6 +230,8 @@ function referenceFor(id){
 }
 function normalizeWeight(v){
   const raw=String(v??"").trim();if(!raw)return"";
+  const pair=raw.replace(/\s/g,"").replace(/,/g,".").match(/^(\d+(?:\.\d+)?)[x×](\d+(?:\.\d+)?)(?:kg)?$/i);
+  if(pair)return `${String(Number(pair[1])).replace(".",",")} × ${String(Number(pair[2])).replace(".",",")} kg`;
   const m=raw.replace(",",".").match(/-?\d+(?:\.\d+)?/);if(!m)return raw;
   const n=Number(m[0]);if(!Number.isFinite(n))return raw;
   return `${String(n).replace(".",",")} kg`;
@@ -223,11 +241,12 @@ function occKey(id,no){return `${id}@@${no}`;}
 function occurrenceStatus(cur,id,no){return cur?.status?.[occKey(id,no)] ?? cur?.status?.[id] ?? "";}
 function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.values?.[id] ?? referenceFor(id);}
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
-function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,historyPeriod,historyYear};}
+function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor};}
 function applyNavState(st){
   if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
   progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionView=st.progressionView||progressionView;
-  historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;
+  overviewPeriod=st.overviewPeriod||overviewPeriod;periodAnchor=st.periodAnchor||periodAnchor;
+  historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;historyAnchor=st.historyAnchor||historyAnchor;
   persistUI();
 }
 function pushNav(v=null,newTab=null){
@@ -371,10 +390,7 @@ function renderActiveToday(cur,date){
   if(cur.session.startsWith("ATHLÉTIQUE")){renderActiveAth(cur,date);return;}
   const ids=sessionIds(cur.session),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
-    <div class="today-meta">
-      <div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div>
-      <div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div>
-    </div>
+    <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <div>${ids.map((id,i)=>todayExerciseCard(id,cur.session,i+1,cur)).join("")}</div>
     <button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>
     <div class="card finish-card">
@@ -389,7 +405,7 @@ function renderActiveToday(cur,date){
   $("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
 function todayExerciseCard(id,session,no,cur){
-  const e=exercise(id),st=occurrenceStatus(cur,id,no),img=sheetFor(id,session,no),ref=occurrenceValue(cur,id,no);
+  const e=exercise(id),st=occurrenceStatus(cur,id,no),img=thumbnailFor(id,session,no),ref=occurrenceValue(cur,id,no);
   const firstPendingNo=sessionIds(session).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
   return `<div class="exercise-card ${firstPendingNo===no?"current":""}">
     <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""></div>
@@ -423,6 +439,7 @@ function setExerciseStatus(id,status,no){
   const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};
   const key=occKey(id,no),current=occurrenceValue(cur,id,no);
   if(!cur.values[key])cur.values[key]=current;
+  if(cur.status[key]===status){delete cur.status[key];delete cur.nextRefs[key];save();render();return;}
   cur.status[key]=status;
   // Remove the legacy canonical status only when this active session has already started using occurrence keys.
   if(Object.prototype.hasOwnProperty.call(cur.status,id))delete cur.status[id];
@@ -438,7 +455,7 @@ function openNextRefModal(id,current,done){
   const p=defaultParams(id); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
   openModal(`<h3>Exercice réussi</h3><p>${esc(exercise(id).name)}</p><div class="field"><label>${esc(label)}</label><input id="next-ref" value="${esc(p.type==="strength"?(state.refs[id]||p.charge||current):current)}"></div>
     <div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="confirm-next">Valider</button></div>`,()=>{
-      $("#confirm-next").onclick=()=>{const raw=$("#next-ref").value.trim()||current;const v=p.type==="strength"?normalizeWeight(raw):raw;closeOverlay(true);done(v);};
+      $("#confirm-next").onclick=()=>{const raw=$("#next-ref").value.trim()||current;const v=p.type==="strength"?normalizeWeight(raw):raw;if(p.type==="strength"&&v){state.refs[id]=v;state.params[id]=Object.assign({},defaultParams(id),{charge:v});}closeOverlay(true);done(v);};
     });
 }
 function normalizeTimeInput(value){
@@ -501,7 +518,7 @@ function commitCurrentSession(){
 function renderActiveAth(cur,date){
   const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
-    <div class="today-meta"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div><div class="line"></div><div style="text-align:center"><div class="meta-label">Durée calculée</div><div class="timer">${durationClock(cur)}</div></div></div>
+    <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
     <div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
     <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
@@ -529,7 +546,7 @@ function openAthSheet(session){
 function renderProgram(){
   const groupIcon='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3H3M16 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 4v3h-3"/></svg>';
   shell(`<header class="header program-header" style="--session-image:url('${headerAsset("Programme")}')">
-    <div class="header__content"><h1>Programme</h1><div class="subtitle">Organisation de vos séances</div></div>
+    <div class="header__content"><h1>Programme</h1><div class="subtitle">Organisation des Séances</div></div>
     </header>
     <div class="tabs program-tabs program-tabs-under" aria-label="Rubriques du programme">${["sessions","groups","manage"].map((m,i)=>`<button data-pmode="${m}" aria-pressed="${programMode===m}" class="${programMode===m?"on":""}">${[icon("dumbbell"),groupIcon,icon("settings")][i]}<span>${["Séances","Groupes","Paramètres"][i]}</span></button>`).join("")}</div>
     ${programMode==="sessions"?programSessions():programMode==="groups"?programGroups():programManage()}`,programMode==="sessions"?"program-home-screen":"program-scroll-screen");
@@ -558,7 +575,7 @@ function programExercises(group){
   const reg=registry(),ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id)&&groupForId(id)===group).sort((a,b)=>reg[a].name.localeCompare(reg[b].name,"fr"));
   return `<div class="group-detail-head"><button class="backlink" data-back-groups>${icon("arrowleft")} Retour aux groupes</button><h2 class="section-title">${esc(group)}</h2><span>${ids.length} exercice${ids.length>1?"s":""}</span></div>
     <section class="library-section"><div class="panel">${ids.map(id=>{
-      const o=occurrenceList(id).find(x=>groupForId(id)===group)||occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo},img=sheetFor(id,o.s,o.n),count=occurrenceList(id).length;
+      const o=occurrenceList(id).find(x=>groupForId(id)===group)||occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo},img=thumbnailFor(id,o.s,o.n),count=occurrenceList(id).length;
       return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.png"}"></div><div class="library-copy"><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(group)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
     }).join("")||`<div class="empty">Aucun exercice dans ce groupe.</div>`}</div></section>`;
 }
@@ -602,7 +619,7 @@ function bindProgramContent(){
   bindVariantScrub();
   $$('[data-session-card]').forEach(b=>b.onclick=e=>{if(e.target.closest('.variant-row'))return;pushNav({type:"programDetail",session:b.dataset.sessionCard});});
   $$('[data-open-ex]').forEach(b=>b.onclick=()=>openSheet(b.dataset.openEx,b.dataset.s,+b.dataset.n));
-  $$('[data-group-open]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.groupOpen;programMode="groups";persistUI();history.replaceState(navState(),"");render();});
+  $$('[data-group-open]').forEach(b=>b.onclick=()=>{programExerciseGroup=b.dataset.groupOpen;programMode="groups";persistUI();history.pushState(navState(),"");render();});
   $$('[data-back-groups]').forEach(b=>b.onclick=()=>{programExerciseGroup="Tous";persistUI();history.replaceState(navState(),"");render();});
   if($("#cycle-position"))$("#cycle-position").onclick=openCycleModal;
   if($("#backup"))$("#backup").onclick=backupJSON;
@@ -614,10 +631,10 @@ function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
   const ids=sessionIds(session);
   const heroAsset=session.startsWith("G1")?"./assets/card-g1-v22.png":session.startsWith("G2")?"./assets/card-g2-v22.png":session.startsWith("G3")?"./assets/card-g3-official.png":"./assets/card-fm-official.png";
-  shell(`<header class="session-header" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button><button class="btn" id="edit-session">${icon("pencil")} Modifier</button></div>
+  shell(`<header class="session-header" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div>
     <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <div class="panel session-list" id="session-list">${ids.map((id,i)=>sessionRow(id,session,i+1)).join("")}</div>
-    <button class="btn gold block add-exercise" id="add-exercise">＋ Ajouter un exercice</button>`);
+    <div class="session-bottom-actions"><button class="btn" id="edit-session">${icon("pencil")} Modifier</button><button class="btn gold add-exercise" id="add-exercise">＋ Ajouter un exercice</button></div>`);
   $("#back-program").onclick=()=>history.back();
   let editing=false;
   $("#edit-session").onclick=()=>{editing=!editing;$("#session-list").classList.toggle("editing",editing);$("#edit-session").textContent=editing?"✓ Terminer":"✎ Modifier";};
@@ -627,7 +644,7 @@ function renderProgramDetail(session){
   $("#add-exercise").onclick=()=>openAddExerciseModal(session);
 }
 function sessionRow(id,session,no){
-  const e=exercise(id),img=sheetFor(id,session,no);
+  const e=exercise(id),img=thumbnailFor(id,session,no);
   return `<div class="session-row" data-session-row data-id="${esc(id)}" data-no="${no}">
     <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.png"}"></div>
     <div class="session-copy"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div></div>`;
@@ -714,18 +731,26 @@ function progressionGlobalPercent(perf){
   });
   return deltas.length?Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length):0;
 }
+function selectedRange(period,anchor=periodAnchor){
+  const d=new Date(`${anchor}T12:00:00`);let start,end;
+  if(period==="week"){start=mondayOf(d);end=new Date(start);end.setDate(end.getDate()+7);}
+  else if(period==="month"){start=new Date(d.getFullYear(),d.getMonth(),1);end=new Date(d.getFullYear(),d.getMonth()+1,1);}
+  else{start=new Date(d.getFullYear(),0,1);end=new Date(d.getFullYear()+1,0,1);}
+  return{start:localISODate(start),end:localISODate(end)};
+}
 function progressOverviewData(){
-  const hist=state.history||[],perf=allPerf();
+  const range=selectedRange(overviewPeriod),hist=(state.history||[]).filter(h=>h.date>=range.start&&h.date<range.end),perf={};
+  Object.entries(allPerf()).forEach(([id,arr])=>perf[id]=arr.filter(x=>x.date>=range.start&&x.date<range.end));
   const sessions=hist.length;
   const exercises=hist.reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0);
   const minutes=hist.reduce((n,h)=>n+(Number(h.duration)||0),0);
   const global=progressionGlobalPercent(perf);
-  const now=new Date(),weeks=[];
-  for(let i=5;i>=0;i--){
-    const d=new Date(now);d.setDate(d.getDate()-i*7);const wk=weekKeyFromDate(localISODate(d));
-    const count=hist.filter(h=>weekKeyFromDate(h.date)===wk).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0);
-    weeks.push({label:`S${6-i}`,value:count});
-  }
+  const weeks=[];
+  if(overviewPeriod==="week"){
+    const monday=new Date(`${range.start}T12:00:00`);["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].forEach((label,i)=>{const d=new Date(monday);d.setDate(d.getDate()+i);const iso=localISODate(d);weeks.push({label,value:hist.filter(h=>h.date===iso).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0)});});
+  }else if(overviewPeriod==="month"){
+    const cursor=new Date(`${range.start}T12:00:00`);let i=1;while(localISODate(cursor)<range.end){const wk=weekKeyFromDate(localISODate(cursor));weeks.push({label:`S${i++}`,value:hist.filter(h=>weekKeyFromDate(h.date)===wk).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0)});cursor.setDate(cursor.getDate()+7);}
+  }else{"J F M A M J J A S O N D".split(" ").forEach((label,i)=>weeks.push({label,value:hist.filter(h=>+h.date.slice(5,7)===i+1).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0)}));}
   const groups={Pectoraux:0,Dos:0,"Épaules":0,Bras:0,Jambes:0,Abdos:0};
   hist.forEach(h=>(h.exercises||[]).forEach(e=>{
     if(e.status==="Non réalisé")return;
@@ -750,6 +775,8 @@ function overviewDonut(distribution,total){
 function renderProgressOverview(){
   const d=progressOverviewData(),hours=Math.floor(d.minutes/60),mins=d.minutes%60;
   return `${progressHomeTabs()}
+    <div class="tabs overview-period-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"]].map(([p,l])=>`<button data-overview-period="${p}" class="${overviewPeriod===p?"on":""}">${l}</button>`).join("")}</div>
+    <button class="period-picker-button" id="overview-period-picker">${esc(periodLabel(overviewPeriod,periodAnchor))}</button>
     <div class="overview-title-row"><h2>Résumé global</h2><div><span>Cycle actuel</span><b>Cycle G - Semaine ${state.cycle}</b></div></div>
     <div class="overview-metrics">
       <div class="overview-metric"><span class="overview-metric-icon">${icon("dumbbell")}</span><b>${d.sessions}</b><span>Séances<br>réalisées</span></div>
@@ -757,7 +784,7 @@ function renderProgressOverview(){
       <div class="overview-metric"><span class="overview-metric-icon">${icon("clock")}</span><b>${hours}h ${String(mins).padStart(2,"0")}</b><span>Temps total</span></div>
       <div class="overview-metric"><span class="overview-metric-icon">${icon("trend")}</span><b>${d.global>0?"+":""}${d.global}%</b><span>Progression<br>globale</span></div>
     </div>
-    <div class="overview-section-head"><h2>Évolution du volume</h2><span>6 dernières semaines</span></div>
+    <div class="overview-section-head"><h2>${overviewPeriod==="week"?"Exercices réalisés par jour":overviewPeriod==="month"?"Exercices réalisés par semaine":"Exercices réalisés par mois"}</h2><span>${esc(periodLabel(overviewPeriod,periodAnchor))}</span></div>
     <div class="overview-panel">${overviewBars(d.weeks)}</div>
     <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
     <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
@@ -778,9 +805,11 @@ function renderProgressHistoryHome(){
 }
 function renderProgress(){
   const body=progressionView==="overview"?renderProgressOverview():progressionView==="history"?renderProgressHistoryHome():renderProgressPerformance();
-  shell(`${header("Progression","Suivi de vos performances","","compact")}${body}`,"progress-screen");
-  $$('[data-prog-view]').forEach(b=>b.onclick=()=>{progressionView=b.dataset.progView;persistUI();history.replaceState(navState(),"");render();});
-  $$("[data-prog-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.progPeriod;persistUI();history.replaceState(navState(),"");render();});
+  shell(`${header("Progression","Suivi des Performances","","compact")}${body}`,"progress-screen");
+  $$('[data-prog-view]').forEach(b=>b.onclick=()=>{progressionView=b.dataset.progView;persistUI();history.pushState(navState(),"");render();});
+  $$("[data-prog-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.progPeriod;persistUI();history.pushState(navState(),"");render();});
+  $$('[data-overview-period]').forEach(b=>b.onclick=()=>{overviewPeriod=b.dataset.overviewPeriod;persistUI();history.pushState(navState(),"");render();});
+  if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
@@ -789,7 +818,7 @@ function averageIncrease(perf,ids){
   return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
 }
 function progressRow(id,no,arr){
-  const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=sheetFor(id,o.s,o.n),trend=trendFor(id,arr),last=arr.at(-1);
+  const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),trend=trendFor(id,arr),last=arr.at(-1);
   return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
     <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">Dernière séance ${formatDate(last.date)}</div>`:""}</div>
     <div class="trend ${trend.key==="slow"?"slow":trend.key==="flat"?"flat":trend.key==="down"?"down":""}">${trend.key==="up"?"↗ ":trend.key==="down"?"↘ ":trend.key==="flat"?"→ ":""}${trend.label}</div><div class="chev">›</div></div>`;
@@ -830,47 +859,63 @@ function lineChart(nums){
     <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
 }
 function progressSettingsContent(id){
-  const p=Object.assign({type:"Charge + répétitions",increment:"+ 2,5 kg",objective:"4 × 10"},state.progressionSettings[id]||{});
-  return `<div class="history-row">Type de progression <span style="float:right">${esc(p.type)}</span></div><div class="history-row">Incrément par défaut <span style="float:right">${esc(p.increment)}</span></div><div class="history-row">Objectif actuel <span style="float:right">${esc(p.objective)}</span></div><div class="history-row">Référence prévue <span style="float:right">${esc(refWithUnit(referenceFor(id)))}</span></div>`;
+  const p=Object.assign({type:"Charge + répétitions",objective:"4 × 10"},state.progressionSettings[id]||{});
+  return `<div class="history-row">Type de progression <span style="float:right">${esc(p.type)}</span></div><div class="history-row">Objectif actuel <span style="float:right">${esc(p.objective)}</span></div><div class="history-row">Référence prévue <span style="float:right">${esc(refWithUnit(referenceFor(id)))}</span></div>`;
 }
 function openProgressSettingsModal(id){
-  const p=Object.assign({type:"Charge + répétitions",increment:"+ 2,5 kg",objective:"4 × 10"},state.progressionSettings[id]||{});
-  openModal(`<h3>Paramètres de progression</h3><div class="field"><label>Type</label><input id="ps-type" value="${esc(p.type)}"></div><div class="field" style="margin-top:6px"><label>Incrément</label><input id="ps-inc" value="${esc(p.increment)}"></div><div class="field" style="margin-top:6px"><label>Objectif</label><input id="ps-obj" value="${esc(p.objective)}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="ps-save">Enregistrer</button></div>`,()=>{
-    $("#ps-save").onclick=()=>{state.progressionSettings[id]={type:$("#ps-type").value,increment:$("#ps-inc").value,objective:$("#ps-obj").value};save();closeOverlay(true);render();};
+  const p=Object.assign({type:"Charge + répétitions",objective:"4 × 10"},state.progressionSettings[id]||{});
+  openModal(`<h3>Paramètres de progression</h3><div class="field"><label>Type</label><input id="ps-type" value="${esc(p.type)}"></div><div class="field" style="margin-top:6px"><label>Objectif</label><input id="ps-obj" value="${esc(p.objective)}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="ps-save">Enregistrer</button></div>`,()=>{
+    $("#ps-save").onclick=()=>{state.progressionSettings[id]={type:$("#ps-type").value,objective:$("#ps-obj").value};save();closeOverlay(true);render();};
   });
 }
 
 function renderHistory(){
   const scoped=historyScope(historyPeriod,historyYear),hs=scoped.history,old=scoped.old;
   const total=hs.reduce((a,h)=>a+(+h.duration||0),0),count=hs.length+old.reduce((a,w)=>a+(+w.count||0),0);
-  const weekDur=weeklyDurations(hs),knownWeeks=Object.keys(weekDur),best=Math.max(historyPeriod==="year"&&historyYear===2025?500:0,...Object.values(weekDur),0),avgWeek=knownWeeks.length?Math.round(total/knownWeeks.length):0,attendance=attendancePct(historyYear,hs,old);
-  shell(`${header("Historique","","","compact")}
+  const weekDur=weeklyDurations(hs),weekCounts=weeklySessionCounts(hs,old),knownWeeks=Object.keys(weekDur),best=Math.max(...Object.values(weekDur),0),avgWeek=knownWeeks.length?Math.round(total/knownWeeks.length):0,attendance=attendancePct(historyYear,hs,old);
+  shell(`${header("Historique","Suivi du parcours","","compact")}
     <div class="tabs">${[["week","Semaine"],["month","Mois"],["year","Année"],["all","Toutes"]].map(([p,l])=>`<button data-hperiod="${p}" class="${historyPeriod===p?"on":""}">${l}</button>`).join("")}</div>
-    <div class="history-year"><button id="prev-year">‹</button><b>${esc(scoped.label)}</b><button id="next-year">›</button></div>
+    <div class="history-year"><button id="prev-year">‹</button><button class="history-period-title" id="history-period-picker">${esc(scoped.label)}</button><button id="next-year">›</button></div><button class="today-period-btn" id="history-today">Aujourd’hui</button>
     <div class="history-grid">
       <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${formatMinutes(avgWeek)}</b><span>Moyenne / semaine</span></div>
-      <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Math.max(0,Object.values(weekDur).filter(v=>v>=300).length)}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
+      <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
     <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row"><button class="on">Durée</button><button>Nombre de séances</button><button>Moyenne</button></div>${monthBars(hs)}</div>
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Répartition par groupe musculaire</div>${muscleDonut(hs)}<button class="btn block" id="month-detail">▣ Voir le détail par mois ›</button></div>`,"history-screen");
-  $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;history.replaceState(navState(),"");render();});
-  $("#prev-year").onclick=()=>{historyYear--;persistUI();history.replaceState(navState(),"");render();};$("#next-year").onclick=()=>{historyYear++;persistUI();history.replaceState(navState(),"");render();};
-  $("#month-detail").onclick=()=>{const month=historyYear===new Date().getFullYear()?new Date().getMonth()+1:12;pushNav({type:"historyMonth",year:historyYear,month});};
+    <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>`,"history-screen");
+  $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
+  $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
+  $("#history-period-picker").onclick=()=>openPeriodPicker("history");
+  $("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
 }
 function historyScope(period,year){
   const allH=state.history||[], allOld=state.oldWeeks||[];
-  if(period==="all")return{history:allH.slice(),old:allOld.slice(),label:"Toutes"};
-  const yh=historyForYear(year),yo=oldWeekEntries(year);
+  if(period==="all")return{history:allH.slice(),old:allOld.slice(),label:"Toutes les périodes"};
+  const anchor=new Date(`${historyAnchor}T12:00:00`),selectedYear=period==="year"?year:anchor.getFullYear(),yh=historyForYear(selectedYear),yo=oldWeekEntries(selectedYear);
   if(period==="year")return{history:yh,old:yo,label:String(year)};
-  const now=new Date(), month=(year===now.getFullYear()?now.getMonth()+1:12), monthPrefix=`${year}-${String(month).padStart(2,"0")}`;
-  if(period==="month")return{history:yh.filter(h=>String(h.date).startsWith(monthPrefix)),old:yo.filter(w=>String(w.week||w.date||"").startsWith(monthPrefix)),label:new Date(year,month-1,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"})};
-  const candidates=[...yh.map(h=>localISODate(mondayOf(new Date(h.date+"T12:00:00")))),...yo.map(w=>String(w.week||w.date||"").slice(0,10))].filter(Boolean).sort();
-  const currentWk=year===now.getFullYear()?currentWeekKey():null, target=currentWk||candidates.at(-1)||`${year}-01-01`;
+  const month=anchor.getMonth()+1, monthPrefix=`${selectedYear}-${String(month).padStart(2,"0")}`;
+  if(period==="month")return{history:yh.filter(h=>String(h.date).startsWith(monthPrefix)),old:yo.filter(w=>String(w.week||w.date||"").startsWith(monthPrefix)),label:new Date(selectedYear,month-1,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"})};
+  const target=localISODate(mondayOf(anchor));
   return{history:yh.filter(h=>localISODate(mondayOf(new Date(h.date+"T12:00:00")))===target),old:yo.filter(w=>String(w.week||w.date||"").slice(0,10)===target),label:`Semaine du ${formatDate(target)}`};
+}
+function shiftHistory(delta){
+  if(historyPeriod==="all")return;const d=new Date(`${historyAnchor}T12:00:00`);
+  if(historyPeriod==="week")d.setDate(d.getDate()+delta*7);else if(historyPeriod==="month")d.setMonth(d.getMonth()+delta);else d.setFullYear(d.getFullYear()+delta);
+  historyAnchor=localISODate(d);historyYear=d.getFullYear();persistUI();history.replaceState(navState(),"");render();
+}
+function weeklyResults(hs,old){
+  const counts={};hs.forEach(h=>{const k=weekKeyFromDate(h.date);counts[k]=(counts[k]||0)+1;});old.forEach(w=>{const k=String(w.week||w.date||"").slice(0,10);counts[k]=(counts[k]||0)+(+w.count||0);});
+  if(historyPeriod!=="all"){
+    const anchor=new Date(`${historyAnchor}T12:00:00`),start=historyPeriod==="week"?mondayOf(anchor):historyPeriod==="month"?mondayOf(new Date(anchor.getFullYear(),anchor.getMonth(),1)):mondayOf(new Date(historyYear,0,1));
+    const end=historyPeriod==="week"?new Date(start.getFullYear(),start.getMonth(),start.getDate()+7):historyPeriod==="month"?new Date(anchor.getFullYear(),anchor.getMonth()+1,1):new Date(historyYear+1,0,1);
+    for(const d=new Date(start);d<end;d.setDate(d.getDate()+7)){const k=localISODate(d);if(counts[k]===undefined)counts[k]=0;}
+  }
+  const buckets=Array(8).fill(0);Object.values(counts).forEach(n=>buckets[Math.min(7,Math.max(0,n))]++);
+  return `<div class="weekly-results">${buckets.map((n,i)=>`<div class="weekly-result ${i>=6?"over-goal":""}"><b>${i}/5</b><span>${n} semaine${n>1?"s":""}</span>${i===5?`<em>Objectif atteint</em>`:i===6?`<em>Objectif dépassé !</em>`:i===7?`<em>Exceptionnel !</em>`:""}</div>`).join("")}</div>`;
 }
 function historyForYear(y){return (state.history||[]).filter(h=>Number(String(h.date).slice(0,4))===+y);}
 function oldWeekEntries(y){return (state.oldWeeks||[]).filter(w=>Number(String(w.week||w.date||"").slice(0,4))===+y);}
 function weeklyDurations(hs){const m={};hs.forEach(h=>{const k=localISODate(mondayOf(new Date(h.date+"T12:00:00")));m[k]=(m[k]||0)+(+h.duration||0);});return m;}
+function weeklySessionCounts(hs,old=[]){const m={};hs.forEach(h=>{const k=weekKeyFromDate(h.date);m[k]=(m[k]||0)+1;});old.forEach(w=>{const k=String(w.week||w.date||"").slice(0,10);m[k]=(m[k]||0)+(+w.count||0);});return m;}
 function attendancePct(y,hs,old){
   const weeks={};
   hs.forEach(h=>{const k=localISODate(mondayOf(new Date(h.date+"T12:00:00")));weeks[k]=(weeks[k]||0)+1;});
@@ -916,7 +961,7 @@ function openSheet(id,session,no){
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
   const sheetImg=$(".fiche-visual img",overlay);if(sheetImg)prepareSheetLayout(sheetImg,$(".fiche-visual",overlay));
-  $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&["charge","increment"].includes(i.dataset.param)?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
+  $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
 function prepareSheetLayout(img,canvas){
   const apply=()=>{
@@ -935,7 +980,7 @@ function prepareSheetLayout(img,canvas){
   if(img.complete&&img.naturalWidth)apply();else img.addEventListener("load",apply,{once:true});
 }
 function paramInputs(p){
-  const labels={series:"Séries",repetitions:"Répétitions",charge:"Charge / référence",increment:"Incrément",reposSeries:"Repos entre séries",reposExercices:"Repos entre exercices",tours:"Tours",normal:"Gainage normal",gauche:"Latéral gauche",droite:"Latéral droit",repos:"Repos",duree:"Durée totale"};
+  const labels={series:"Séries",repetitions:"Répétitions",charge:"Charge / référence",reposSeries:"Repos entre séries",reposExercices:"Repos entre exercices",tours:"Tours",normal:"Gainage normal",gauche:"Latéral gauche",droite:"Latéral droit",repos:"Repos",duree:"Durée totale"};
   return Object.entries(p).filter(([k])=>k!=="type").map(([k,v])=>`<div class="field"><label>${esc(labels[k]||k)}</label><input data-param="${esc(k)}" value="${esc(v)}"></div>`).join("");
 }
 function openCycleModal(){
@@ -955,6 +1000,23 @@ function openModal(html,onReady){
 function closeOverlay(goBack){
   overlayRoot.innerHTML="";
   if(goBack && history.state?.overlay)history.back();
+}
+function periodLabel(period,anchor){
+  const d=new Date(`${anchor}T12:00:00`);
+  if(period==="week")return `Semaine du ${formatDate(localISODate(mondayOf(d)))}`;
+  if(period==="month")return d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  return String(d.getFullYear());
+}
+function openPeriodPicker(target){
+  const period=target==="history"?historyPeriod:overviewPeriod;
+  const anchor=target==="history"?historyAnchor:periodAnchor;
+  if(period==="all"){historyPeriod="year";historyYear=new Date().getFullYear();historyAnchor=localISODate();persistUI();render();return;}
+  const d=new Date(`${anchor}T12:00:00`),type=period==="month"?"month":period==="year"?"number":"date";
+  const value=period==="month"?anchor.slice(0,7):period==="year"?String(d.getFullYear()):anchor;
+  openModal(`<h3>Choisir ${period==="week"?"une semaine":period==="month"?"un mois":"une année"}</h3><div class="field"><label>Période</label><input id="period-choice" type="${type}" ${type==="number"?'min="2000" max="2100"':''} value="${esc(value)}"></div><button class="btn block" id="period-now" style="margin-top:8px">Aujourd’hui</button><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="period-confirm">Afficher</button></div>`,()=>{
+    $("#period-now").onclick=()=>{$("#period-choice").value=type==="month"?localISODate().slice(0,7):type==="number"?String(new Date().getFullYear()):localISODate();};
+    $("#period-confirm").onclick=()=>{const raw=$("#period-choice").value;if(!raw)return;let next=raw;if(type==="month")next=`${raw}-01`;if(type==="number")next=`${raw}-01-01`;if(target==="history"){historyAnchor=next;historyYear=+next.slice(0,4);}else periodAnchor=next;persistUI();closeOverlay(true);render();};
+  });
 }
 function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");return d.toLocaleDateString("fr-FR");}
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
