@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-bouquet-final-20260914-1";
+const CACHE = "fitness-v24-1-correctifs-20260914-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
@@ -14,8 +14,8 @@ const ROOT = [
   "./data.js",
   "./app.js",
   "./manifest.webmanifest",
-  "./icon-192.png",
-  "./icon-512.png",
+  "./icon-192-v241.png",
+  "./icon-512-v241.png",
   "./assets/hero-program-official.png",
   "./assets/hero-today-official.png",
   "./assets/hero-progress-official.png",

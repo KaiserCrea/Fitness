@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 24;
+const APP_REV = 25;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -304,9 +304,24 @@ function shell(content,screenClass=""){
   app.innerHTML=`<main class="app ${screenClass==="program-home-screen"?"app-program-home":screenClass==="today-waiting-screen"?"app-today-waiting":""}"><section class="screen ${screenClass} ${navTransitionClass}">${content}</section></main>`;
   nav();bindGlobalInView();
 }
+function openThumbnailPreview(src){
+  if(!src)return;
+  const ov=document.createElement("div");
+  ov.className="thumb-preview-overlay";
+  ov.innerHTML=`<div class="thumb-preview-card" role="dialog" aria-modal="true" aria-label="Agrandissement de la miniature"><button class="thumb-preview-close" aria-label="Fermer">×</button><img src="${esc(src)}" alt=""></div>`;
+  overlayRoot.innerHTML="";overlayRoot.appendChild(ov);
+  history.pushState(Object.assign(navState(),{overlay:"thumb-preview"}),"");
+  ov.querySelector(".thumb-preview-close").onclick=()=>closeOverlay(true);
+  ov.onclick=e=>{if(e.target===ov)closeOverlay(true);};
+}
 function bindGlobalInView(){
   $$('[data-cycle-menu]').forEach(b=>b.onclick=()=>openCycleModal());
   $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb","official-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program-official.png";});
+  $$(".thumb img").forEach(img=>{
+    const holder=img.closest(".thumb");
+    if(holder)holder.classList.add("previewable-thumb");
+    img.onclick=e=>{e.preventDefault();e.stopPropagation();openThumbnailPreview(img.currentSrc||img.src);};
+  });
 }
 function render(){
   ensureWeek();
@@ -391,7 +406,8 @@ function timeButton(value,id){return `<button class="time-edit" id="${id}">${esc
 function renderActiveToday(cur,date){
   if(cur.session.startsWith("ATHLÉTIQUE")){renderActiveAth(cur,date);return;}
   const ids=sessionIds(cur.session),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
+  const todayHeroClass=cur.session.startsWith("G1")?"tall session-hero-g1":cur.session.startsWith("G2")?"tall session-hero-g2":"tall";
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <div>${ids.map((id,i)=>todayExerciseCard(id,cur.session,i+1,cur)).join("")}</div>
     <button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>
@@ -519,7 +535,8 @@ function commitCurrentSession(){
 }
 function renderActiveAth(cur,date){
   const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,"tall")}
+  const todayHeroClass=cur.session.startsWith("G1")?"tall session-hero-g1":cur.session.startsWith("G2")?"tall session-hero-g2":"tall";
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
     <div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
@@ -633,7 +650,8 @@ function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
   const ids=sessionIds(session);
   const heroAsset=session.startsWith("G1")?"./assets/card-g1-v24.png":session.startsWith("G2")?"./assets/card-g2-v24.png":session.startsWith("G3")?"./assets/card-g3-official.png":"./assets/card-fm-official.png";
-  shell(`<header class="session-header" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div>
+  const heroClass=session.startsWith("G1")?" session-hero-g1":session.startsWith("G2")?" session-hero-g2":"";
+  shell(`<header class="session-header${heroClass}" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div>
     <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <div class="panel session-list" id="session-list">${ids.map((id,i)=>sessionRow(id,session,i+1)).join("")}</div>
     <div class="session-bottom-actions"><button class="btn" id="edit-session">${icon("pencil")} Modifier</button><button class="btn gold add-exercise" id="add-exercise">＋ Ajouter un exercice</button></div>`);
