@@ -1,4 +1,4 @@
-const CACHE = "fitness-v23-bouquet-final-20260914-1";
+const CACHE = "fitness-v23-1-correctif-affichage-20260914-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",

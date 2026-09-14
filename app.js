@@ -195,7 +195,7 @@ function thumbnailFor(id,session,no){
   const occurrence=occurrenceList(id).find(x=>THUMBNAILS[`${x.s}|${x.n}`]);
   return occurrence?pathUrl(THUMBNAILS[`${occurrence.s}|${occurrence.n}`]):"";
 }
-function thumbClass(img){return img?"fiche-thumb":"fallback-thumb";}
+function thumbClass(img){return img?"official-thumb":"fallback-thumb";}
 function groupForId(id){
   const occ=Object.entries(OCCURRENCE_SHEETS).find(([k])=>{
     const [s,n]=k.split("|"); return DATA.sessions?.[s]?.[+n-1]?.id===id;
@@ -304,7 +304,7 @@ function shell(content,screenClass=""){
 }
 function bindGlobalInView(){
   $$('[data-cycle-menu]').forEach(b=>b.onclick=()=>openCycleModal());
-  $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program-official.png";});
+  $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb","official-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program-official.png";});
 }
 function render(){
   ensureWeek();

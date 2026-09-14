@@ -815,5 +815,63 @@ body.lock-program-home{
 .sheet-canvas.fiche-visual + .sheet-params{background:#090a0a;margin-right:0}
 .sheet-with-sidebar + .sheet-params .param-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .sheet-with-sidebar + .sheet-params .field{min-width:0}
+
+/* ===== V23.1 — correctif d'affichage =====
+   Le bandeau conserve sa hauteur ; seul le bloc de texte rejoint l'alignement
+   vertical des bandeaux Progression et Historique. */
+.header.program-header .header__content{
+  bottom:17px;
+}
+
+/* Le libellé de période occupe l'espace disponible sans passer sous le bouton
+   Aujourd'hui, quelle que soit la période sélectionnée. */
+.history-year{
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) 44px;
+  align-items:center;
+  gap:10px;
+  margin:8px 0 7px;
+}
+.history-year>button:first-child,
+.history-year>button:last-child{
+  width:44px;
+  height:36px;
+  min-width:44px;
+}
+.history-year .history-period-title{
+  display:block;
+  width:100%;
+  min-width:0;
+  height:auto;
+  min-height:40px;
+  padding:8px 5px;
+  font-size:clamp(14px,3.8vw,17px);
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.today-period-btn{
+  position:relative;
+  z-index:1;
+  clear:both;
+  margin:0 auto 12px;
+}
+
+/* Les fichiers du dossier miniatures sont déjà cadrés. Ils ne doivent jamais
+   recevoir le zoom historique utilisé pour extraire une zone d'une fiche. */
+.thumb img.official-thumb{
+  position:absolute!important;
+  z-index:1!important;
+  inset:0!important;
+  width:100%!important;
+  max-width:100%!important;
+  height:100%!important;
+  transform:none!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  filter:none!important;
+  margin:0!important;
+}
 .program-card.program-card-shaded::before{filter:none}
 .program-card.program-card-shaded::after{background:linear-gradient(0deg,#070707f5 0%,#08080887 45%,transparent 74%),linear-gradient(90deg,#05050594 0%,transparent 68%)}
