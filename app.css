@@ -983,3 +983,27 @@ body.lock-program-home{
 @media(max-width:365px){
   .thumb-preview-card{width:90vw;height:min(58vh,460px);min-height:250px}
 }
+
+
+/* =====================================================================
+   V24.2 — correctif miniatures officielles + cadrage G1/G2
+   ===================================================================== */
+/* G1/G2 reviennent aux cartes larges V22 et utilisent exactement la même
+   logique de cadrage que G3 : pas de zoom portrait spécifique. */
+.program-card-g1::before,
+.program-card-g2::before{
+  background-size:cover!important;
+  background-position:right center!important;
+  background-repeat:no-repeat!important;
+  background-color:#080808!important;
+  filter:brightness(1.10) contrast(1.10) saturate(1.04)!important;
+}
+.session-header.session-hero-g1::before,
+.session-header.session-hero-g2::before{
+  background-size:118% auto!important;
+  background-position:78% 18%!important;
+  background-repeat:no-repeat!important;
+  background-color:#050505!important;
+}
+/* La fenêtre d'agrandissement reste inchangée et affiche la vraie miniature. */
+.thumb-preview-card img{object-fit:contain!important;object-position:center!important}
