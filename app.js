@@ -315,7 +315,7 @@ function nav(){
 }
 function headerAsset(title){
   if(title==="Aujourd’hui")return "./assets/hero-today-v20.png";
-  if(title==="Programme")return "./assets/hero-program-official.png";
+  if(title==="Programme")return "./assets/hero-program-v2411.png";
   if(title==="Progression")return "./assets/hero-progress-v20.png";
   if(title==="Historique")return "./assets/hero-history-v20.png";
   return "./assets/hero-program-official.png";

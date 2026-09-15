@@ -1238,3 +1238,13 @@ body.lock-program-home{
   content:none!important;
   display:none!important;
 }
+
+/* V24.11 — Bandeau Programme validé : rendu intégré tel quel */
+.program-header::before{
+  background-image:var(--session-image)!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  filter:none!important;
+}
+.program-header::after{background:none!important;box-shadow:none!important}
+.program-header .header__content{display:none!important}
