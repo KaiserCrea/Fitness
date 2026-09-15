@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 28;
+const APP_REV = 29;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -89,7 +89,7 @@ function defaultState(){
   return {
     installed:false,cycle:"A",nextG:1,weekKey:currentWeekKey(),completedG:[],
     history:[],oldWeeks:[],refs:{},params:{},progressionSettings:{},
-    sessionOrder:{},programOverrides:{},customExercises:{},archivedExercises:[],
+    sessionOrder:{},programOverrides:{},customExercises:{},archivedExercises:[],ephemeralSessions:[],
     today:null,todayDismissed:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},measurements:[],bodySettings:{heightCm:""},appRev:APP_REV
   };
 }
@@ -117,6 +117,7 @@ function migrate(){
   s.refs=s.refs||{}; s.params=s.params||{}; s.sessionOrder=s.sessionOrder||{};
   s.programOverrides=s.programOverrides||{}; s.customExercises=s.customExercises||{};
   s.archivedExercises=Array.isArray(s.archivedExercises)?s.archivedExercises:[];
+  s.ephemeralSessions=Array.isArray(s.ephemeralSessions)?s.ephemeralSessions.filter(x=>x&&Array.isArray(x.exerciseIds)):[];
   s.progressionSettings=s.progressionSettings||{}; s.lastComplement=s.lastComplement||{}; s.athParams=s.athParams||{};
   s.measurements=Array.isArray(s.measurements)?s.measurements.filter(x=>x&&typeof x==="object"):[]; s.bodySettings=s.bodySettings||{heightCm:""};
   if(!raw?.nextAth || !raw?.nextFm) inferRotations(s);
@@ -161,6 +162,10 @@ function sessionIds(session){
   const ov=state.programOverrides[session];
   return Array.isArray(ov)?ov.slice():baseIds(session);
 }
+
+function activeSessionIds(cur){return Array.isArray(cur?.exerciseIds)?cur.exerciseIds.slice():sessionIds(cur?.session);}
+function ephemeralById(id){return state.ephemeralSessions.find(x=>x.id===id);}
+function ephemeralDisplayName(cur){return cur?.ephemeralName||ephemeralById(cur?.ephemeralId)?.name||"Séance éphémère";}
 const EXERCISE_ALIAS_GROUPS=[
   ["Développé militaire debout à la barre","Développé militaire à la barre"],
   ["Oiseau avec haltères poitrine appuyée sur banc incliné","Élévation latérale couchée sur banc incliné avec haltère","Élévation latérale couchée sur banc incliné avec haltères"],
@@ -437,9 +442,9 @@ function durationClock(cur){
 function timeButton(value,id){return `<button class="time-edit" id="${id}">${esc(value||"--:--")} ${icon("pencil")}</button>`;}
 function renderActiveToday(cur,date){
   if(cur.session.startsWith("ATHLÉTIQUE")){renderActiveAth(cur,date);return;}
-  const ids=sessionIds(cur.session),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
+  const ids=activeSessionIds(cur),statuses=ids.map((id,i)=>occurrenceStatus(cur,id,i+1)),success=statuses.filter(x=>x==="Réussi").length,fail=statuses.filter(x=>x==="Échoué").length,skip=statuses.filter(x=>x==="Non réalisé").length;
   const todayHeroClass=cur.session.startsWith("G1")?"tall session-hero-g1":cur.session.startsWith("G2")?"tall session-hero-g2":"tall";
-  shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
+  shell(`${header("Aujourd’hui",date,`<div class="session-code">${esc(cur.ephemeral?ephemeralDisplayName(cur):niceSession(cur.session))}</div><div class="session-groups">${esc(cur.ephemeral?"Séance hors-cycle":groupLabel(cur.session))}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <div>${ids.map((id,i)=>todayExerciseCard(id,cur.session,i+1,cur)).join("")}</div>
     <button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>
@@ -456,7 +461,7 @@ function renderActiveToday(cur,date){
 }
 function todayExerciseCard(id,session,no,cur){
   const e=exercise(id),st=occurrenceStatus(cur,id,no),img=thumbnailFor(id,session,no),ref=occurrenceValue(cur,id,no);
-  const firstPendingNo=sessionIds(session).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
+  const firstPendingNo=activeSessionIds(cur).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
   return `<div class="exercise-card ${firstPendingNo===no?"current":""}">
     <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""></div>
     <div class="ex-info"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div></div>
@@ -473,7 +478,7 @@ function sessionHasDraftData(cur){
 function cancelCurrentSession(){
   const cur=state.today;if(!cur)return;
   const finish=()=>{
-    state.todayDismissed={date:localISODate(),session:cur.session};
+    state.todayDismissed=cur.ephemeral?null:{date:localISODate(),session:cur.session};
     state.today=null;
     save();
     rememberTabScroll();
@@ -537,7 +542,7 @@ function saveCurrentSession(){
     return;
   }
   if(!cur.session.startsWith("ATHLÉTIQUE")){
-    const ids=sessionIds(cur.session);
+    const ids=activeSessionIds(cur);
     const missing=ids.map((id,i)=>({id,no:i+1,key:occKey(id,i+1)})).filter(o=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,o.id,o.no)));
     if(missing.length){
       openModal(`<h3>Statuts à compléter</h3><p>${missing.length} exercice(s) n'ont pas encore de statut. Chaque exercice doit être Réussi, Échoué ou Non réalisé.</p>
@@ -552,9 +557,9 @@ function saveCurrentSession(){
 function commitCurrentSession(){
   const cur=state.today;if(!cur)return;
   const mins=minutesBetweenTimes(cur.start,cur.end);if(mins==null)return;
-  const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:sessionIds(cur.session);
+  const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:activeSessionIds(cur);
   const exRecords=ids.map((id,i)=>{const no=i+1,status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual;return{id,name:exercise(id).name,status,actual,next,no};}).filter(e=>e.status!=="Non réalisé");
-  state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.session,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
+  state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
   ids.forEach((id,i)=>{const v=occurrenceNext(cur,id,i+1);if(!v)return;state.refs[id]=v;const p=defaultParams(id);if(p.type==="strength"){p.charge=v;state.params[id]=p;}});
   if(/^G[123][ABC]$/.test(cur.session)){
     const n=+cur.session[1]; if(!state.completedG.includes(n))state.completedG.push(n);state.nextG=Math.min(3,n+1);
@@ -643,8 +648,40 @@ function programManage(){
       <label class="btn block" style="display:block;text-align:center;margin-top:6px">Restaurer une sauvegarde<input id="restore" type="file" accept=".json,application/json" hidden></label>
       <button class="btn block" id="export" style="margin-top:6px">Exporter l’historique (CSV)</button>
     </div>
+    <h2 class="section-title">Séances éphémères</h2>
+    <div class="card ephemeral-card"><button class="btn gold block" id="add-ephemeral">${icon("plus")} Ajouter une séance éphémère</button>
+      <div class="ephemeral-list">${state.ephemeralSessions.length?state.ephemeralSessions.map(x=>`<div class="ephemeral-row"><div><b>${esc(x.name||"Séance éphémère")}</b><span>${x.exerciseIds.length} exercice${x.exerciseIds.length>1?"s":""}</span></div><div class="ephemeral-actions"><button class="backlink" data-start-ephemeral="${esc(x.id)}">Démarrer</button><button class="backlink" data-edit-ephemeral="${esc(x.id)}">Modifier</button><button class="backlink" data-delete-ephemeral="${esc(x.id)}">Supprimer</button></div></div>`).join(""):`<div class="empty">Aucune séance éphémère enregistrée.</div>`}</div>
+    </div>
     <h2 class="section-title">Exercices archivés</h2><div class="card">${state.archivedExercises.length?state.archivedExercises.map(id=>`<div class="history-row"><b>${esc(exercise(id).name)}</b><button class="backlink" data-unarchive="${esc(id)}" style="float:right">Restaurer</button></div>`).join(""):`<div class="empty">Aucun exercice archivé.</div>`}</div>`;
 }
+function openEphemeralEditor(editId=""){
+  const existing=ephemeralById(editId),groups=["Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"];
+  const initialIds=existing?.exerciseIds||[];
+  const selectedGroups=new Set(initialIds.map(groupForId));
+  openModal(`<h3>${existing?"Modifier":"Créer"} une séance éphémère</h3><p>Choisissez les groupes musculaires à afficher.</p><div class="ephemeral-group-picks">${groups.map(g=>`<label class="ephemeral-pick"><input type="checkbox" value="${esc(g)}" ${selectedGroups.has(g)?"checked":""}><span>${esc(g)}</span></label>`).join("")}</div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="ephemeral-next">Choisir les exercices</button></div>`,ov=>{
+    $("#ephemeral-next",ov).onclick=()=>{const chosen=$$(".ephemeral-pick input:checked",ov).map(x=>x.value);if(!chosen.length)return;closeOverlay(false);openEphemeralExercises(existing,chosen);};
+  });
+}
+function openEphemeralExercises(existing,groups){
+  const reg=registry(),initial=new Set(existing?.exerciseIds||[]),ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id)&&groups.includes(groupForId(id))).sort((a,b)=>reg[a].name.localeCompare(reg[b].name,"fr"));
+  openModal(`<h3>Exercices de la séance</h3><div class="field"><label>Nom de la séance (facultatif)</label><input id="ephemeral-name" value="${esc(existing?.name||"")}" placeholder="Ex. Bras, Rattrapage…"></div><p>Cochez les exercices. L’ordre affiché sera l’ordre de la séance.</p><div class="option-list">${ids.map(id=>`<div class="option-row ephemeral-ex-option"><label><b>${esc(exercise(id).name)}</b><span>${esc(groupForId(id))}</span></label><div class="ephemeral-order-tools"><input type="checkbox" value="${esc(id)}" ${initial.has(id)?"checked":""}><button type="button" class="backlink" data-move-up aria-label="Monter">↑</button><button type="button" class="backlink" data-move-down aria-label="Descendre">↓</button></div></div>`).join("")}</div><div class="modal-actions"><button class="btn ghost" id="ephemeral-back">Retour</button><button class="btn gold" id="ephemeral-save">Enregistrer</button></div>`,ov=>{
+    $$('[data-move-up]',ov).forEach(b=>b.onclick=()=>{const r=b.closest('.ephemeral-ex-option');if(r?.previousElementSibling)r.parentNode.insertBefore(r,r.previousElementSibling);});
+    $$('[data-move-down]',ov).forEach(b=>b.onclick=()=>{const r=b.closest('.ephemeral-ex-option'),n=r?.nextElementSibling;if(n)r.parentNode.insertBefore(n,r);});
+    $("#ephemeral-back",ov).onclick=()=>{closeOverlay(false);openEphemeralEditor(existing?.id||"");};
+    $("#ephemeral-save",ov).onclick=()=>{const exerciseIds=$$(".ephemeral-ex-option input:checked",ov).map(x=>x.value);if(!exerciseIds.length)return;const name=$("#ephemeral-name",ov).value.trim()||"Séance éphémère";if(existing){existing.name=name;existing.exerciseIds=exerciseIds;}else state.ephemeralSessions.push({id:"eph-"+Date.now(),name,exerciseIds});save();closeOverlay(true);render();};
+  });
+}
+function startEphemeral(id){
+  const x=ephemeralById(id);if(!x||!x.exerciseIds.length)return;
+  const snapshot={};x.exerciseIds.forEach((eid,i)=>snapshot[occKey(eid,i+1)]=referenceFor(eid));
+  state.today={session:"ÉPHÉMÈRE",ephemeral:true,ephemeralId:x.id,ephemeralName:x.name,exerciseIds:x.exerciseIds.slice(),start:"",end:"",manualTimes:true,status:{},values:snapshot,nextRefs:{}};
+  state.todayDismissed=null;save();rememberTabScroll();tab="today";view={type:"root"};tabScroll.today=0;persistUI();history.replaceState(navState(),"");render();restoreTabScroll("today");
+}
+function deleteEphemeral(id){
+  const x=ephemeralById(id);if(!x)return;
+  openModal(`<h3>Supprimer la séance ?</h3><p>${esc(x.name)} sera retirée de Paramètres. Les séances déjà enregistrées dans l’historique resteront conservées.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="confirm-delete-ephemeral">Supprimer</button></div>`,ov=>{$("#confirm-delete-ephemeral",ov).onclick=()=>{state.ephemeralSessions=state.ephemeralSessions.filter(e=>e.id!==id);save();closeOverlay(true);render();};});
+}
+
 let programVariantTimer=0;
 function activateProgramVariant(btn){
   const session=btn?.dataset?.openG||btn?.dataset?.openComp;if(!session||programVariantTimer)return;
@@ -676,6 +713,10 @@ function bindProgramContent(){
   if($("#backup"))$("#backup").onclick=backupJSON;
   if($("#restore"))$("#restore").onchange=restoreJSON;
   if($("#export"))$("#export").onclick=exportCSV;
+  if($("#add-ephemeral"))$("#add-ephemeral").onclick=()=>openEphemeralEditor();
+  $$('[data-start-ephemeral]').forEach(b=>b.onclick=()=>startEphemeral(b.dataset.startEphemeral));
+  $$('[data-edit-ephemeral]').forEach(b=>b.onclick=()=>openEphemeralEditor(b.dataset.editEphemeral));
+  $$('[data-delete-ephemeral]').forEach(b=>b.onclick=()=>deleteEphemeral(b.dataset.deleteEphemeral));
   $$('[data-unarchive]').forEach(b=>b.onclick=()=>{state.archivedExercises=state.archivedExercises.filter(x=>x!==b.dataset.unarchive);save();render();});
 }
 function renderProgramDetail(session){
