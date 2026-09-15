@@ -1129,3 +1129,47 @@ body.lock-program-home{
   background:linear-gradient(180deg,#ffe18a,#e3af42)!important;
   box-shadow:inset 0 1px 0 #fff5bd88,0 0 15px #dba63b2c!important;
 }
+
+/* =====================================================================
+   V24.6 — harmonisation définitive cartes + bandeaux G1/G2/G3
+   ===================================================================== */
+/* Cartes G1/G2/G3 de Programme : davantage de relief doré, tout en gardant
+   le rendu sombre premium des cartes Athlétique / Full Mix. */
+.program-card-g1::before,
+.program-card-g2::before,
+.program-card-g3::before{
+  background-size:cover!important;
+  background-position:right center!important;
+  background-repeat:no-repeat!important;
+  filter:brightness(1.00) contrast(1.10) saturate(1.04)!important;
+  opacity:.98!important;
+}
+.program-card-g1::after,
+.program-card-g2::after,
+.program-card-g3::after{
+  background:
+    radial-gradient(circle at 80% 34%,#efbd5940 0%,#c88f2318 27%,transparent 50%),
+    linear-gradient(90deg,#020202d9 0%,#030303a8 30%,#05050542 55%,transparent 80%),
+    linear-gradient(0deg,#040404e8 0%,#0505058a 25%,transparent 62%)!important;
+}
+
+/* Pages G1/G2/G3 ouvertes : reprendre exactement le cadrage de base utilisé
+   par Full Mix, au lieu du cover qui zoomait et coupait le personnage. */
+.session-header.session-hero-g1::before,
+.session-header.session-hero-g2::before,
+.session-header.session-hero-g3::before{
+  background-image:
+    linear-gradient(90deg,#040404 0%,#050505ee 32%,#0505059d 49%,transparent 76%),
+    linear-gradient(0deg,#050505 0%,transparent 56%),
+    var(--session-image)!important;
+  background-size:118% auto!important;
+  background-position:78% 18%!important;
+  background-repeat:no-repeat!important;
+  background-color:#050505!important;
+  filter:saturate(.9) contrast(1.12) brightness(.92)!important;
+}
+.session-header.session-hero-g1::after,
+.session-header.session-hero-g2::after,
+.session-header.session-hero-g3::after{
+  background:radial-gradient(circle at 75% 41%,#e6b54b25,transparent 33%)!important;
+}
