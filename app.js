@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 27;
+const APP_REV = 28;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -133,7 +133,7 @@ function migrate(){
 }
 let state=migrate();
 
-function save(){ localStorage.setItem(KEY,JSON.stringify(state)); }
+function save(){ invalidateDerivedCaches(); localStorage.setItem(KEY,JSON.stringify(state)); }
 function ensureWeek(){
   const wk=currentWeekKey();
   if(state.weekKey===wk) return;
@@ -173,15 +173,18 @@ const EXERCISE_ALIAS_GROUPS=[
   ["Relevé de jambes suspendu","Relevé de genoux suspendu à la barre fixe","Relevé de jambes","Relevé de jambes (suspension ou appui)"]
 ];
 function exerciseNameKey(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();}
-function rawExerciseEntries(){return Object.entries(DATA.sessions||{}).flatMap(([session,es])=>(es||[]).map((e,i)=>({session,e,i})));}
+const RAW_EXERCISE_ENTRIES=Object.entries(DATA.sessions||{}).flatMap(([session,es])=>(es||[]).map((e,i)=>({session,e,i})));
+const RAW_EXERCISE_BY_ID=new Map(RAW_EXERCISE_ENTRIES.map(x=>[x.e.id,x.e]));
+const RAW_EXERCISE_BY_NAME=new Map(RAW_EXERCISE_ENTRIES.map(x=>[exerciseNameKey(x.e.name),x.e]));
+function rawExerciseEntries(){return RAW_EXERCISE_ENTRIES;}
 function aliasGroupForName(name){const k=exerciseNameKey(name);return EXERCISE_ALIAS_GROUPS.find(g=>g.some(n=>exerciseNameKey(n)===k));}
 function canonicalId(id){
-  const raw=rawExerciseEntries().find(x=>x.e.id===id)?.e||state.customExercises?.[id]; if(!raw)return id;
+  const raw=RAW_EXERCISE_BY_ID.get(id)||state.customExercises?.[id]; if(!raw)return id;
   const group=aliasGroupForName(raw.name); if(!group)return id;
-  for(const preferred of group){const hit=rawExerciseEntries().find(x=>exerciseNameKey(x.e.name)===exerciseNameKey(preferred));if(hit)return hit.e.id;}
+  for(const preferred of group){const hit=RAW_EXERCISE_BY_NAME.get(exerciseNameKey(preferred));if(hit)return hit.id;}
   return id;
 }
-function canonicalDisplayName(id){const raw=rawExerciseEntries().find(x=>x.e.id===id)?.e||state.customExercises?.[id];const group=aliasGroupForName(raw?.name);return group?.[0]||raw?.name||id;}
+function canonicalDisplayName(id){const raw=RAW_EXERCISE_BY_ID.get(id)||state.customExercises?.[id];const group=aliasGroupForName(raw?.name);return group?.[0]||raw?.name||id;}
 function buildRegistry(){
   const reg={};
   Object.entries(DATA.sessions||{}).forEach(([session,es])=>es.forEach((e,i)=>{
@@ -190,13 +193,16 @@ function buildRegistry(){
   Object.entries(state.customExercises||{}).forEach(([id,e])=>{const cid=canonicalId(id);if(!reg[cid])reg[cid]=Object.assign({id:cid,firstSession:"",firstNo:1},e)});
   return reg;
 }
-function registry(){return buildRegistry();}
+let registryCache=null,occurrenceCache=new Map();
+function invalidateDerivedCaches(){registryCache=null;occurrenceCache.clear();}
+function registry(){return registryCache||(registryCache=buildRegistry());}
 function exercise(id){const cid=canonicalId(id);return registry()[cid]||{id:cid,name:canonicalDisplayName(id),remark:""};}
 function occurrenceList(id){
-  const out=[],cid=canonicalId(id);
+  const cid=canonicalId(id);if(occurrenceCache.has(cid))return occurrenceCache.get(cid);
+  const out=[];
   const sessions=new Set([...Object.keys(DATA.sessions||{}),...Object.keys(state.programOverrides||{})]);
   sessions.forEach(s=>sessionIds(s).forEach((eid,i)=>{if(canonicalId(eid)===cid)out.push({s,n:i+1,id:eid});}));
-  return out;
+  occurrenceCache.set(cid,out);return out;
 }
 function sheetPathForOccurrence(session,no){return OCCURRENCE_SHEETS[`${session}|${no}`]||"";}
 function canonicalSheetOccurrence(id){
