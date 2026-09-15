@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 29;
+const APP_REV = 30;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -249,6 +249,27 @@ function groupForId(id){
   return state.customExercises?.[id]?.group||"Autre";
 }
 function paramType(id){return DATA.paramType?.[id]||state.customExercises?.[id]?.paramType||"strength";}
+function repetitionTargetFor(id){
+  const raw=String(exercise(id)?.name||id||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[’']/g," ");
+  const rules=[
+    ["developpe couche machine convergente","8–10"],["developpe couche avec halteres","8–10"],["developpe incline smith","8–10"],["developpe incline avec halteres","8–10"],["developpe incline halteres","8–10"],["developpe epaules halteres","8–10"],
+    ["developpe militaire debout","6–10"],["developpe militaire a la barre","6–10"],["developpe militaire barre","6–10"],["developpe militaire","6–10"],["squat libre","6–10"],["souleve de terre","5–8"],["rowing barre","6–10"],
+    ["ecarte unilateral a la poulie basse","12–15"],["ecarte unilateral poulie basse","12–15"],["ecarte poulie basse assis","12–15"],["ecarte couche","12–15"],["ecarte incline","12–15"],["ecarte a la poulie basse vers le haut","12–15"],["ecarte poulie basse vers haut","12–15"],["pec deck","12–15"],["butterfly","12–15"],
+    ["dips lestes","8–10"],["curl biceps a la barre ez","10–12"],["curl barre ez","10–12"],["curl biceps avec halteres","10–12"],["curl halteres","10–12"],["curl unilateral sur pupitre vertical","12–15"],["pupitre vertical","12–15"],
+    ["crunch abdominal","15–20"],["abdominaux","15–20"],["tirage horizontal a la poulie avec double poignee","8–12"],["tirage horizontal double poignee","8–12"],["tirage bras tendus","12–15"],["rowing unilateral","8–10"],["tirage vertical prise serree","8–12"],["tirage vertical serre","8–12"],
+    ["extension triceps a la poulie","10–15"],["barre au front","10–12"],["dips sur banc","12–15"],["releve de jambes","12–20"],["flexions laterales","15–20"],["tirage menton","10–12"],["elevation laterale unilateral","15–20"],["elevations laterales avec halteres","15–20"],["elevations laterales assis","15–20"],["elevation laterale couchee","15–20"],["elevation laterale poulie derriere","15–20"],["elevation laterale poulie","15–20"],
+    ["hack squat","8–10"],["leg extension","12–15"],["leg curl allonge","10–15"],["leg curl assis","10–15"],["mollets debout","12–20"],["mollets assis","12–20"],["mollets smith","12–20"],
+    ["spider curl","10–15"],["curl marteau","10–12"],["curl poulie basse v","12–15"],["tirage vertical neutre","8–12"],["tirage horizontal large","8–12"],["rowing assis machine","8–12"],["extension triceps corde","12–15"],["extension triceps au-dessus","10–15"],["extension triceps couche","10–12"],["crunch leste","10–15"],["flexion laterale lestee","12–15"],
+    ["reverse pec deck","15–20"],["oiseau","15–20"],["leg press horizontale","8–12"],["leg press","8–12"],["chest press","8–12"],["curl incline","10–12"],["curl ez pronation","10–15"],["curl biceps a la machine","10–15"],["curl machine","10–15"],
+    ["lat pulldown","8–12"],["rowing a la poulie basse","8–12"],["rowing poulie basse","8–12"],["extension triceps poulie arriere","12–15"],["extension triceps prise inversee","12–15"],["dips assis","8–12"],["elevation en y","15–20"],["elevation y","15–20"],["goblet squat","10–15"],["fentes marchees","10–15 / jambe"],["chaise romaine","12–20"],
+    ["rowing poitrine appuyee","8–12"],["tractions","6–12"],["curl pupitre ez","10–12"],["magic triceps ez","10–12"],["magic triceps halteres","10–12"],["extension corde au-dessus","12–15"],["fentes bulgares","8–12 / jambe"],["extension lombaire","12–15"],["extension triceps unilaterale","12–15"],["pallof press","12–15 / côté"],["adduction hanche","15–20"],["abduction hanche","15–20"],["face pull","15–20"],["crunch poulie","12–20"],["releve genoux suspendu","12–20"],["wood chop","12–15 / côté"],
+    ["biceps black jack","Protocole Black Jack"],["gainage","30–60 s"],["circuit abdos","8 min"]
+  ];
+  for(const [key,val] of rules)if(raw.includes(key))return val;
+  return "";
+}
+function repetitionBounds(id){const t=repetitionTargetFor(id),m=t.match(/(\d+)\s*[–-]\s*(\d+)/);return m?{min:+m[1],max:+m[2]}:null;}
+function repNumber(v){const m=String(v??"").match(/\d+/);return m?+m[0]:NaN;}
 function defaultParams(id){
   const existing=state.params[id]; if(existing&&Object.keys(existing).length)return clone(existing);
   const t=paramType(id);
@@ -278,7 +299,7 @@ function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?
 function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor};}
 function applyNavState(st){
   if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
-  progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionView=st.progressionView||progressionView; measurementPeriod=st.measurementPeriod||measurementPeriod;
+  progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionView=st.progressionView||progressionView; measurementPeriod=(st.measurementPeriod==="week"?"month":st.measurementPeriod)||measurementPeriod;
   overviewPeriod=st.overviewPeriod||overviewPeriod;periodAnchor=st.periodAnchor||periodAnchor;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;historyAnchor=st.historyAnchor||historyAnchor;
   persistUI();
@@ -491,7 +512,7 @@ function cancelCurrentSession(){
   openModal(`<h3>Annuler la séance ?</h3><p>Les informations saisies pour cette séance seront supprimées. Le cycle, l’historique et les statistiques ne seront pas modifiés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Continuer la séance</button><button class="btn gold" id="confirm-cancel-session">Annuler la séance</button></div>`,()=>{$("#confirm-cancel-session").onclick=finish;});
 }
 function setExerciseStatus(id,status,no){
-  const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};
+  const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};cur.reps=cur.reps||{};cur.nextReps=cur.nextReps||{};
   const key=occKey(id,no),current=occurrenceValue(cur,id,no);
   if(!cur.values[key])cur.values[key]=current;
   if(cur.status[key]===status){delete cur.status[key];delete cur.nextRefs[key];save();render();return;}
@@ -499,7 +520,7 @@ function setExerciseStatus(id,status,no){
   // Remove the legacy canonical status only when this active session has already started using occurrence keys.
   if(Object.prototype.hasOwnProperty.call(cur.status,id))delete cur.status[id];
   if(status==="Réussi"){
-    openNextRefModal(id,current,next=>{cur.nextRefs[key]=next;save();render();});
+    openNextRefModal(id,current,(next,doneReps,nextReps)=>{cur.nextRefs[key]=next;if(Number.isFinite(doneReps))cur.reps[key]=doneReps;if(Number.isFinite(nextReps))cur.nextReps[key]=nextReps;save();render();});
   }else{
     if(status==="Échoué")cur.nextRefs[key]=current;
     else delete cur.nextRefs[key];
@@ -507,10 +528,11 @@ function setExerciseStatus(id,status,no){
   }
 }
 function openNextRefModal(id,current,done){
-  const p=defaultParams(id); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
-  openModal(`<h3>Exercice réussi</h3><p>${esc(exercise(id).name)}</p><div class="field"><label>${esc(label)}</label><input id="next-ref" value="${esc(p.type==="strength"?(state.refs[id]||p.charge||current):current)}"></div>
+  const p=defaultParams(id),target=repetitionTargetFor(id),bounds=repetitionBounds(id); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
+  const currentRep=repNumber(p.repetitions),suggested=Number.isFinite(currentRep)&&bounds?Math.min(bounds.max,currentRep):currentRep;
+  openModal(`<h3>Exercice réussi</h3><p>${esc(exercise(id).name)}</p>${target?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(target)}</b></div>`:""}${p.type==="strength"?`<div class="param-grid"><div class="field"><label>Répétitions réalisées</label><input id="done-reps" inputmode="numeric" value="${Number.isFinite(currentRep)?currentRep:""}"></div><div class="field"><label>Prochaine cible répétitions</label><input id="next-reps" inputmode="numeric" value="${Number.isFinite(suggested)?suggested:""}"></div></div>`:""}<div class="field" style="margin-top:6px"><label>${esc(label)}</label><input id="next-ref" value="${esc(p.type==="strength"?(state.refs[id]||p.charge||current):current)}"></div>
     <div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="confirm-next">Valider</button></div>`,()=>{
-      $("#confirm-next").onclick=()=>{const raw=$("#next-ref").value.trim()||current;const v=p.type==="strength"?normalizeWeight(raw):raw;if(p.type==="strength"&&v){state.refs[id]=v;state.params[id]=Object.assign({},defaultParams(id),{charge:v});}closeOverlay(true);done(v);};
+      $("#confirm-next").onclick=()=>{const raw=$("#next-ref").value.trim()||current;const v=p.type==="strength"?normalizeWeight(raw):raw;const doneReps=p.type==="strength"?repNumber($("#done-reps")?.value):NaN,nextReps=p.type==="strength"?repNumber($("#next-reps")?.value):NaN;if(p.type==="strength"&&v){state.refs[id]=v;state.params[id]=Object.assign({},defaultParams(id),{charge:v,repetitions:Number.isFinite(nextReps)?String(nextReps):p.repetitions});}closeOverlay(true);done(v,doneReps,nextReps);};
     });
 }
 function normalizeTimeInput(value){
@@ -558,7 +580,7 @@ function commitCurrentSession(){
   const cur=state.today;if(!cur)return;
   const mins=minutesBetweenTimes(cur.start,cur.end);if(mins==null)return;
   const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:activeSessionIds(cur);
-  const exRecords=ids.map((id,i)=>{const no=i+1,status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual;return{id,name:exercise(id).name,status,actual,next,no};}).filter(e=>e.status!=="Non réalisé");
+  const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual,reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps;return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no};}).filter(e=>e.status!=="Non réalisé");
   state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
   ids.forEach((id,i)=>{const v=occurrenceNext(cur,id,i+1);if(!v)return;state.refs[id]=v;const p=defaultParams(id);if(p.type==="strength"){p.charge=v;state.params[id]=p;}});
   if(/^G[123][ABC]$/.test(cur.session)){
@@ -789,17 +811,22 @@ function renderAthProgram(session){
 }
 
 function allPerf(){
-  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,status:e.status,session:h.session,duration:h.duration});}}));return m;
+  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,reps:e.reps,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return m;
 }
 function periodStart(period){
   const d=new Date(); if(period==="1m")d.setMonth(d.getMonth()-1);else if(period==="3m")d.setMonth(d.getMonth()-3);else if(period==="6m")d.setMonth(d.getMonth()-6);else if(period==="1y")d.setFullYear(d.getFullYear()-1);else return null;return localISODate(d);
 }
 function trendFor(id,arr){
   if(!arr||arr.length<2)return{key:"none",label:"Données insuffisantes"};
-  const nums=arr.map(x=>parseNumber(x.value)).filter(Number.isFinite);if(nums.length>=2&&nums.at(-1)<nums.at(-2))return{key:"down",label:"Régression"};
-  let same=1;for(let i=arr.length-1;i>0;i--){if(normalizeRef(arr[i].value)===normalizeRef(arr[i-1].value))same++;else break;}
+  const a=arr[arr.length-2],b=arr[arr.length-1],wa=parseNumber(a.value),wb=parseNumber(b.value),ra=repNumber(a.reps),rb=repNumber(b.reps),bounds=repetitionBounds(id);
+  if(Number.isFinite(wa)&&Number.isFinite(wb)){
+    if(wb>wa)return{key:"up",label:"Progression nette"};
+    if(wb===wa&&Number.isFinite(ra)&&Number.isFinite(rb)&&rb>ra)return{key:"up",label:"Progression nette"};
+    if(wb<wa)return{key:"down",label:"Régression"};
+    if(wb===wa&&Number.isFinite(ra)&&Number.isFinite(rb)&&rb<ra)return{key:"down",label:"Régression"};
+  }
+  let same=1;for(let i=arr.length-1;i>0;i--){if(normalizeRef(arr[i].value)===normalizeRef(arr[i-1].value)&&repNumber(arr[i].reps)===repNumber(arr[i-1].reps))same++;else break;}
   if(same>=6)return{key:"flat",label:"Stagnation"};if(same>=4)return{key:"slow",label:"Progression lente"};
-  if(nums.length>=2&&nums.at(-1)>nums[0])return{key:"up",label:"Progression nette"};
   return{key:"none",label:"Données insuffisantes"};
 }
 function normalizeRef(v){return String(v??"").trim().toLowerCase();}
@@ -897,9 +924,9 @@ function renderProgressHistoryHome(){
   return `${progressHomeTabs()}<div class="overview-section-head"><h2>Historique des séances</h2><span>${recent.length} dernières</span></div><div class="panel progress-history-home">${recent.map(h=>`<div class="progress-history-row"><div><b>${esc(h.session||"Séance")}</b><span>${esc(h.date||"")}</span></div><div><b>${Number(h.duration)||0} min</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div></div>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`}</div>`;
 }
 function measurementRange(period){
+  if(period==="all")return null;
   const d=new Date();let start;
-  if(period==="week")start=mondayOf(d);
-  else if(period==="month")start=new Date(d.getFullYear(),d.getMonth(),1);
+  if(period==="month")start=new Date(d.getFullYear(),d.getMonth(),1);
   else start=new Date(d.getFullYear(),0,1);
   return localISODate(start);
 }
@@ -921,18 +948,18 @@ function smoothMeasureChart(rows,key="weight",unit="kg"){
   return `<svg class="measure-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g><path class="measure-line" d="${path}"/>${pts.map(q=>`<circle class="chart-point measure-point" cx="${q.x}" cy="${q.y}" r="4.5"><title>${formatDate(q.date)} : ${round1(q.v)} ${unit}</title></circle><text class="chart-label" x="${q.x}" y="${q.y-9}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
 }
 function renderMeasurements(){
-  const all=measurementRows(),start=measurementRange(measurementPeriod),rows=all.filter(x=>String(x.date)>=start),last=all.at(-1),prev=all.at(-2),c=last?measurementCalc(last):null;
+  const all=measurementRows(),start=measurementRange(measurementPeriod),rows=start?all.filter(x=>String(x.date)>=start):all,last=all.at(-1),prev=all.at(-2),c=last?measurementCalc(last):null;
   const fmt=(v,s="")=>Number.isFinite(v)?`${round1(v)}${s}`:"—";
   return `${progressHomeTabs()}
     <div class="measure-head"><div><h2>Mesures corporelles</h2><span>${last?`Dernière mesure : ${formatDate(last.date)}`:"Aucune mesure enregistrée"}</span></div><button class="btn gold" id="add-measure">＋ Ajouter</button></div>
-    <div class="tabs measure-period-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"]].map(([p,l])=>`<button data-measure-period="${p}" class="${measurementPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <div class="measure-metrics">
       <div><span>Poids</span><b>${c?fmt(c.weight," kg"):"—"}</b><em>${last?measurementDelta(last,prev,"weight"):"—"} kg</em></div>
       <div><span>Masse grasse</span><b>${c?fmt(c.bf," %"):"—"}</b><em>${c?fmt(c.fatMass," kg"):"—"}</em></div>
       <div><span>Masse musculaire</span><b>${c?fmt(c.muscle," kg"):"—"}</b><em>${last?measurementDelta(last,prev,"muscle"):"—"} kg</em></div>
       <div><span>Tour de taille</span><b>${c?fmt(c.waist," cm"):"—"}</b><em>${last?measurementDelta(last,prev,"waist"):"—"} cm</em></div>
     </div>
-    <div class="overview-section-head"><h2>Évolution du poids</h2><span>${measurementPeriod==="week"?"Cette semaine":measurementPeriod==="month"?"Ce mois":"Cette année"}</span></div>
+    <div class="tabs measure-period-tabs">${[["month","Mois"],["year","Année"],["all","Tout"]].map(([p,l])=>`<button data-measure-period="${p}" class="${measurementPeriod===p?"on":""}">${l}</button>`).join("")}</div>
+    <div class="overview-section-head"><h2>Évolution du poids</h2><span>${measurementPeriod==="month"?"Ce mois":measurementPeriod==="year"?"Cette année":"Depuis la première mesure"}</span></div>
     <div class="overview-panel measure-chart">${smoothMeasureChart(rows,"weight")}</div>
     <div class="measure-calculated"><div><span>IMC</span><b>${c?fmt(c.bmi):"—"}</b></div><div><span>Masse grasse</span><b>${c?fmt(c.fatMass," kg"):"—"}</b></div><div><span>Masse maigre</span><b>${c?fmt(c.leanMass," kg"):"—"}</b></div></div>
     <details class="card body-measurements"><summary><span><b class="serif gold">Mensurations</b><small>Bras, cuisses, mollets, poitrine, épaules, hanches</small></span><span>Afficher</span></summary>${c?`<div class="body-measure-grid"><button data-body-chart="arm"><span>Bras</span><b>G ${fmt(c.armL," cm")} · D ${fmt(c.armR," cm")}</b></button><button data-body-chart="thigh"><span>Cuisses</span><b>G ${fmt(c.thighL," cm")} · D ${fmt(c.thighR," cm")}</b></button><button data-body-chart="calf"><span>Mollets</span><b>G ${fmt(c.calfL," cm")} · D ${fmt(c.calfR," cm")}</b></button><button data-body-chart="chest"><span>Poitrine</span><b>${fmt(c.chest," cm")}</b></button><button data-body-chart="shoulders"><span>Épaules</span><b>${fmt(c.shoulders," cm")}</b></button><button data-body-chart="hips"><span>Hanches</span><b>${fmt(c.hips," cm")}</b></button></div>`:`<div class="empty">Ajoutez une mesure pour renseigner vos mensurations.</div>`}</details>
@@ -976,8 +1003,8 @@ function averageIncrease(perf,ids){
 function progressRow(id,no,arr){
   const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),trend=trendFor(id,arr),last=arr.at(-1);
   return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
-    <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">Dernière séance ${formatDate(last.date)}</div>`:""}</div>
-    <div class="trend ${trend.key==="slow"?"slow":trend.key==="flat"?"flat":trend.key==="down"?"down":""}">${trend.key==="up"?"↗ ":trend.key==="down"?"↘ ":trend.key==="flat"?"→ ":""}${trend.label}</div><div class="chev">›</div></div>`;
+    <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">${Number.isFinite(repNumber(last.reps))?`${repNumber(last.reps)} reps · `:""}Dernière séance ${formatDate(last.date)}</div>`:""}</div>
+    <div class="trend ${trend.key==="slow"?"slow":trend.key==="flat"?"flat":trend.key==="down"?"down":""}">${trend.key==="up"?"↗ ":trend.key==="down"?"↘ ":trend.key==="flat"?"→ ":""}${trend.label}</div></div>`;
 }
 function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
@@ -1015,11 +1042,11 @@ function lineChart(nums){
     <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
 }
 function progressSettingsContent(id){
-  const p=Object.assign({type:"Charge + répétitions",objective:"4 × 10"},state.progressionSettings[id]||{});
+  const p=Object.assign({type:"Charge + répétitions",objective:repetitionTargetFor(id)||"Libre"},state.progressionSettings[id]||{});
   return `<div class="history-row">Type de progression <span style="float:right">${esc(p.type)}</span></div><div class="history-row">Objectif actuel <span style="float:right">${esc(p.objective)}</span></div><div class="history-row">Référence prévue <span style="float:right">${esc(refWithUnit(referenceFor(id)))}</span></div>`;
 }
 function openProgressSettingsModal(id){
-  const p=Object.assign({type:"Charge + répétitions",objective:"4 × 10"},state.progressionSettings[id]||{});
+  const p=Object.assign({type:"Charge + répétitions",objective:repetitionTargetFor(id)||"Libre"},state.progressionSettings[id]||{});
   openModal(`<h3>Paramètres de progression</h3><div class="field"><label>Type</label><input id="ps-type" value="${esc(p.type)}"></div><div class="field" style="margin-top:6px"><label>Objectif</label><input id="ps-obj" value="${esc(p.objective)}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="ps-save">Enregistrer</button></div>`,()=>{
     $("#ps-save").onclick=()=>{state.progressionSettings[id]={type:$("#ps-type").value,objective:$("#ps-obj").value};save();closeOverlay(true);render();};
   });
@@ -1141,7 +1168,7 @@ function openSheet(id,session,no){
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <button class="sheet-close" data-close-sheet>Fermer</button>
     <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
-    <div class="sheet-params"><h3>Paramètres de l’exercice</h3><div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
+    <div class="sheet-params"><h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);

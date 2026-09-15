@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-14-ephemeres-20260915-1";
+const CACHE = "fitness-v24-16-progression-20260915-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",

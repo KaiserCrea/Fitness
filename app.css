@@ -1291,3 +1291,9 @@ body.lock-program-home{
 /* V24.14 — séances éphémères */
 .ephemeral-card{border-color:#6f5932}.ephemeral-list{margin-top:8px}.ephemeral-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:11px 3px;border-top:1px solid #302d27}.ephemeral-row b{display:block;font-family:Georgia,serif;color:#f0d07b;font-size:14px}.ephemeral-row span{display:block;color:#99958e;font-size:8px;margin-top:3px}.ephemeral-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.ephemeral-group-picks{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:9px 0}.ephemeral-pick{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px;border:1px solid #55472e;border-radius:8px;background:#131516;color:#eee;font-size:11px}.ephemeral-pick input,.ephemeral-ex-option input{accent-color:#d7b45d;width:18px;height:18px}
 .ephemeral-ex-option>label{min-width:0}.ephemeral-ex-option>label b,.ephemeral-ex-option>label span{display:block}.ephemeral-order-tools{display:flex;align-items:center;gap:7px}.ephemeral-order-tools .backlink{font-size:16px;min-width:28px}
+/* V24.16 — plages de répétitions, double progression et zoom tactile */
+.rep-target-callout{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px;padding:8px 10px;border:1px solid #8b6b32;border-radius:8px;background:#11100d}.rep-target-callout span{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#bcb5a8}.rep-target-callout b{font-family:Georgia,serif;font-size:15px;color:#efca68;white-space:nowrap}
+.progress-row{grid-template-columns:auto auto minmax(0,1fr) auto!important}
+.sheet-canvas.fiche-visual{overflow:hidden!important;touch-action:pan-y;overscroll-behavior:contain}
+.sheet-canvas.fiche-visual.sheet-zoomed{touch-action:none!important;cursor:grab}
+.sheet-canvas.fiche-visual.sheet-zoomed:active{cursor:grabbing}
