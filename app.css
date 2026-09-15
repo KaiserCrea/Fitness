@@ -1297,3 +1297,7 @@ body.lock-program-home{
 .sheet-canvas.fiche-visual{overflow:hidden!important;touch-action:pan-y;overscroll-behavior:contain}
 .sheet-canvas.fiche-visual.sheet-zoomed{touch-action:none!important;cursor:grab}
 .sheet-canvas.fiche-visual.sheet-zoomed:active{cursor:grabbing}
+
+/* V24.17 — tactile fiches techniques Android */
+.sheet-canvas.fiche-visual{overscroll-behavior:contain;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.sheet-canvas.fiche-visual>img{-webkit-user-drag:none;user-select:none}

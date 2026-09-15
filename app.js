@@ -175,7 +175,12 @@ const EXERCISE_ALIAS_GROUPS=[
   ["Extension triceps à la corde à la poulie haute","Extension triceps à la corde poulie haute","Extension triceps à la poulie"],
   ["Mollets assis à la machine","Mollets assis à la machine / Seated Calf Raise"],
   ["Crunch abdominal à la machine","Crunch abdominal","Crunch abdominale à la machine"],
-  ["Relevé de jambes suspendu","Relevé de genoux suspendu à la barre fixe","Relevé de jambes","Relevé de jambes (suspension ou appui)"]
+  ["Relevé de jambes suspendu","Relevé de genoux suspendu à la barre fixe","Relevé de jambes","Relevé de jambes (suspension ou appui)"],
+  ["Écarté unilatéral à la poulie basse","Presse unilatérale à la poulie basse, trajectoire ascendante"],
+  ["Tirage vertical prise serrée en V","Tirage vertical prise serrée en V à la poulie haute"],
+  ["Curl biceps à la poulie basse en position bayésienne","Curl biceps à la poulie basse en V"],
+  ["Extension triceps au-dessus de la tête à la corde","Extension triceps poulie arrière"],
+  ["Circuit abdos 8 min","Circuit abdos complet — 8 min"]
 ];
 function exerciseNameKey(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();}
 const RAW_EXERCISE_ENTRIES=Object.entries(DATA.sessions||{}).flatMap(([session,es])=>(es||[]).map((e,i)=>({session,e,i})));
@@ -687,10 +692,16 @@ function openEphemeralEditor(editId=""){
 function openEphemeralExercises(existing,groups){
   const reg=registry(),initial=new Set(existing?.exerciseIds||[]),ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id)&&groups.includes(groupForId(id))).sort((a,b)=>reg[a].name.localeCompare(reg[b].name,"fr"));
   openModal(`<h3>Exercices de la séance</h3><div class="field"><label>Nom de la séance (facultatif)</label><input id="ephemeral-name" value="${esc(existing?.name||"")}" placeholder="Ex. Bras, Rattrapage…"></div><p>Cochez les exercices. L’ordre affiché sera l’ordre de la séance.</p><div class="option-list">${ids.map(id=>`<div class="option-row ephemeral-ex-option"><label><b>${esc(exercise(id).name)}</b><span>${esc(groupForId(id))}</span></label><div class="ephemeral-order-tools"><input type="checkbox" value="${esc(id)}" ${initial.has(id)?"checked":""}><button type="button" class="backlink" data-move-up aria-label="Monter">↑</button><button type="button" class="backlink" data-move-down aria-label="Descendre">↓</button></div></div>`).join("")}</div><div class="modal-actions"><button class="btn ghost" id="ephemeral-back">Retour</button><button class="btn gold" id="ephemeral-save">Enregistrer</button></div>`,ov=>{
-    $$('[data-move-up]',ov).forEach(b=>b.onclick=()=>{const r=b.closest('.ephemeral-ex-option');if(r?.previousElementSibling)r.parentNode.insertBefore(r,r.previousElementSibling);});
-    $$('[data-move-down]',ov).forEach(b=>b.onclick=()=>{const r=b.closest('.ephemeral-ex-option'),n=r?.nextElementSibling;if(n)r.parentNode.insertBefore(n,r);});
+    // Preserve the exact order in which exercises are checked. Existing sessions keep their saved order.
+    let selectedOrder=(existing?.exerciseIds||[]).filter(id=>initial.has(id));
+    $$('.ephemeral-ex-option input',ov).forEach(input=>input.addEventListener('change',()=>{
+      if(input.checked){if(!selectedOrder.includes(input.value))selectedOrder.push(input.value);}
+      else selectedOrder=selectedOrder.filter(id=>id!==input.value);
+    }));
+    $$('[data-move-up]',ov).forEach(b=>b.onclick=()=>{const r=b.closest('.ephemeral-ex-option');if(r?.previousElementSibling)r.parentNode.insertBefore(r,r.previousElementSibling);const checked=$$('.ephemeral-ex-option input:checked',ov).map(x=>x.value);selectedOrder=checked;});
+    $$('[data-move-down]',ov).forEach(b=>b.onclick=()=>{const r=b.closest('.ephemeral-ex-option'),n=r?.nextElementSibling;if(n)r.parentNode.insertBefore(n,r);const checked=$$('.ephemeral-ex-option input:checked',ov).map(x=>x.value);selectedOrder=checked;});
     $("#ephemeral-back",ov).onclick=()=>{closeOverlay(false);openEphemeralEditor(existing?.id||"");};
-    $("#ephemeral-save",ov).onclick=()=>{const exerciseIds=$$(".ephemeral-ex-option input:checked",ov).map(x=>x.value);if(!exerciseIds.length)return;const name=$("#ephemeral-name",ov).value.trim()||"Séance éphémère";if(existing){existing.name=name;existing.exerciseIds=exerciseIds;}else state.ephemeralSessions.push({id:"eph-"+Date.now(),name,exerciseIds});save();closeOverlay(true);render();};
+    $("#ephemeral-save",ov).onclick=()=>{const checked=new Set($$(".ephemeral-ex-option input:checked",ov).map(x=>x.value));const exerciseIds=selectedOrder.filter(id=>checked.has(id));if(!exerciseIds.length)return;const name=$("#ephemeral-name",ov).value.trim()||"Séance éphémère";if(existing){existing.name=name;existing.exerciseIds=exerciseIds;}else state.ephemeralSessions.push({id:"eph-"+Date.now(),name,exerciseIds});save();closeOverlay(true);render();};
   });
 }
 function startEphemeral(id){
@@ -1189,6 +1200,21 @@ function bindSheetDoubleTapZoom(img,canvas){
   canvas.addEventListener("pointermove",e=>{if(!points.has(e.pointerId))return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size>=2&&pinchStart){e.preventDefault();const a=[...points.values()].slice(0,2),dx=a[1].x-a[0].x,dy=a[1].y-a[0].y,dist=Math.max(1,Math.hypot(dx,dy)),mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;setScaleAt(pinchStart.scale*dist/pinchStart.dist,mx,my);}else if(points.size===1&&scale>1.01&&panStart){e.preventDefault();tx=panStart.tx+(e.clientX-panStart.x);ty=panStart.ty+(e.clientY-panStart.y);apply();}},{passive:false});
   const up=e=>{if(!points.has(e.pointerId))return;const wasSingle=points.size===1;points.delete(e.pointerId);if(points.size<2)pinchStart=null;if(points.size===1&&scale>1.01){const a=[...points.values()][0];panStart={x:a.x,y:a.y,tx,ty};}else panStart=null;if(wasSingle){const now=Date.now();if(now-lastTap<330){e.preventDefault();setScaleAt(scale>1.01?1:2,e.clientX,e.clientY);lastTap=0;}else lastTap=now;}};
   canvas.addEventListener("pointerup",up,{passive:false});canvas.addEventListener("pointercancel",up,{passive:false});
+  // Android/WebView touch fallback: some devices do not deliver multi-touch pointer events reliably.
+  let tStart=null,tPan=null,tLastTap=0;
+  const touchPoint=t=>({x:t.clientX,y:t.clientY});
+  canvas.addEventListener("touchstart",e=>{
+    if(e.touches.length===2){e.preventDefault();const a=touchPoint(e.touches[0]),b=touchPoint(e.touches[1]);tStart={dist:Math.hypot(b.x-a.x,b.y-a.y),scale,midX:(a.x+b.x)/2,midY:(a.y+b.y)/2};tPan=null;}
+    else if(e.touches.length===1&&scale>1.01){e.preventDefault();const a=touchPoint(e.touches[0]);tPan={x:a.x,y:a.y,tx,ty};}
+  },{passive:false});
+  canvas.addEventListener("touchmove",e=>{
+    if(e.touches.length===2&&tStart){e.preventDefault();const a=touchPoint(e.touches[0]),b=touchPoint(e.touches[1]),dist=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;setScaleAt(tStart.scale*dist/tStart.dist,mx,my);}
+    else if(e.touches.length===1&&scale>1.01&&tPan){e.preventDefault();const a=touchPoint(e.touches[0]);tx=tPan.tx+(a.x-tPan.x);ty=tPan.ty+(a.y-tPan.y);apply();}
+  },{passive:false});
+  canvas.addEventListener("touchend",e=>{
+    if(e.touches.length===0){const now=Date.now(),c=e.changedTouches?.[0];if(c&&now-tLastTap<330){e.preventDefault();setScaleAt(scale>1.01?1:2,c.clientX,c.clientY);tLastTap=0;}else tLastTap=now;tStart=tPan=null;}
+    else if(e.touches.length===1&&scale>1.01){const a=touchPoint(e.touches[0]);tPan={x:a.x,y:a.y,tx,ty};tStart=null;}
+  },{passive:false});
 }
 function prepareSheetLayout(img,canvas){
   const apply=()=>{
