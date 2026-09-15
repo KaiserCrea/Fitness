@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 26;
+const APP_REV = 27;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -278,6 +278,11 @@ function pushNav(v=null,newTab=null){
     const from=tabs.indexOf(tab),to=tabs.indexOf(newTab);
     navTransitionClass=to>from?"slide-from-right":"slide-from-left";
     tab=newTab;view={type:"root"};
+    // V24.5 : chaque rubrique principale retrouve son écran d’entrée attendu.
+    if(newTab==="program"){programMode="sessions";programExerciseGroup="Tous";}
+    if(newTab==="progress"){progressionView="overview";}
+    // Évite qu’un geste tactile commencé dans l’ancien écran reste actif après navigation.
+    tabSwipe=null;
   } else if(v){rememberTabScroll();view=v;}
   persistUI();
   history.pushState(navState(),""); render();
@@ -971,7 +976,7 @@ function renderHistory(){
   const total=hs.reduce((a,h)=>a+(+h.duration||0),0),count=hs.length+old.reduce((a,w)=>a+(+w.count||0),0);
   const weekDur=weeklyDurations(hs),weekCounts=weeklySessionCounts(hs,old),knownWeeks=Object.keys(weekDur),best=Math.max(...Object.values(weekDur),0),avgWeek=knownWeeks.length?Math.round(total/knownWeeks.length):0,attendance=attendancePct(historyYear,hs,old);
   shell(`${header("Historique","Suivi du parcours","","compact")}
-    <div class="tabs">${[["week","Semaine"],["month","Mois"],["year","Année"],["all","Toutes"]].map(([p,l])=>`<button data-hperiod="${p}" class="${historyPeriod===p?"on":""}">${l}</button>`).join("")}</div>
+    <div class="progress-home-tabs history-home-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"],["all","Toutes"]].map(([p,l])=>`<button data-hperiod="${p}" class="${historyPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <div class="history-year"><button id="prev-year">‹</button><button class="history-period-title" id="history-period-picker">${esc(scoped.label)}</button><button id="next-year">›</button></div><button class="today-period-btn" id="history-today">Aujourd’hui</button>
     <div class="history-grid">
       <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${formatMinutes(avgWeek)}</b><span>Moyenne / semaine</span></div>

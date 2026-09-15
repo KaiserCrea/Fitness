@@ -1112,3 +1112,20 @@ body.lock-program-home{
 .sheet-canvas.fiche-visual.sheet-zoomed:active{cursor:grabbing}
 .sheet-canvas.fiche-visual>img{will-change:transform;max-width:100%!important;width:100%!important;height:auto!important}
 .sheet-canvas.fiche-visual.sheet-zoomed>img{width:100%!important;max-width:100%!important;height:auto!important;clip-path:none!important;cursor:inherit!important}
+
+
+/* =====================================================================
+   V24.5 — entrées par défaut + harmonisation barre Historique
+   ===================================================================== */
+/* Historique reprend exactement la famille visuelle de Progression. */
+.history-screen>.history-home-tabs{
+  margin-top:0!important;
+  margin-bottom:11px!important;
+  border-color:#a77b35!important;
+  border-radius:12px!important;
+  box-shadow:inset 0 0 0 1px #e3b95518,0 6px 18px #0007!important;
+}
+.history-screen>.history-home-tabs button.on{
+  background:linear-gradient(180deg,#ffe18a,#e3af42)!important;
+  box-shadow:inset 0 1px 0 #fff5bd88,0 0 15px #dba63b2c!important;
+}
