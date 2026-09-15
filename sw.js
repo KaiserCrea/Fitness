@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-8-programme-volume-20260915-1";
+const CACHE = "fitness-v24-9-programme-volume-20260915-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",

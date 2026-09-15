@@ -2,9 +2,9 @@
   "name": "Fitness",
   "short_name": "Fitness",
   "description": "Application personnelle de suivi d'entraînement",
-  "start_url": "./?v=24.8",
+  "start_url": "./?v=24.9",
   "scope": "./",
-  "id": "./fitness-v24-8",
+  "id": "./fitness-v24-9",
   "display": "standalone",
   "display_override": [
     "standalone"
