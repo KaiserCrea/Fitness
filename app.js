@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 27;
+const APP_REV = 26;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -47,20 +47,19 @@ const SCROLL_KEY="fitness-tab-scroll-v9";
 const needsCleanReset=!localStorage.getItem(RESET_KEY);
 let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
 let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
-let tab=!needsCleanReset&&tabs.includes(savedUI?.tab)?savedUI.tab:"today";
+let tab="today";
 let view={type:"root"};
 let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(!needsCleanReset&&savedUI?.programMode==="exercises"?"groups":"sessions");
 let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
 let progressionPeriod=savedUI?.progressionPeriod||"1m";
 let progressionGroup=savedUI?.progressionGroup||"Tous";
-let progressionView=!needsCleanReset&&savedUI?.progressionView||"overview";
+let progressionView="overview";
 let measurementPeriod=!needsCleanReset&&savedUI?.measurementPeriod||"month";
 let overviewPeriod=!needsCleanReset&&savedUI?.overviewPeriod||"week";
 let periodAnchor=!needsCleanReset&&savedUI?.periodAnchor||localISODate();
 let historyPeriod=!needsCleanReset&&savedUI?.historyPeriod||"week";
 let historyYear=!needsCleanReset&&Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
 let historyAnchor=!needsCleanReset&&savedUI?.historyAnchor||localISODate();
-let historyVolumeMode=!needsCleanReset&&savedUI?.historyVolumeMode||"duration";
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
 let navTransitionClass="";
 function rememberTabScroll(){
@@ -71,7 +70,7 @@ function rememberTabScroll(){
 }
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 function persistUI(){
-  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor,historyVolumeMode}));}catch{}
+  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor}));}catch{}
 }
 
 function localISODate(d=new Date()){
@@ -162,20 +161,41 @@ function sessionIds(session){
   const ov=state.programOverrides[session];
   return Array.isArray(ov)?ov.slice():baseIds(session);
 }
+const EXERCISE_ALIAS_GROUPS=[
+  ["Développé militaire debout à la barre","Développé militaire à la barre"],
+  ["Oiseau avec haltères poitrine appuyée sur banc incliné","Élévation latérale couchée sur banc incliné avec haltère","Élévation latérale couchée sur banc incliné avec haltères"],
+  ["Rowing barre","Rowing barre EZ"],
+  ["Tirage horizontal prise large","Rowing poulie basse prise large vers le haut du torse"],
+  ["Tirage vertical prise neutre","Tirage vertical prise neutre à la barre"],
+  ["Extension triceps à la corde à la poulie haute","Extension triceps à la corde poulie haute","Extension triceps à la poulie"],
+  ["Mollets assis à la machine","Mollets assis à la machine / Seated Calf Raise"],
+  ["Crunch abdominal à la machine","Crunch abdominal","Crunch abdominale à la machine"],
+  ["Relevé de jambes suspendu","Relevé de genoux suspendu à la barre fixe","Relevé de jambes","Relevé de jambes (suspension ou appui)"]
+];
+function exerciseNameKey(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();}
+function rawExerciseEntries(){return Object.entries(DATA.sessions||{}).flatMap(([session,es])=>(es||[]).map((e,i)=>({session,e,i})));}
+function aliasGroupForName(name){const k=exerciseNameKey(name);return EXERCISE_ALIAS_GROUPS.find(g=>g.some(n=>exerciseNameKey(n)===k));}
+function canonicalId(id){
+  const raw=rawExerciseEntries().find(x=>x.e.id===id)?.e||state.customExercises?.[id]; if(!raw)return id;
+  const group=aliasGroupForName(raw.name); if(!group)return id;
+  for(const preferred of group){const hit=rawExerciseEntries().find(x=>exerciseNameKey(x.e.name)===exerciseNameKey(preferred));if(hit)return hit.e.id;}
+  return id;
+}
+function canonicalDisplayName(id){const raw=rawExerciseEntries().find(x=>x.e.id===id)?.e||state.customExercises?.[id];const group=aliasGroupForName(raw?.name);return group?.[0]||raw?.name||id;}
 function buildRegistry(){
   const reg={};
   Object.entries(DATA.sessions||{}).forEach(([session,es])=>es.forEach((e,i)=>{
-    if(!reg[e.id]) reg[e.id]={id:e.id,name:e.name,remark:e.remark||"",firstSession:session,firstNo:i+1};
+    const cid=canonicalId(e.id); if(!reg[cid]) reg[cid]={id:cid,name:canonicalDisplayName(e.id),remark:e.remark||"",firstSession:session,firstNo:i+1};
   }));
-  Object.entries(state.customExercises||{}).forEach(([id,e])=>reg[id]=Object.assign({id,firstSession:"",firstNo:1},e));
+  Object.entries(state.customExercises||{}).forEach(([id,e])=>{const cid=canonicalId(id);if(!reg[cid])reg[cid]=Object.assign({id:cid,firstSession:"",firstNo:1},e)});
   return reg;
 }
 function registry(){return buildRegistry();}
-function exercise(id){return registry()[id]||{id,name:id,remark:""};}
+function exercise(id){const cid=canonicalId(id);return registry()[cid]||{id:cid,name:canonicalDisplayName(id),remark:""};}
 function occurrenceList(id){
-  const out=[];
+  const out=[],cid=canonicalId(id);
   const sessions=new Set([...Object.keys(DATA.sessions||{}),...Object.keys(state.programOverrides||{})]);
-  sessions.forEach(s=>sessionIds(s).forEach((eid,i)=>{if(eid===id)out.push({s,n:i+1});}));
+  sessions.forEach(s=>sessionIds(s).forEach((eid,i)=>{if(canonicalId(eid)===cid)out.push({s,n:i+1,id:eid});}));
   return out;
 }
 function sheetPathForOccurrence(session,no){return OCCURRENCE_SHEETS[`${session}|${no}`]||"";}
@@ -717,7 +737,7 @@ function renderAthProgram(session){
 }
 
 function allPerf(){
-  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;(m[e.id]||(m[e.id]=[])).push({date:h.date,value:e.actual,next:e.next,status:e.status,session:h.session,duration:h.duration});}));return m;
+  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,status:e.status,session:h.session,duration:h.duration});}}));return m;
 }
 function periodStart(period){
   const d=new Date(); if(period==="1m")d.setMonth(d.getMonth()-1);else if(period==="3m")d.setMonth(d.getMonth()-3);else if(period==="6m")d.setMonth(d.getMonth()-6);else if(period==="1y")d.setFullYear(d.getFullYear()-1);else return null;return localISODate(d);
@@ -945,6 +965,7 @@ function openProgressSettingsModal(id){
   });
 }
 
+let historyVolumeMode="duration";
 function renderHistory(){
   const scoped=historyScope(historyPeriod,historyYear),hs=scoped.history,old=scoped.old;
   const total=hs.reduce((a,h)=>a+(+h.duration||0),0),count=hs.length+old.reduce((a,w)=>a+(+w.count||0),0);
@@ -956,13 +977,13 @@ function renderHistory(){
       <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${formatMinutes(avgWeek)}</b><span>Moyenne / semaine</span></div>
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row history-volume-tabs">${[["duration","Durée"],["sessions","Nombre de séances"],["average","Moyenne"]].map(([m,l])=>`<button data-volume-mode="${m}" class="${historyVolumeMode===m?"on":""}">${l}</button>`).join("")}</div>${historyVolumeChart(hs,old)}</div>
+    <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row history-volume-tabs">${[["duration","Durée"],["count","Nombre de séances"],["average","Moyenne"]].map(([m,l])=>`<button data-volume-mode="${m}" class="${historyVolumeMode===m?"on":""}">${l}</button>`).join("")}</div>${historyVolumeBars(hs,old,historyVolumeMode)}</div>
     <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>`,"history-screen");
-  $$("[data-volume-mode]").forEach(b=>b.onclick=()=>{historyVolumeMode=b.dataset.volumeMode;persistUI();history.replaceState(navState(),"");render();});
-  $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;if(historyPeriod==="year")historyYear=new Date(`${historyAnchor}T12:00:00`).getFullYear();persistUI();history.pushState(navState(),"");render();});
+  $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
   $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
   $("#history-period-picker").onclick=()=>openPeriodPicker("history");
   $("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
+  $$('[data-volume-mode]').forEach(b=>b.onclick=()=>{historyVolumeMode=b.dataset.volumeMode;render();});
 }
 function historyScope(period,year){
   const allH=state.history||[], allOld=state.oldWeeks||[];
@@ -1000,29 +1021,24 @@ function attendancePct(y,hs,old){
   const keys=Object.keys(weeks);if(!keys.length)return 0;
   let got=0,target=0;keys.forEach(k=>{const oldItem=old.find(w=>(w.week||w.date)===k),t=oldItem?3:5;got+=Math.min(weeks[k],t);target+=t;});return Math.round(got/target*100);
 }
-function historyVolumeChart(hs,old=[]){
-  const anchor=new Date(`${historyAnchor}T12:00:00`), rows=[];
-  const add=(key,label,start,end)=>{
-    const detailed=hs.filter(h=>h.date>=start&&h.date<end), duration=detailed.reduce((a,h)=>a+(+h.duration||0),0);
-    const oldCount=old.filter(w=>{const d=String(w.week||w.date||"").slice(0,10);return d>=start&&d<end;}).reduce((a,w)=>a+(+w.count||0),0);
-    const sessions=detailed.length+oldCount;
-    const value=historyVolumeMode==="sessions"?sessions:historyVolumeMode==="average"?(sessions?Math.round(duration/sessions):0):duration;
-    rows.push({key,label,value,duration,sessions});
-  };
+function historyVolumeBuckets(hs,old){
+  const anchor=new Date(`${historyAnchor}T12:00:00`),b=[];
+  const add=(label,start,end)=>{const items=hs.filter(h=>h.date>=start&&h.date<end),duration=items.reduce((n,h)=>n+(+h.duration||0),0);let count=items.length;old.forEach(w=>{const d=String(w.week||w.date||"").slice(0,10);if(d>=start&&d<end)count+=+w.count||0;});b.push({label,duration,count,average:count?Math.round(duration/count):0});};
   if(historyPeriod==="week"){
-    const st=mondayOf(anchor);for(let i=0;i<7;i++){const a=new Date(st);a.setDate(a.getDate()+i);const b=new Date(a);b.setDate(b.getDate()+1);add(i,a.toLocaleDateString("fr-FR",{weekday:"short"}).replace(".",""),localISODate(a),localISODate(b));}
+    const st=mondayOf(anchor);["lun","mar","mer","jeu","ven","sam","dim"].forEach((label,i)=>{const a=new Date(st);a.setDate(a.getDate()+i);const z=new Date(a);z.setDate(z.getDate()+1);add(label,localISODate(a),localISODate(z));});
   }else if(historyPeriod==="month"){
-    const y=anchor.getFullYear(),m=anchor.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,1);let i=1;
-    for(let a=mondayOf(first);a<last;a.setDate(a.getDate()+7)){const b=new Date(a);b.setDate(b.getDate()+7);add(i,`S${i}`,localISODate(a),localISODate(b));i++;}
+    const first=new Date(anchor.getFullYear(),anchor.getMonth(),1),end=new Date(anchor.getFullYear(),anchor.getMonth()+1,1);let cur=mondayOf(first),i=1;while(cur<end){const nxt=new Date(cur);nxt.setDate(nxt.getDate()+7);add(`S${i++}`,localISODate(cur<first?first:cur),localISODate(nxt>end?end:nxt));cur=nxt;}
   }else if(historyPeriod==="year"){
-    const y=historyYear;for(let m=0;m<12;m++){const a=new Date(y,m,1),b=new Date(y,m+1,1);add(m,a.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""),localISODate(a),localISODate(b));}
+    "J F M A M J J A S O N D".split(" ").forEach((label,i)=>add(label,localISODate(new Date(historyYear,i,1)),localISODate(new Date(historyYear,i+1,1))));
   }else{
-    const years=[...new Set([...(state.history||[]).map(h=>+String(h.date).slice(0,4)),...(state.oldWeeks||[]).map(w=>+String(w.week||w.date||"").slice(0,4))])].filter(Boolean).sort();
-    years.forEach(y=>add(y,String(y),`${y}-01-01`,`${y+1}-01-01`));
-  }
-  const max=Math.max(1,...rows.map(r=>r.value));
-  const unit=historyVolumeMode==="duration"?"min":historyVolumeMode==="sessions"?"séance":"min/séance";
-  return `<div class="volume-axis-label">${historyVolumeMode==="duration"?"Durée":historyVolumeMode==="sessions"?"Nombre de séances":"Durée moyenne par séance"}</div><div class="bar-chart volume-chart">${rows.map(r=>`<div class="bar-wrap"><span class="bar-value">${r.value}${historyVolumeMode==="duration"?" min":""}</span><div class="bar" style="height:${r.value?Math.max(5,r.value/max*100):1}%"></div><label>${esc(r.label)}</label></div>`).join("")}</div><div class="volume-unit">${unit}</div>`;
+    const years=[...new Set([...(state.history||[]).map(h=>+String(h.date).slice(0,4)),...(state.oldWeeks||[]).map(w=>+String(w.week||w.date||"").slice(0,4))].filter(Number.isFinite))].sort((a,b)=>a-b);
+    (years.length?years:[new Date().getFullYear()]).forEach(y=>add(String(y),`${y}-01-01`,`${y+1}-01-01`));
+  }return b;
+}
+function historyVolumeBars(hs,old,mode){
+  const items=historyVolumeBuckets(hs,old),vals=items.map(x=>x[mode]||0),max=Math.max(1,...vals);
+  const fmt=v=>mode==="count"?String(v):formatMinutes(v);
+  return `<div class="history-volume-chart">${items.map((x,i)=>{const v=vals[i],pct=v?Math.max(7,Math.round(v/max*100)):0;return `<div class="history-volume-col"><span class="history-volume-value" style="bottom:calc(${pct}% + 4px)">${fmt(v)}</span><i style="height:${pct}%"></i><label>${esc(x.label)}</label></div>`}).join("")}</div>`;
 }
 function muscleDonut(hs){
   const counts={Pectoraux:0,Dos:0,Épaules:0,Biceps:0,Triceps:0,Jambes:0,Abdos:0};
@@ -1059,44 +1075,22 @@ function openSheet(id,session,no){
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
   const sheetCanvas=$(".fiche-visual",overlay);
   const sheetImg=$(".fiche-visual img",overlay);
-  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);bindSheetDoubleTapZoom(sheetImg,sheetCanvas);bindSheetPinchZoom(sheetImg,sheetCanvas);}
+  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);bindSheetDoubleTapZoom(sheetImg,sheetCanvas);}
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
 function bindSheetDoubleTapZoom(img,canvas){
   if(!img||!canvas)return;
-  let lastTap=0,lastX=.5,lastY=.5;
-  const toggle=(clientX,clientY)=>{
-    const r=canvas.getBoundingClientRect();
-    const x=Math.max(0,Math.min(1,(clientX-r.left)/Math.max(1,r.width)));
-    const y=Math.max(0,Math.min(1,(clientY-r.top)/Math.max(1,r.height)));
-    const zooming=!canvas.classList.contains("sheet-zoomed");
-    canvas.classList.toggle("sheet-zoomed",zooming);
-    if(zooming){
-      requestAnimationFrame(()=>{
-        canvas.scrollLeft=x*Math.max(0,canvas.scrollWidth-canvas.clientWidth);
-        canvas.scrollTop=y*Math.max(0,canvas.scrollHeight-canvas.clientHeight);
-      });
-    }else{
-      canvas.scrollTo({left:0,top:0,behavior:"smooth"});
-    }
-  };
-  img.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();toggle(e.clientX,e.clientY);});
-  img.addEventListener("pointerup",e=>{
-    if(e.pointerType==="mouse")return;
-    const now=Date.now();
-    if(now-lastTap<330){e.preventDefault();e.stopPropagation();toggle(e.clientX,e.clientY);lastTap=0;return;}
-    lastTap=now;lastX=e.clientX;lastY=e.clientY;
-  },{passive:false});
+  let scale=1,tx=0,ty=0,lastTap=0,panStart=null,pinchStart=null;
+  const points=new Map();
+  const clamp=()=>{const r=canvas.getBoundingClientRect(),w=img.clientWidth*scale,h=img.clientHeight*scale;tx=Math.min(0,Math.max(r.width-w,tx));ty=Math.min(0,Math.max(r.height-h,ty));};
+  const apply=()=>{clamp();img.style.transformOrigin="0 0";img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;canvas.classList.toggle("sheet-zoomed",scale>1.01);};
+  const setScaleAt=(next,cx,cy)=>{const r=canvas.getBoundingClientRect(),x=cx-r.left,y=cy-r.top,old=scale;next=Math.max(1,Math.min(4,next));tx=x-(x-tx)*(next/old);ty=y-(y-ty)*(next/old);scale=next;if(scale<=1.01){scale=1;tx=ty=0;}apply();};
+  img.addEventListener("dblclick",e=>{e.preventDefault();e.stopPropagation();setScaleAt(scale>1.01?1:2,e.clientX,e.clientY);});
+  canvas.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse")return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture?.(e.pointerId);if(points.size===1&&scale>1.01)panStart={x:e.clientX,y:e.clientY,tx,ty};if(points.size===2){const a=[...points.values()],dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;pinchStart={dist:Math.hypot(dx,dy),scale,midX:(a[0].x+a[1].x)/2,midY:(a[0].y+a[1].y)/2};panStart=null;}},{passive:false});
+  canvas.addEventListener("pointermove",e=>{if(!points.has(e.pointerId))return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});if(points.size>=2&&pinchStart){e.preventDefault();const a=[...points.values()].slice(0,2),dx=a[1].x-a[0].x,dy=a[1].y-a[0].y,dist=Math.max(1,Math.hypot(dx,dy)),mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;setScaleAt(pinchStart.scale*dist/pinchStart.dist,mx,my);}else if(points.size===1&&scale>1.01&&panStart){e.preventDefault();tx=panStart.tx+(e.clientX-panStart.x);ty=panStart.ty+(e.clientY-panStart.y);apply();}},{passive:false});
+  const up=e=>{if(!points.has(e.pointerId))return;const wasSingle=points.size===1;points.delete(e.pointerId);if(points.size<2)pinchStart=null;if(points.size===1&&scale>1.01){const a=[...points.values()][0];panStart={x:a.x,y:a.y,tx,ty};}else panStart=null;if(wasSingle){const now=Date.now();if(now-lastTap<330){e.preventDefault();setScaleAt(scale>1.01?1:2,e.clientX,e.clientY);lastTap=0;}else lastTap=now;}};
+  canvas.addEventListener("pointerup",up,{passive:false});canvas.addEventListener("pointercancel",up,{passive:false});
 }
-
-function bindSheetPinchZoom(img,canvas){
-  const pts=new Map();let startDist=0,startScale=1,scale=1;
-  const apply=()=>{if(scale<=1.02){scale=1;canvas.classList.remove("sheet-zoomed");img.style.width="";}else{canvas.classList.add("sheet-zoomed");img.style.width=`${scale*100}%`;}};
-  canvas.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse")return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture?.(e.pointerId);if(pts.size===2){const a=[...pts.values()];startDist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);startScale=scale;}} ,{passive:true});
-  canvas.addEventListener("pointermove",e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pts.size===2&&startDist){const a=[...pts.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);scale=Math.max(1,Math.min(4,startScale*d/startDist));apply();e.preventDefault();}}, {passive:false});
-  const end=e=>{pts.delete(e.pointerId);if(pts.size<2)startDist=0;};canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel",end);
-}
-
 function prepareSheetLayout(img,canvas){
   const apply=()=>{
     if(!img.naturalWidth||!img.naturalHeight)return;
@@ -1147,8 +1141,7 @@ function openPeriodPicker(target){
   if(period==="all"){historyPeriod="year";historyYear=new Date().getFullYear();historyAnchor=localISODate();persistUI();render();return;}
   const d=new Date(`${anchor}T12:00:00`),type=period==="month"?"month":period==="year"?"number":"date";
   const value=period==="month"?anchor.slice(0,7):period==="year"?String(d.getFullYear()):anchor;
-  openModal(`<h3>Choisir ${period==="week"?"une semaine":period==="month"?"un mois":"une année"}</h3><div class="field"><label>Période</label><input id="period-choice" type="${type}" ${type==="number"?'min="2000" max="2100"':''} value="${esc(value)}"></div>${target==="history"?"":`<button class="btn block" id="period-now" style="margin-top:8px">Aujourd’hui</button>`}<div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="period-confirm">Afficher</button></div>`,()=>{
-    if($("#period-now"))$("#period-now").onclick=()=>{$("#period-choice").value=type==="month"?localISODate().slice(0,7):type==="number"?String(new Date().getFullYear()):localISODate();};
+  openModal(`<h3>Choisir ${period==="week"?"une semaine":period==="month"?"un mois":"une année"}</h3><div class="field"><label>Période</label><input id="period-choice" type="${type}" ${type==="number"?'min="2000" max="2100"':''} value="${esc(value)}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="period-confirm">Afficher</button></div>`,()=>{
     $("#period-confirm").onclick=()=>{const raw=$("#period-choice").value;if(!raw)return;let next=raw;if(type==="month")next=`${raw}-01`;if(type==="number")next=`${raw}-01-01`;if(target==="history"){historyAnchor=next;historyYear=+next.slice(0,4);}else periodAnchor=next;persistUI();closeOverlay(true);render();};
   });
 }

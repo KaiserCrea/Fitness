@@ -1074,28 +1074,41 @@ body.lock-program-home{
 }
 .sheet-canvas.fiche-visual:not(.sheet-zoomed)>img{cursor:zoom-in}
 
-/* V24.4 — finitions validées : héros G alignés sur Full Mix/ATH, historique dynamique, pinch zoom */
+/* =====================================================================
+   V24.4 — bouquet correctifs navigation, historique, zoom et doublons
+   ===================================================================== */
+/* Historique : barre de périodes collée au visuel et finition dorée premium. */
+.history-screen>.tabs{margin-top:0!important;border-color:#a77b35!important;border-radius:0 0 14px 14px!important;box-shadow:inset 0 0 0 1px #e3b95518,0 7px 20px #0008!important}
+.history-screen>.tabs button.on{background:linear-gradient(180deg,#ffe18a,#e3af42)!important;box-shadow:inset 0 1px 0 #fff5bd88,0 0 15px #dba63b2c!important}
+/* Progression : cadre aussi doré et lumineux que Programme. */
+.progress-home-tabs{border-color:#a77b35!important;box-shadow:inset 0 0 0 1px #e3b95518,0 6px 18px #0007!important}
+.progress-home-tabs button.on{background:linear-gradient(180deg,#ffe18a,#e3af42)!important;box-shadow:inset 0 1px 0 #fff5bd88,0 0 15px #dba63b2c!important}
+
+/* G1/G2/G3 : même respiration que Full Mix / Athlétique, sans coupe basse. */
 .session-header.session-hero-g1::before,
 .session-header.session-hero-g2::before,
 .session-header.session-hero-g3::before{
-  background-size:auto 100%!important;
-  background-position:right bottom!important;
-  background-repeat:no-repeat!important;
-  background-color:#050505!important;
-  filter:brightness(.88) contrast(1.12) saturate(.96)!important;
+  background-size:cover!important;
+  background-position:right center!important;
+  filter:brightness(.84) contrast(1.12) saturate(.96)!important;
 }
 .session-header.session-hero-g1::after,
 .session-header.session-hero-g2::after,
 .session-header.session-hero-g3::after{
-  background:linear-gradient(90deg,#030303 0%,#030303e8 25%,#0505058a 49%,transparent 76%),linear-gradient(0deg,#050505 0%,#050505b8 18%,transparent 55%),radial-gradient(circle at 79% 35%,#e9b64b38 0%,#b77a1718 26%,transparent 50%)!important;
+  background:linear-gradient(90deg,#020202f7 0%,#030303d5 27%,#05050570 50%,transparent 76%),linear-gradient(0deg,#040404ed 0%,#0505059e 19%,transparent 48%),radial-gradient(circle at 80% 34%,#efb94d35 0%,transparent 48%)!important;
 }
-.history-volume-tabs button{min-width:0}
-.volume-axis-label{margin:7px 2px 0;color:#d8c48f;font-size:10px}
-.volume-chart{height:205px!important;align-items:flex-end!important;gap:4px;padding:28px 5px 22px!important}
-.volume-chart .bar-wrap{height:100%;min-width:0;flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
-.volume-chart .bar-wrap .bar{width:min(28px,72%);min-height:2px;position:relative;left:auto;bottom:auto}
-.volume-chart .bar-wrap label{position:absolute;bottom:-18px;font-size:8px;color:#aaa;white-space:nowrap}
-.volume-chart .bar-value{font-size:8px;color:#f2d274;margin-bottom:4px;min-height:10px;white-space:nowrap}
-.volume-unit{text-align:right;color:#8f887b;font-size:8px;margin-top:3px}
-.sheet-canvas.fiche-visual{touch-action:none}
-.sheet-canvas.fiche-visual.sheet-zoomed{touch-action:none!important}
+
+/* Volume historique : les zéros restent au sol, les valeurs réelles sont proportionnelles. */
+.history-volume-tabs button{white-space:normal!important;line-height:1.1!important}
+.history-volume-chart{height:190px;display:flex;align-items:flex-end;gap:7px;padding:30px 10px 24px;border:1px solid #4c422f;border-radius:10px;background:#0d0f10;overflow:hidden}
+.history-volume-col{position:relative;flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;min-width:0}
+.history-volume-col i{display:block;width:70%;min-height:0;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#ffe292,#d7a844);box-shadow:0 0 10px #d8a53a24}
+.history-volume-col label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:8px;color:#d7d1c8;white-space:nowrap}
+.history-volume-value{position:absolute;bottom:calc(var(--bar-h,0px) + 4px);top:-20px;font-size:8px;color:#e8ca78;white-space:nowrap}
+
+/* Zoom fiche : point de zoom = endroit touché, déplacement libre une fois agrandie. */
+.sheet-canvas.fiche-visual{overflow:hidden!important;touch-action:pan-y;overscroll-behavior:contain}
+.sheet-canvas.fiche-visual.sheet-zoomed{overflow:hidden!important;touch-action:none!important;cursor:grab}
+.sheet-canvas.fiche-visual.sheet-zoomed:active{cursor:grabbing}
+.sheet-canvas.fiche-visual>img{will-change:transform;max-width:100%!important;width:100%!important;height:auto!important}
+.sheet-canvas.fiche-visual.sheet-zoomed>img{width:100%!important;max-width:100%!important;height:auto!important;clip-path:none!important;cursor:inherit!important}
