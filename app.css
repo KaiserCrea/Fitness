@@ -1248,3 +1248,32 @@ body.lock-program-home{
 }
 .program-header::after{background:none!important;box-shadow:none!important}
 .program-header .header__content{display:none!important}
+
+/* ===== V24.12 — Bandeau Programme : référence validée, cadrage unique =====
+   Même image, même hauteur et même cadrage dans Séances / Groupes / Paramètres. */
+.program-home-screen > .header.program-header,
+.program-scroll-screen > .header.program-header{
+  height:min(56.25vw,242px)!important;
+  min-height:min(56.25vw,242px)!important;
+  flex:0 0 min(56.25vw,242px)!important;
+  margin-bottom:0!important;
+}
+.program-home-screen > .header.program-header::before,
+.program-scroll-screen > .header.program-header::before{
+  background-image:var(--session-image)!important;
+  background-size:100% 100%!important;
+  background-position:50% 50%!important;
+  background-repeat:no-repeat!important;
+  filter:none!important;
+  transform:none!important;
+  opacity:1!important;
+}
+.program-home-screen > .header.program-header::after,
+.program-scroll-screen > .header.program-header::after{
+  content:none!important;
+  display:none!important;
+}
+.program-home-screen > .header.program-header .header__content,
+.program-scroll-screen > .header.program-header .header__content{
+  display:none!important;
+}

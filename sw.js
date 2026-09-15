@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-11-bandeau-programme-valide-20260915-1";
+const CACHE = "fitness-v24-12-bandeau-programme-reference-exacte-20260915-1";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
@@ -16,7 +16,7 @@ const ROOT = [
   "./manifest.webmanifest",
   "./icon-192-v241.png",
   "./icon-512-v241.png",
-  "./assets/hero-program-v2411.png",
+  "./assets/hero-program-v2412.png",
   "./assets/hero-program-official.png",
   "./assets/hero-today-official.png",
   "./assets/hero-progress-official.png",
