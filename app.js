@@ -768,7 +768,6 @@ function progressHomeTabs(){
     <button data-prog-view="overview" class="${progressionView==="overview"?"on":""}">${icon("chart")}<span>Vue d’ensemble</span></button>
     <button data-prog-view="performance" class="${progressionView==="performance"?"on":""}">${icon("trend")}<span>Performances</span></button>
     <button data-prog-view="measurements" class="${progressionView==="measurements"?"on":""}">${icon("list")}<span>Mesures</span></button>
-    <button data-prog-view="history" class="${progressionView==="history"?"on":""}">${icon("clock")}<span>Historique</span></button>
   </div>`;
 }
 function weekKeyFromDate(date){
@@ -869,16 +868,16 @@ function measurementCalc(m){
   const fatMass=Number.isFinite(weight)&&Number.isFinite(bf)?weight*bf/100:NaN;
   const leanMass=Number.isFinite(weight)&&Number.isFinite(fatMass)?weight-fatMass:NaN;
   const bmi=Number.isFinite(weight)&&Number.isFinite(height)&&height>0?weight/((height/100)**2):NaN;
-  return{weight,bf,fatMass,leanMass,bmi,muscle:parseNumber(m.muscleMassKg),visceral:parseNumber(m.visceralFat),waist:parseNumber(m.waistCm)};
+  return{weight,bf,fatMass,leanMass,bmi,muscle:parseNumber(m.muscleMassKg),waist:parseNumber(m.waistCm),chest:parseNumber(m.chestCm),shoulders:parseNumber(m.shouldersCm),hips:parseNumber(m.hipsCm),armL:parseNumber(m.armLeftCm),armR:parseNumber(m.armRightCm),thighL:parseNumber(m.thighLeftCm),thighR:parseNumber(m.thighRightCm),calfL:parseNumber(m.calfLeftCm),calfR:parseNumber(m.calfRightCm)};
 }
 function measurementDelta(cur,prev,key){if(!prev)return"—";const a=measurementCalc(cur)[key],b=measurementCalc(prev)[key];if(!Number.isFinite(a)||!Number.isFinite(b))return"—";const d=round1(a-b);return `${d>0?"+":""}${d}`;}
-function smoothMeasureChart(rows,key="weight"){
+function smoothMeasureChart(rows,key="weight",unit="kg"){
   const vals=rows.map(m=>({m,v:measurementCalc(m)[key]})).filter(x=>Number.isFinite(x.v));
   if(!vals.length)return `<div class="empty">Ajoutez une première mesure pour afficher la courbe.</div>`;
   const W=330,H=185,p=28,ys=vals.map(x=>x.v),min=Math.min(...ys),max=Math.max(...ys),span=Math.max(1,max-min);
   const pts=vals.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,vals.length-1)),y:H-p-(x.v-min)/span*(H-2*p),v:x.v,date:x.m.date}));
   let path=`M ${pts[0].x} ${pts[0].y}`;for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],mx=(a.x+b.x)/2;path+=` Q ${mx} ${a.y} ${mx} ${(a.y+b.y)/2} Q ${mx} ${b.y} ${b.x} ${b.y}`;}
-  return `<svg class="measure-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g><path class="measure-line" d="${path}"/>${pts.map(q=>`<circle class="chart-point measure-point" cx="${q.x}" cy="${q.y}" r="4.5"><title>${formatDate(q.date)} : ${round1(q.v)} kg</title></circle><text class="chart-label" x="${q.x}" y="${q.y-9}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
+  return `<svg class="measure-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g><path class="measure-line" d="${path}"/>${pts.map(q=>`<circle class="chart-point measure-point" cx="${q.x}" cy="${q.y}" r="4.5"><title>${formatDate(q.date)} : ${round1(q.v)} ${unit}</title></circle><text class="chart-label" x="${q.x}" y="${q.y-9}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
 }
 function renderMeasurements(){
   const all=measurementRows(),start=measurementRange(measurementPeriod),rows=all.filter(x=>String(x.date)>=start),last=all.at(-1),prev=all.at(-2),c=last?measurementCalc(last):null;
@@ -894,20 +893,28 @@ function renderMeasurements(){
     </div>
     <div class="overview-section-head"><h2>Évolution du poids</h2><span>${measurementPeriod==="week"?"Cette semaine":measurementPeriod==="month"?"Ce mois":"Cette année"}</span></div>
     <div class="overview-panel measure-chart">${smoothMeasureChart(rows,"weight")}</div>
-    <div class="measure-calculated"><div><span>IMC</span><b>${c?fmt(c.bmi):"—"}</b></div><div><span>Masse grasse</span><b>${c?fmt(c.fatMass," kg"):"—"}</b></div><div><span>Masse maigre</span><b>${c?fmt(c.leanMass," kg"):"—"}</b></div><div><span>Graisse viscérale</span><b>${c?fmt(c.visceral):"—"}</b></div></div>
+    <div class="measure-calculated"><div><span>IMC</span><b>${c?fmt(c.bmi):"—"}</b></div><div><span>Masse grasse</span><b>${c?fmt(c.fatMass," kg"):"—"}</b></div><div><span>Masse maigre</span><b>${c?fmt(c.leanMass," kg"):"—"}</b></div></div>
+    <details class="card body-measurements"><summary><span><b class="serif gold">Mensurations</b><small>Bras, cuisses, mollets, poitrine, épaules, hanches</small></span><span>Afficher</span></summary>${c?`<div class="body-measure-grid"><button data-body-chart="arm"><span>Bras</span><b>G ${fmt(c.armL," cm")} · D ${fmt(c.armR," cm")}</b></button><button data-body-chart="thigh"><span>Cuisses</span><b>G ${fmt(c.thighL," cm")} · D ${fmt(c.thighR," cm")}</b></button><button data-body-chart="calf"><span>Mollets</span><b>G ${fmt(c.calfL," cm")} · D ${fmt(c.calfR," cm")}</b></button><button data-body-chart="chest"><span>Poitrine</span><b>${fmt(c.chest," cm")}</b></button><button data-body-chart="shoulders"><span>Épaules</span><b>${fmt(c.shoulders," cm")}</b></button><button data-body-chart="hips"><span>Hanches</span><b>${fmt(c.hips," cm")}</b></button></div>`:`<div class="empty">Ajoutez une mesure pour renseigner vos mensurations.</div>`}</details>
     <div class="card measure-history"><div class="row-between"><b class="serif gold">Historique des mesures</b><button class="backlink" id="measure-height">Taille : ${esc(state.bodySettings?.heightCm||"—")} cm</button></div>${all.length?all.slice(-8).reverse().map(m=>`<button class="measure-row" data-edit-measure="${esc(m.id)}"><span>${formatDate(m.date)}</span><b>${esc(m.weight||"—")} kg</b><span>${esc(m.bodyFatPct||"—")} % MG</span><span>${esc(m.waistCm||"—")} cm</span></button>`).join(""):`<div class="empty">Aucune mesure enregistrée.</div>`}</div>`;
 }
+function openBodyMeasurementChart(kind){
+  const map={arm:["Bras","armLeftCm","armRightCm"],thigh:["Cuisses","thighLeftCm","thighRightCm"],calf:["Mollets","calfLeftCm","calfRightCm"],chest:["Poitrine","chestCm"],shoulders:["Épaules","shouldersCm"],hips:["Hanches","hipsCm"]},cfg=map[kind];if(!cfg)return;
+  const rows=measurementRows(),chart=key=>smoothMeasureChart(rows,key,"cm");
+  const body=cfg.length===3?`<div class="body-chart-pair"><div><b>Gauche</b>${chart(cfg[1])}</div><div><b>Droite</b>${chart(cfg[2])}</div></div>`:chart(cfg[1]);
+  openModal(`<h3>Évolution · ${cfg[0]}</h3><div class="overview-panel measure-chart">${body}</div><div class="modal-actions"><button class="btn gold" data-close-modal>Fermer</button></div>`);
+}
 function openMeasurementModal(id=""){
-  const cur=id?(state.measurements||[]).find(x=>x.id===id):null,m=cur||{date:localISODate(),weight:"",bodyFatPct:"",muscleMassKg:"",visceralFat:"",waistCm:""};
-  openModal(`<h3>${cur?"Modifier":"Ajouter"} une mesure</h3><div class="field"><label>Date</label><input id="m-date" type="date" value="${esc(m.date)}"></div><div class="param-grid" style="margin-top:8px"><div class="field"><label>Poids (kg)</label><input id="m-weight" inputmode="decimal" value="${esc(m.weight)}"></div><div class="field"><label>Masse grasse (%)</label><input id="m-bf" inputmode="decimal" value="${esc(m.bodyFatPct)}"></div><div class="field"><label>Masse musculaire (kg)</label><input id="m-muscle" inputmode="decimal" value="${esc(m.muscleMassKg)}"></div><div class="field"><label>Graisse viscérale</label><input id="m-visceral" inputmode="decimal" value="${esc(m.visceralFat)}"></div><div class="field"><label>Tour de taille (cm)</label><input id="m-waist" inputmode="decimal" value="${esc(m.waistCm)}"></div><div class="field"><label>Taille (cm)</label><input id="m-height" inputmode="decimal" value="${esc(state.bodySettings?.heightCm||"")}"></div></div><div class="modal-actions">${cur?`<button class="btn ghost" id="delete-measure">Supprimer</button>`:`<button class="btn ghost" data-close-modal>Annuler</button>`}<button class="btn gold" id="save-measure">Enregistrer</button></div>`,()=>{
-    $("#save-measure").onclick=()=>{const next={id:cur?.id||`m-${Date.now()}`,date:$("#m-date").value||localISODate(),weight:$("#m-weight").value.trim(),bodyFatPct:$("#m-bf").value.trim(),muscleMassKg:$("#m-muscle").value.trim(),visceralFat:$("#m-visceral").value.trim(),waistCm:$("#m-waist").value.trim()};state.bodySettings.heightCm=$("#m-height").value.trim();if(cur)Object.assign(cur,next);else state.measurements.push(next);save();closeOverlay(true);render();};
+  const cur=id?(state.measurements||[]).find(x=>x.id===id):null,m=cur||{date:localISODate(),weight:"",bodyFatPct:"",muscleMassKg:"",waistCm:"",chestCm:"",shouldersCm:"",hipsCm:"",armLeftCm:"",armRightCm:"",thighLeftCm:"",thighRightCm:"",calfLeftCm:"",calfRightCm:""};
+  openModal(`<h3>${cur?"Modifier":"Ajouter"} une mesure</h3><div class="field"><label>Date</label><input id="m-date" type="date" value="${esc(m.date)}"></div><div class="param-grid" style="margin-top:8px"><div class="field"><label>Poids (kg)</label><input id="m-weight" inputmode="decimal" value="${esc(m.weight)}"></div><div class="field"><label>Masse grasse (%)</label><input id="m-bf" inputmode="decimal" value="${esc(m.bodyFatPct)}"></div><div class="field"><label>Masse musculaire (kg)</label><input id="m-muscle" inputmode="decimal" value="${esc(m.muscleMassKg)}"></div><div class="field"><label>Tour de taille (cm)</label><input id="m-waist" inputmode="decimal" value="${esc(m.waistCm)}"></div></div><details class="modal-measure-details"><summary>Mensurations du corps <span>facultatif</span></summary><div class="param-grid"><div class="field"><label>Bras gauche (cm)</label><input id="m-arm-l" inputmode="decimal" value="${esc(m.armLeftCm)}"></div><div class="field"><label>Bras droit (cm)</label><input id="m-arm-r" inputmode="decimal" value="${esc(m.armRightCm)}"></div><div class="field"><label>Cuisse gauche (cm)</label><input id="m-thigh-l" inputmode="decimal" value="${esc(m.thighLeftCm)}"></div><div class="field"><label>Cuisse droite (cm)</label><input id="m-thigh-r" inputmode="decimal" value="${esc(m.thighRightCm)}"></div><div class="field"><label>Mollet gauche (cm)</label><input id="m-calf-l" inputmode="decimal" value="${esc(m.calfLeftCm)}"></div><div class="field"><label>Mollet droit (cm)</label><input id="m-calf-r" inputmode="decimal" value="${esc(m.calfRightCm)}"></div><div class="field"><label>Poitrine (cm)</label><input id="m-chest" inputmode="decimal" value="${esc(m.chestCm)}"></div><div class="field"><label>Épaules (cm)</label><input id="m-shoulders" inputmode="decimal" value="${esc(m.shouldersCm)}"></div><div class="field"><label>Hanches (cm)</label><input id="m-hips" inputmode="decimal" value="${esc(m.hipsCm)}"></div></div></details><div class="modal-actions">${cur?`<button class="btn ghost" id="delete-measure">Supprimer</button>`:`<button class="btn ghost" data-close-modal>Annuler</button>`}<button class="btn gold" id="save-measure">Enregistrer</button></div>`,()=>{
+    $("#save-measure").onclick=()=>{const val=id=>$(id).value.trim(),next={id:cur?.id||`m-${Date.now()}`,date:$("#m-date").value||localISODate(),weight:val("#m-weight"),bodyFatPct:val("#m-bf"),muscleMassKg:val("#m-muscle"),waistCm:val("#m-waist"),armLeftCm:val("#m-arm-l"),armRightCm:val("#m-arm-r"),thighLeftCm:val("#m-thigh-l"),thighRightCm:val("#m-thigh-r"),calfLeftCm:val("#m-calf-l"),calfRightCm:val("#m-calf-r"),chestCm:val("#m-chest"),shouldersCm:val("#m-shoulders"),hipsCm:val("#m-hips")};if(cur)Object.assign(cur,next);else state.measurements.push(next);save();closeOverlay(true);render();};
     if(cur)$("#delete-measure").onclick=()=>{state.measurements=state.measurements.filter(x=>x.id!==cur.id);save();closeOverlay(true);render();};
   });
 }
 function openHeightModal(){openModal(`<h3>Taille</h3><p>Elle sert uniquement au calcul automatique de l’IMC.</p><div class="field"><label>Taille (cm)</label><input id="height-only" inputmode="decimal" value="${esc(state.bodySettings?.heightCm||"")}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-height">Enregistrer</button></div>`,()=>{$("#save-height").onclick=()=>{state.bodySettings.heightCm=$("#height-only").value.trim();save();closeOverlay(true);render();};});}
 
 function renderProgress(){
-  const body=progressionView==="overview"?renderProgressOverview():progressionView==="measurements"?renderMeasurements():progressionView==="history"?renderProgressHistoryHome():renderProgressPerformance();
+  if(progressionView==="history")progressionView="overview";
+  const body=progressionView==="overview"?renderProgressOverview():progressionView==="measurements"?renderMeasurements():renderProgressPerformance();
   shell(`${header("Progression","Suivi des Performances","","compact")}${body}`,"progress-screen");
   $$('[data-prog-view]').forEach(b=>b.onclick=()=>{progressionView=b.dataset.progView;persistUI();history.pushState(navState(),"");render();});
   $$("[data-prog-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.progPeriod;persistUI();history.pushState(navState(),"");render();});
@@ -916,6 +923,7 @@ function renderProgress(){
   if($("#add-measure"))$("#add-measure").onclick=()=>openMeasurementModal();
   $$('[data-edit-measure]').forEach(b=>b.onclick=()=>openMeasurementModal(b.dataset.editMeasure));
   if($("#measure-height"))$("#measure-height").onclick=openHeightModal;
+  $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
@@ -977,6 +985,15 @@ function openProgressSettingsModal(id){
 }
 
 let historyVolumeMode="duration";
+function historySessionRows(limit=5){
+  const rows=[...(state.history||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,limit);
+  return rows.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div><i>›</i></button>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
+}
+function openAllSessionHistory(){
+  const rows=[...(state.history||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date)));let lastMonth="";
+  const html=rows.map(h=>{const key=String(h.date).slice(0,7),d=new Date(`${key}-01T12:00:00`),head=key!==lastMonth?`<h4 class="session-month-title">${d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}</h4>`:"";lastMonth=key;return `${head}<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div><i>›</i></button>`;}).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
+  openModal(`<h3>Toutes les séances</h3><div class="all-session-history">${html}</div><div class="modal-actions"><button class="btn gold" data-close-modal>Fermer</button></div>`,()=>{$$("[data-history-session]").forEach(b=>b.onclick=()=>{const id=b.dataset.historySession;closeOverlay(true);pushNav({type:"historyDetail",id});});});
+}
 function renderHistory(){
   const scoped=historyScope(historyPeriod,historyYear),hs=scoped.history,old=scoped.old;
   const total=hs.reduce((a,h)=>a+(+h.duration||0),0),count=hs.length+old.reduce((a,w)=>a+(+w.count||0),0);
@@ -989,12 +1006,15 @@ function renderHistory(){
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
     <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row history-volume-tabs">${[["duration","Durée"],["count","Nombre de séances"],["average","Moyenne"]].map(([m,l])=>`<button data-volume-mode="${m}" class="${historyVolumeMode===m?"on":""}">${l}</button>`).join("")}</div>${historyVolumeBars(hs,old,historyVolumeMode)}</div>
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>`,"history-screen");
+    <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>
+    <div class="card session-history-card"><div class="row-between"><div class="section-title" style="margin:0">Historique des séances</div><span class="tiny muted">5 dernières</span></div><div class="session-history-list">${historySessionRows(5)}</div>${(state.history||[]).length>5?`<button class="btn ghost block" id="all-session-history">Voir toutes les séances</button>`:""}</div>`,"history-screen");
   $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
   $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
   $("#history-period-picker").onclick=()=>openPeriodPicker("history");
   $("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
   $$('[data-volume-mode]').forEach(b=>b.onclick=()=>{historyVolumeMode=b.dataset.volumeMode;render();});
+  $$('[data-history-session]').forEach(b=>b.onclick=()=>pushNav({type:"historyDetail",id:b.dataset.historySession}));
+  if($("#all-session-history"))$("#all-session-history").onclick=openAllSessionHistory;
 }
 function historyScope(period,year){
   const allH=state.history||[], allOld=state.oldWeeks||[];
