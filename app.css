@@ -1173,3 +1173,27 @@ body.lock-program-home{
 .session-header.session-hero-g3::after{
   background:radial-gradient(circle at 75% 41%,#e6b54b25,transparent 33%)!important;
 }
+
+/* =====================================================================
+   V24.7 — cadrage maquette validée G1 / G2 / G3 (pages de séance)
+   IMPORTANT : Full Mix et Athlétique restent inchangés.
+   Les visuels G utilisent leur image portrait sans agrandissement type cover.
+   ===================================================================== */
+.session-header.session-hero-g1::before,
+.session-header.session-hero-g2::before,
+.session-header.session-hero-g3::before{
+  background-image:
+    linear-gradient(90deg,#030303 0%,#030303f7 19%,#030303d0 37%,#03030370 54%,transparent 72%),
+    linear-gradient(0deg,#040404d8 0%,transparent 42%),
+    var(--session-image)!important;
+  background-size:100% 100%,100% 100%,auto 100%!important;
+  background-position:center center,center center,right center!important;
+  background-repeat:no-repeat!important;
+  background-color:#030303!important;
+  filter:saturate(.94) contrast(1.08) brightness(.94)!important;
+}
+.session-header.session-hero-g1::after,
+.session-header.session-hero-g2::after,
+.session-header.session-hero-g3::after{
+  background:radial-gradient(circle at 82% 40%,#e8b84b24,transparent 36%)!important;
+}
