@@ -90,7 +90,7 @@ body{padding-bottom:0;background:#030303}
 .header.compact{height:148px}
 .header.tall{height:222px}
 .header::before,.session-header::before{
-  background-image:linear-gradient(90deg,#030303 0%,#040404ec 31%,#05050578 49%,transparent 73%),linear-gradient(0deg,#050505 0%,transparent 54%),var(--session-image,url('./assets/hero-program-official.png'));
+  background-image:linear-gradient(90deg,#030303 0%,#040404ec 31%,#05050578 49%,transparent 73%),linear-gradient(0deg,#050505 0%,transparent 54%),var(--session-image,url('./assets/hero-program-official.jpg'));
   background-size:cover;
   background-position:center center;
   filter:saturate(.96) contrast(1.08) brightness(.98);
@@ -299,7 +299,7 @@ body{padding-bottom:0;background:#030303}
 .header.tall .cycle-chip{position:absolute;top:14px;right:0;min-width:96px;padding:7px 10px;border-radius:11px}
 .header.tall .cycle-chip b{font-size:14px}.header.tall .cycle-chip span{font-size:9px}
 .today-waiting-screen{position:relative;min-height:calc(100dvh - var(--nav-h));overflow:hidden}
-.today-waiting-gym{position:absolute;z-index:0;left:-8px;right:-8px;top:216px;bottom:-22px;background:linear-gradient(180deg,#030303 0%,#03030390 10%,transparent 27%,#02020270 80%,#020202 100%),linear-gradient(90deg,#0008,transparent 28%,transparent 72%,#0008),url('./assets/today-waiting-gym-official.png') center top/cover no-repeat;filter:brightness(.73) saturate(.9) contrast(1.08)}
+.today-waiting-gym{position:absolute;z-index:0;left:-8px;right:-8px;top:216px;bottom:-22px;background:linear-gradient(180deg,#030303 0%,#03030390 10%,transparent 27%,#02020270 80%,#020202 100%),linear-gradient(90deg,#0008,transparent 28%,transparent 72%,#0008),url('./assets/today-waiting-gym-official.jpg') center top/cover no-repeat;filter:brightness(.73) saturate(.9) contrast(1.08)}
 .today-waiting-screen .header,.today-waiting-screen .cancelled-session-card{position:relative;z-index:2}
 .today-waiting-screen .cancelled-session-card{background:#101213ed;backdrop-filter:blur(5px)}
 
@@ -358,7 +358,7 @@ body{padding-bottom:0;background:#030303}
   .library-row .thumb{width:76px;height:62px}
 }
 
-.install{background-image:linear-gradient(90deg,#050505ef,#050505a8),url('./assets/hero-program-official.png');}
+.install{background-image:linear-gradient(90deg,#050505ef,#050505a8),url('./assets/hero-program-official.jpg');}
 .program-home-screen{display:flex;flex-direction:column}
 .program-home-screen>.header{flex:0 0 auto}
 .program-home-screen>.program-tabs{flex:0 0 auto}
@@ -578,7 +578,7 @@ body.lock-program-home{
   background-image:
     linear-gradient(90deg,#030303f4 0%,#050505d9 27%,#0505056b 50%,transparent 75%),
     linear-gradient(0deg,#050505ee 0%,transparent 54%),
-    var(--session-image,url('./assets/hero-program-official.png'));
+    var(--session-image,url('./assets/hero-program-official.jpg'));
   background-size:100% 100%,100% 100%,auto 108%;
   background-position:0 0,0 0,right 42%;
   background-repeat:no-repeat;
@@ -727,7 +727,7 @@ body.lock-program-home{
 .program-home-screen>.header.program-header{flex:0 0 var(--main-hero-height)}
 .header.program-header{margin-bottom:0}
 .header.program-header::before{
-  background-image:linear-gradient(90deg,#05050570,transparent 75%),url('./assets/today-waiting-gym-official.png');
+  background-image:linear-gradient(90deg,#05050570,transparent 75%),url('./assets/today-waiting-gym-official.jpg');
   background-size:cover;background-position:center,center 38%;
   filter:brightness(.85) saturate(.95);
 }
@@ -772,7 +772,7 @@ body.lock-program-home{
 .header.premium-header.tall .session-groups{max-width:calc(100% - 110px);font-size:18px;line-height:1.15;min-height:44px;display:flex;align-items:center}
 .app.app-today-waiting{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px))}
 .today-waiting-screen{isolation:isolate;position:relative;min-height:calc(100svh - var(--nav-h) - env(safe-area-inset-bottom,0px));padding:36px 0 105px;overflow:visible}
-.today-waiting-screen>.today-waiting-gym{position:absolute;z-index:-1;inset:0 -10px;background:linear-gradient(180deg,#0005,transparent 65%),url('./assets/today-waiting-v20.png') center center/cover no-repeat;filter:none;pointer-events:none}
+.today-waiting-screen>.today-waiting-gym{position:absolute;z-index:-1;inset:0 -10px;background:linear-gradient(180deg,#0005,transparent 65%),url('./assets/today-waiting-v20.jpg') center center/cover no-repeat;filter:none;pointer-events:none}
 .waiting-copy{position:relative;padding:0 6px 20px;text-shadow:0 2px 8px #000}
 .waiting-copy h1{font-family:Georgia,serif;font-size:38px;line-height:1.1;margin:0 0 8px;color:#fff;font-weight:400}
 .waiting-copy .session-code{margin-top:16px;font-size:46px}
@@ -1202,7 +1202,7 @@ body.lock-program-home{
 /* Une seule image dans le bandeau Programme : supprime la superposition qui
    produisait le personnage fantôme, sans modifier les autres bandeaux. */
 .header.program-header::before{
-  background-image:linear-gradient(90deg,#030303b8 0%,#03030370 27%,transparent 67%),var(--session-image,url('./assets/hero-program-official.png'))!important;
+  background-image:linear-gradient(90deg,#030303b8 0%,#03030370 27%,transparent 67%),var(--session-image,url('./assets/hero-program-official.jpg'))!important;
   background-size:cover!important;
   background-position:center center!important;
   background-repeat:no-repeat!important;
@@ -1228,7 +1228,7 @@ body.lock-program-home{
 .program-home-screen > .header.program-header::before{
   background-image:
     linear-gradient(90deg,#03030352 0%,#03030328 24%,transparent 58%),
-    var(--session-image,url('./assets/hero-program-official.png'))!important;
+    var(--session-image,url('./assets/hero-program-official.jpg'))!important;
   background-size:100% 100%!important;
   background-position:center center!important;
   background-repeat:no-repeat!important;
@@ -1301,3 +1301,18 @@ body.lock-program-home{
 /* V24.17 — tactile fiches techniques Android */
 .sheet-canvas.fiche-visual{overscroll-behavior:contain;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .sheet-canvas.fiche-visual>img{-webkit-user-drag:none;user-select:none}
+
+/* V24_18: calendar, backup reminder and isolated full-screen sheet viewer */
+.training-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center}.training-calendar-grid>span{padding:8px 0}.training-day{min-height:42px;background:#1d1c1a;border:1px solid #39342a;border-radius:7px;color:#ddd;display:flex;align-items:center;justify-content:center;gap:3px;flex-direction:column}.training-day.trained{border-color:#d4ae60;background:#332b1d;color:#f1d18b}.training-day small{font-size:10px}.backup-reminder{position:fixed;inset:0;background:#000c;z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px}.backup-reminder>.card{width:min(100%,420px);padding:24px}.fullscreen-sheet{position:fixed;inset:0;z-index:9999;background:#050505;display:flex;flex-direction:column}.fullscreen-toolbar{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;color:#e9c87e}.fullscreen-toolbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fullscreen-toolbar button{background:#29251c;color:#f1d18b;border:1px solid #766039;border-radius:8px;padding:10px}.fullscreen-stage{flex:1;min-height:0;overflow:hidden;touch-action:none;position:relative;display:flex;align-items:center;justify-content:center}.fullscreen-stage img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;transform-origin:0 0;user-select:none;-webkit-user-drag:none;touch-action:none}.sheet-canvas.fiche-visual{cursor:zoom-in}
+
+/* V24.18 — guided workout overlay */
+.v2418-timer-entry{grid-column:1/-1;padding:4px 12px 8px}.v2418-timer-entry .btn{width:100%;font-size:12px}.v2418-guide{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.94);overflow:auto;display:flex;align-items:center;justify-content:center;padding:20px}.v2418-guide-card{width:min(100%,520px);max-height:95vh;overflow:auto;background:#191919;border:1px solid #a7894d;border-radius:20px;padding:22px;color:#eee}.v2418-guide-clock{text-align:center;font-size:clamp(50px,15vw,86px);font-variant-numeric:tabular-nums;color:#e2c17d;margin:22px 0}.v2418-guide-actions{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.v2418-guide-actions .btn{flex:1;min-width:120px}.v2418-guide input{max-width:100%}
+
+/* V24.18.2 : centered image with predictable pinch/pan geometry */
+.fullscreen-stage img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);transform-origin:center center;max-width:100%;max-height:100%}
+
+/* V24.18.3: guide and fullscreen controls remain reachable on notched Android devices. */
+.v2418-guide{padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px)}
+.v2418-guide-card{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px)}
+.v2418-guide button:disabled{opacity:.45;cursor:not-allowed}
+.fullscreen-toolbar{padding-bottom:8px;padding-right:calc(env(safe-area-inset-right) + 12px)}

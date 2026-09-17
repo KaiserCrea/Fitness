@@ -7,7 +7,12 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 30;
+const APP_REV = 36;
+const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
+const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
+const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
+const BACKUP_SNOOZE_KEY="fitness-backup-snooze-v2418";
+let calendarAnchor=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0");
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -44,7 +49,8 @@ const app=$("#app"), overlayRoot=$("#overlay-root");
 
 const UI_KEY="fitness-ui-v9";
 const SCROLL_KEY="fitness-tab-scroll-v9";
-const needsCleanReset=!localStorage.getItem(RESET_KEY);
+// Never reset existing workout data merely because a legacy UI-reset marker is absent.
+const needsCleanReset=false;
 let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
 let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
 let tab="today";
@@ -102,10 +108,20 @@ function inferRotations(s){
 }
 function migrate(){
   let raw=null; try{raw=JSON.parse(localStorage.getItem(KEY)||"null")}catch{}
-  if(raw&&needsCleanReset){
-    raw={installed:raw.installed!==false,cycle:cycles.includes(raw.cycle)?raw.cycle:"A",nextG:Math.min(3,Math.max(1,+raw.nextG||1)),weekKey:currentWeekKey()};
+  if(raw && (raw.appRev||0)<APP_REV){
+    const oldText=localStorage.getItem(KEY);
+    // Keep the original V24.17 recovery copy; never overwrite it on subsequent releases.
+    const backupKey="fitness-pre-migration-v2418-from-"+String(raw.appRev||0);
+    try{
+      const target=localStorage.getItem(backupKey)===null?backupKey:backupKey+"-latest";
+      localStorage.setItem(target,oldText);
+      if(localStorage.getItem(target)!==oldText)throw Error("Copie de sécurité non vérifiée");
+    }catch(e){
+      alert("Mise à jour interrompue : impossible de protéger vos données actuelles. Libérez de l’espace ou exportez-les avant de réessayer.");
+      throw e;
+    }
   }
-  if(needsCleanReset)localStorage.setItem(RESET_KEY,"done");
+  // Preserve all existing user data during upgrades, including older installations.
   const s=Object.assign(defaultState(),raw||{});
   s.history=(Array.isArray(s.history)?s.history:[]).filter(h=>h&&typeof h==="object").map((h,i)=>{
     const exercises=Array.isArray(h.exercises)?h.exercises:(h.exercises&&typeof h.exercises==="object"?Object.values(h.exercises):[]);
@@ -118,7 +134,7 @@ function migrate(){
   s.programOverrides=s.programOverrides||{}; s.customExercises=s.customExercises||{};
   s.archivedExercises=Array.isArray(s.archivedExercises)?s.archivedExercises:[];
   s.ephemeralSessions=Array.isArray(s.ephemeralSessions)?s.ephemeralSessions.filter(x=>x&&Array.isArray(x.exerciseIds)):[];
-  s.progressionSettings=s.progressionSettings||{}; s.lastComplement=s.lastComplement||{}; s.athParams=s.athParams||{};
+  s.progressionSettings=s.progressionSettings||{}; s.lastComplement=s.lastComplement||{}; s.athParams=s.athParams||{}; s.guideConfigs=s.guideConfigs||{};
   s.measurements=Array.isArray(s.measurements)?s.measurements.filter(x=>x&&typeof x==="object"):[]; s.bodySettings=s.bodySettings||{heightCm:""};
   if(!raw?.nextAth || !raw?.nextFm) inferRotations(s);
   // Preserve the previous reordering model by converting sessionOrder into complete overrides only when safe.
@@ -345,11 +361,11 @@ function nav(){
   });
 }
 function headerAsset(title){
-  if(title==="Aujourd’hui")return "./assets/hero-today-v20.png";
-  if(title==="Programme")return "./assets/hero-program-v2412.png";
-  if(title==="Progression")return "./assets/hero-progress-v20.png";
-  if(title==="Historique")return "./assets/hero-history-v20.png";
-  return "./assets/hero-program-official.png";
+  if(title==="Aujourd’hui")return "./assets/hero-today-v20.jpg";
+  if(title==="Programme")return "./assets/hero-program-v2412.jpg";
+  if(title==="Progression")return "./assets/hero-progress-v20.jpg";
+  if(title==="Historique")return "./assets/hero-history-v20.jpg";
+  return "./assets/hero-program-official.jpg";
 }
 function header(title,subtitle="",extra="",cls=""){
   const asset=headerAsset(title);
@@ -379,7 +395,7 @@ function openThumbnailPreview(src){
 }
 function bindGlobalInView(){
   $$('[data-cycle-menu]').forEach(b=>b.onclick=()=>openCycleModal());
-  $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb","official-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program-official.png";});
+  $$("img[data-fallback]").forEach(img=>img.onerror=()=>{img.onerror=null;img.classList.remove("fiche-thumb","official-thumb");img.classList.add("fallback-thumb");img.src="./assets/hero-program-official.jpg";});
   $$(".thumb img").forEach(img=>{
     const holder=img.closest(".thumb");
     if(holder)holder.classList.add("previewable-thumb");
@@ -480,6 +496,7 @@ function renderActiveToday(cur,date){
       <div><div class="tiny serif gold" style="text-align:center;margin-bottom:3px">Bilan</div><div class="bilan"><div><b>${success}</b><span>Réussis</span></div><div><b>${fail}</b><span>Échoués</span></div><div><b>${skip}</b><span>Non réalisés</span></div></div></div></div>
       <button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button>
     </div>`,"today-screen");
+  $$('[data-guide]').forEach(b=>b.onclick=()=>openExerciseGuide(b.dataset.guide,+b.dataset.guideNo));
   $$('[data-status]').forEach(b=>b.onclick=()=>setExerciseStatus(b.dataset.id,b.dataset.status,+b.dataset.no));
   $$('[data-sheet]').forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet,b.dataset.session,+b.dataset.no));
   $("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");
@@ -490,9 +507,9 @@ function todayExerciseCard(id,session,no,cur){
   const firstPendingNo=activeSessionIds(cur).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
   return `<div class="exercise-card ${firstPendingNo===no?"current":""}">
     <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""></div>
-    <div class="ex-info"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div></div>
+    <div class="ex-info"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div>${actualSetsFor(id)?`<div class="tiny muted">Dernière fois : ${esc(actualSetsFor(id).sets.join(" / "))} · ${esc(refWithUnit(actualSetsFor(id).weight))}</div>`:""}${cur.setReps?.[occKey(id,no)]?`<div class="tiny gold">Aujourd’hui : ${esc(cur.setReps[occKey(id,no)].join(" / "))}</div>`:""}</div>
     <button class="backlink chev" data-sheet="${esc(id)}" data-session="${esc(session)}" data-no="${no}" aria-label="Voir la fiche">${icon("chevron")}</button>
-    <div class="status-actions">
+    <div class="v2418-timer-entry"><button class="btn" data-guide="${esc(id)}" data-guide-no="${no}">Chronomètre et coach vocal</button></div><div class="status-actions">
       ${[["Réussi","check"],["Échoué","x"],["Non réalisé","ban"]].map(([x,ic])=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}">${icon(ic)} ${x}</button>`).join("")}
     </div>
   </div>`;
@@ -517,20 +534,44 @@ function cancelCurrentSession(){
   openModal(`<h3>Annuler la séance ?</h3><p>Les informations saisies pour cette séance seront supprimées. Le cycle, l’historique et les statistiques ne seront pas modifiés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Continuer la séance</button><button class="btn gold" id="confirm-cancel-session">Annuler la séance</button></div>`,()=>{$("#confirm-cancel-session").onclick=finish;});
 }
 function setExerciseStatus(id,status,no){
-  const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};cur.reps=cur.reps||{};cur.nextReps=cur.nextReps||{};
+  const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};cur.reps=cur.reps||{};cur.nextReps=cur.nextReps||{};cur.setReps=cur.setReps||{};
   const key=occKey(id,no),current=occurrenceValue(cur,id,no);
   if(!cur.values[key])cur.values[key]=current;
-  if(cur.status[key]===status){delete cur.status[key];delete cur.nextRefs[key];save();render();return;}
+  if(cur.status[key]===status){delete cur.status[key];delete cur.nextRefs[key];if(cur.setReps)delete cur.setReps[key];save();render();return;}
   cur.status[key]=status;
   // Remove the legacy canonical status only when this active session has already started using occurrence keys.
   if(Object.prototype.hasOwnProperty.call(cur.status,id))delete cur.status[id];
   if(status==="Réussi"){
-    openNextRefModal(id,current,(next,doneReps,nextReps)=>{cur.nextRefs[key]=next;if(Number.isFinite(doneReps))cur.reps[key]=doneReps;if(Number.isFinite(nextReps))cur.nextReps[key]=nextReps;save();render();});
+    openNextRefModal(id,current,(next,doneReps,nextReps)=>{cur.nextRefs[key]=next;if(Number.isFinite(doneReps))cur.reps[key]=doneReps;if(Number.isFinite(nextReps))cur.nextReps[key]=nextReps;save();render();openSetResultsModal(id,no,current);});
   }else{
-    if(status==="Échoué")cur.nextRefs[key]=current;
+    if(status==="Échoué"){cur.nextRefs[key]=current;openSetResultsModal(id,no,current);return;}
     else delete cur.nextRefs[key];
     save();render();
   }
+}
+function actualSetsFor(id){
+ const equipment=state.progressionSettings[id]?.equipment||"";
+ const matches=[];for(const h of state.history||[])for(const e of h.exercises||[])if(canonicalId(e.id)===canonicalId(id)&&String(e.equipment||"")===equipment&&Array.isArray(e.setReps)&&e.setReps.length)matches.push({date:h.date,sets:e.setReps,weight:e.actual,status:e.status});
+ return matches.at(-1)||null;
+}
+function targetSuggestion(id,sets,weight){
+ const bounds=repetitionBounds(id),p=defaultParams(id),setting=state.progressionSettings[id]||{},inc=Number(setting.increment)||2.5;
+ const expected=Math.min(20,Math.max(1,parseInt(p.series)||4));
+ if(!bounds||sets.length!==expected||sets.some(r=>!Number.isInteger(r)||r<0))return null;
+ const currentGoal=repNumber(p.repetitions);
+ const goal=Number.isFinite(currentGoal)?Math.max(bounds.min,Math.min(bounds.max,currentGoal)):bounds.min;
+ const n=parseNumber(weight),simpleKg=/^\s*\d+(?:[,.]\d+)?\s*(kg)?\s*$/i.test(String(weight));
+ if(sets.every(r=>r>=bounds.max)&&Number.isFinite(n)&&simpleKg){
+   return {weight:normalizeWeight(String(Math.round((n+inc)*100)/100)),reps:bounds.min,description:`Toutes les séries ont atteint ${bounds.max} répétitions. Augmentation proposée de ${inc} kg et retour à ${bounds.min} répétitions.`};
+ }
+ // A failed last set must be completed before raising the target for every set.
+ if(sets.some(r=>r<goal))return {weight,reps:goal,description:`Objectif actuel : ${expected} séries de ${goal}. Conserver la charge et compléter les séries inachevées.`};
+ const next=Math.min(bounds.max,Math.max(goal,Math.min(...sets))+1);
+ return {weight,reps:next,description:`Toutes les séries ont atteint ${goal}. Proposer ${next} répétitions à charge identique.`};
+}
+function openSetResultsModal(id,no,current,onDone){
+ const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id);
+ openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(current))}</p>${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{$('#save-set-results').onclick=()=>{const values=$$('[data-set-reps]').map(x=>Number(x.value));if(values.some((v,i)=>!Number.isInteger(v)||v<0||v>200||!$$('[data-set-reps]')[i].value.trim())){alert('Saisissez chaque série (0 à 200).');return;}cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);const suggestion=targetSuggestion(id,values,current);cur.nextRefs=cur.nextRefs||{};cur.nextRefs[key]=current;cur.nextReps=cur.nextReps||{};if(suggestion)cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();if(suggestion)openModal(`<h3>Progression proposée</h3><p>${esc(suggestion.description)}</p><p>Prochaine cible : <b>${esc(suggestion.weight)} · ${suggestion.reps} répétitions</b></p><div class="modal-actions"><button class="btn ghost" id="suggest-ignore">Conserver ma référence</button><button class="btn gold" id="suggest-accept">Accepter la proposition</button></div>`,()=>{$("#suggest-ignore").onclick=()=>{closeOverlay(true);render();};$("#suggest-accept").onclick=()=>{cur.nextRefs[key]=suggestion.weight;cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();};});if(onDone)onDone(values);};});
 }
 function openNextRefModal(id,current,done){
   const p=defaultParams(id),target=repetitionTargetFor(id),bounds=repetitionBounds(id); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
@@ -585,7 +626,7 @@ function commitCurrentSession(){
   const cur=state.today;if(!cur)return;
   const mins=minutesBetweenTimes(cur.start,cur.end);if(mins==null)return;
   const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:activeSessionIds(cur);
-  const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual,reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps;return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no};}).filter(e=>e.status!=="Non réalisé");
+  const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual,reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps,setReps=cur.setReps?.[key]||null,equipment=state.progressionSettings[id]?.equipment||"";return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no,setReps,equipment};}).filter(e=>e.status!=="Non réalisé");
   state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
   ids.forEach((id,i)=>{const v=occurrenceNext(cur,id,i+1);if(!v)return;state.refs[id]=v;const p=defaultParams(id);if(p.type==="strength"){p.charge=v;state.params[id]=p;}});
   if(/^G[123][ABC]$/.test(cur.session)){
@@ -603,9 +644,9 @@ function renderActiveAth(cur,date){
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
-    <div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
+    <button class="btn gold block" id="ath-guide">Démarrer le guidage ATH (manuel)</button><div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
     <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
-  $("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
+  $("#ath-guide").onclick=()=>openAthGuide(cur.session);$("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
 function athStepSummary(session,index,step){
   const values=state.athParams?.[session]?.[index]||{};
@@ -649,7 +690,7 @@ function programGCard(n){
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
 function programCompCard(title,variants,next){
-  const asset=title==="ATHLÉTIQUE"?"./assets/card-ath-official.png":"./assets/card-fm-official.png";
+  const asset=title==="ATHLÉTIQUE"?"./assets/card-ath-official.jpg":"./assets/card-fm-official.jpg";
   const pos='right center';
   return `<div class="program-card comp-card" style="--card-image:url('${asset}');--card-position:${pos}"><span class="code">${esc(title)}</span><span class="groups">${title==="ATHLÉTIQUE"?"Cardio / Endurance<br>Condition physique":"Séances complètes<br>Ciblées"}</span>
     <span class="variant-row fm-row">${variants.map(v=>`<button data-open-comp="${title==="ATHLÉTIQUE"?`ATHLÉTIQUE ${v}`:`FULL MIX ${v}`}" class="">${v}</button>`).join("")}</span></div>`;
@@ -659,7 +700,7 @@ function programExercises(group){
   return `<div class="group-detail-head"><button class="backlink" data-back-groups>${icon("arrowleft")} Retour aux groupes</button><h2 class="section-title">${esc(group)}</h2><span>${ids.length} exercice${ids.length>1?"s":""}</span></div>
     <section class="library-section"><div class="panel">${ids.map(id=>{
       const o=occurrenceList(id).find(x=>groupForId(id)===group)||occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo},img=thumbnailFor(id,o.s,o.n),count=occurrenceList(id).length;
-      return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.png"}"></div><div class="library-copy"><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(group)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
+      return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div><div class="library-copy"><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(group)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
     }).join("")||`<div class="empty">Aucun exercice dans ce groupe.</div>`}</div></section>`;
 }
 function programGroups(){
@@ -671,7 +712,8 @@ function programManage(){
   return `<h2 class="section-title">Paramètres</h2>
     <div class="card">
       <button class="btn block" id="cycle-position">Repositionner le cycle G</button>
-      <button class="btn block" id="backup" style="margin-top:6px">Sauvegarder toutes les données (JSON)</button>
+      <h3>Sauvegarde et restauration</h3><p class="tiny muted">Dernière sauvegarde : ${esc(lastBackupLabel())}</p><button class="btn block" id="backup" style="margin-top:6px">Exporter toutes mes données (JSON)</button>
+      <label class="btn block" style="display:block;text-align:center;margin-top:6px">Vérifier le fichier JSON téléchargé<input id="verify-backup" type="file" accept=".json,application/json" hidden></label>
       <label class="btn block" style="display:block;text-align:center;margin-top:6px">Restaurer une sauvegarde<input id="restore" type="file" accept=".json,application/json" hidden></label>
       <button class="btn block" id="export" style="margin-top:6px">Exporter l’historique (CSV)</button>
     </div>
@@ -744,6 +786,7 @@ function bindProgramContent(){
   $$('[data-back-groups]').forEach(b=>b.onclick=()=>{programExerciseGroup="Tous";persistUI();history.replaceState(navState(),"");render();});
   if($("#cycle-position"))$("#cycle-position").onclick=openCycleModal;
   if($("#backup"))$("#backup").onclick=backupJSON;
+  if($("#verify-backup"))$("#verify-backup").onchange=verifyBackupFile;
   if($("#restore"))$("#restore").onchange=restoreJSON;
   if($("#export"))$("#export").onclick=exportCSV;
   if($("#add-ephemeral"))$("#add-ephemeral").onclick=()=>openEphemeralEditor();
@@ -755,7 +798,7 @@ function bindProgramContent(){
 function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
   const ids=sessionIds(session);
-  const heroAsset=session.startsWith("G1")?"./assets/card-g1-v22.png":session.startsWith("G2")?"./assets/card-g2-v22.png":session.startsWith("G3")?"./assets/card-g3-official.png":"./assets/card-fm-official.png";
+  const heroAsset=session.startsWith("G1")?"./assets/card-g1-v22.jpg":session.startsWith("G2")?"./assets/card-g2-v22.jpg":session.startsWith("G3")?"./assets/card-g3-official.jpg":"./assets/card-fm-official.jpg";
   const heroClass=session.startsWith("G1")?" session-hero-g1":session.startsWith("G2")?" session-hero-g2":session.startsWith("G3")?" session-hero-g3":"";
   shell(`<header class="session-header${heroClass}" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div>
     <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
@@ -772,7 +815,7 @@ function renderProgramDetail(session){
 function sessionRow(id,session,no){
   const e=exercise(id),img=thumbnailFor(id,session,no);
   return `<div class="session-row" data-session-row data-id="${esc(id)}" data-no="${no}">
-    <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.png"}"></div>
+    <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div>
     <div class="session-copy"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div></div>`;
 }
 function enableSort(list,session){
@@ -814,8 +857,8 @@ function openExerciseActionModal(session,id){
 }
 function renderAthProgram(session){
   const img=pathUrl(ATH_SHEETS[session]||"");
-  shell(`<header class="session-header" style="--session-image:url('./assets/card-ath-official.png')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
-    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-program-official.png"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
+  shell(`<header class="session-header" style="--session-image:url('./assets/card-ath-official.jpg')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
+    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-program-official.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
     <div class="card">${(DATA.ath?.[session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(session,i,x))}</div></div>`).join("")}</div>`);
   $("#back-program").onclick=()=>history.back();
   $("#open-ath-sheet").onclick=()=>openAthSheet(session);
@@ -903,6 +946,12 @@ function overviewDonut(distribution,total){
   if(cursor<100)stops.push(`#2b2924 ${cursor}% 100%`);
   return `<div class="overview-donut-wrap"><div class="overview-donut" style="background:conic-gradient(${stops.join(",")})"><div><b>${total}</b><span>exercices</span></div></div><div class="overview-legend">${distribution.map((x,i)=>`<div><span><i style="background:${palette[i]}"></i>${x.name}</span><b>${x.pct}%</b></div>`).join("")}</div></div>`;
 }
+function trainingCalendar(){
+  const [year,month]=calendarAnchor.split("-").map(Number),first=new Date(year,month-1,1),count=new Date(year,month,0).getDate(),offset=(first.getDay()+6)%7,byDay={};
+  (state.history||[]).forEach(h=>{if(h.date?.startsWith(calendarAnchor))byDay[h.date]=(byDay[h.date]||0)+1;});
+  const cells=Array.from({length:offset},()=>`<span></span>`).concat(Array.from({length:count},(_,i)=>{const day=calendarAnchor+"-"+String(i+1).padStart(2,"0"),n=byDay[day]||0;return `<button type="button" data-calendar-day="${day}" class="training-day ${n?"trained":""}" aria-label="${i+1} : ${n} séance(s)"><b>${i+1}</b>${n?`<small>${n}</small>`:""}</button>`;}));
+  return `<section class="card training-calendar"><div class="row-between"><h2>Calendrier des entraînements</h2><div><button class="btn ghost" data-calendar-shift="-1" aria-label="Mois précédent">‹</button> <button class="btn ghost" data-calendar-shift="1" aria-label="Mois suivant">›</button></div></div><p class="gold">${esc(first.toLocaleDateString("fr-FR",{month:"long",year:"numeric"}))}</p><div class="training-calendar-grid">${["L","M","M","J","V","S","D"].map(x=>`<span class="tiny muted">${x}</span>`).join("")}${cells.join("")}</div></section>`;
+}
 function renderProgressOverview(){
   const d=progressOverviewData(),hours=Math.floor(d.minutes/60),mins=d.minutes%60;
   return `${progressHomeTabs()}
@@ -917,6 +966,7 @@ function renderProgressOverview(){
     </div>
     <div class="overview-section-head"><h2>${overviewPeriod==="week"?"Exercices réalisés par jour":overviewPeriod==="month"?"Exercices réalisés par semaine":"Exercices réalisés par mois"}</h2><span>${esc(periodLabel(overviewPeriod,periodAnchor))}</span></div>
     <div class="overview-panel">${overviewBars(d.weeks)}</div>
+    ${trainingCalendar()}
     <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
     <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
 }
@@ -1004,6 +1054,8 @@ function renderProgress(){
   if($("#measure-height"))$("#measure-height").onclick=openHeightModal;
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
+  $$(`[data-calendar-shift]`).forEach(b=>b.onclick=()=>{const d=new Date(calendarAnchor+"-01T12:00:00");d.setMonth(d.getMonth()+Number(b.dataset.calendarShift));calendarAnchor=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");render();});
+  $$(`[data-calendar-day]`).forEach(b=>b.onclick=()=>{const day=b.dataset.calendarDay,hs=(state.history||[]).filter(h=>h.date===day);openModal(`<h3>${esc(formatDate(day))}</h3>${hs.map(h=>`<p><b>${esc(niceSession(h.session))}</b> · ${formatMinutes(h.duration)}</p>`).join("")||"<p>Aucune séance.</p>"}<button class="btn block" data-close-modal>Fermer</button>`);});
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
@@ -1026,7 +1078,7 @@ function renderProgressDetail(id,sub="evolution"){
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${sub==="evolution"?progressEvolutionContent(nums,delta,pct,trend):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
-    <div class="card progress-settings-card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div>`,"progress-detail-screen");
+    <div class="card progress-settings-card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div><div class="card"><div class="section-title">Records personnels</div>${personalRecordsContent(id)}</div>`,"progress-detail-screen");
   $("#back-progress").onclick=()=>history.back();
   $$("[data-detail-tab]").forEach(b=>b.onclick=()=>{view={type:"progressDetail",id,sub:b.dataset.detailTab};history.replaceState(navState(),"");render();});
   $$("[data-detail-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.detailPeriod;history.replaceState(navState(),"");render();});
@@ -1052,14 +1104,35 @@ function lineChart(nums){
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g>
     <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
 }
+function comparableLoadKg(raw){
+ // A dual-stack notation (e.g. "2 × 20 kg") must not be mistaken for a 2 kg lift.
+ const m=String(raw??"").trim().replace(",",".").match(/^(\d+(?:\.\d+)?)\s*(?:kg)?$/i);
+ return m?Number(m[1]):NaN;
+}
+function personalRecordsContent(id){
+ const equipment=state.progressionSettings[id]?.equipment||"";
+ const entries=(state.history||[]).flatMap(h=>(h.exercises||[])
+   .filter(e=>canonicalId(e.id)===canonicalId(id)&&String(e.equipment||"")===equipment&&e.status==="Réussi")
+   .map(e=>({date:h.date,weight:comparableLoadKg(e.actual),reps:Array.isArray(e.setReps)?Math.max(...e.setReps):repNumber(e.reps),sets:Array.isArray(e.setReps)?e.setReps:[]})));
+ const valid=entries.filter(e=>Number.isFinite(e.weight)&&e.weight>0&&Number.isFinite(e.reps)&&e.reps>0);
+ if(!valid.length)return '<div class="tiny muted">Les records apparaîtront après des performances réussies et comparables (même machine et charge en kg). Les progrès d’un objectif échoué restent visibles dans le suivi des séries.</div>';
+ const heavy=valid.reduce((a,b)=>b.weight>a.weight?b:a);
+ const reference=comparableLoadKg(referenceFor(id));
+ const repWeight=Number.isFinite(reference)&&valid.some(e=>e.weight===reference)?reference:heavy.weight;
+ const atWeight=valid.filter(e=>e.weight===repWeight),rep=atWeight.reduce((a,b)=>b.reps>a.reps?b:a);
+ const volumes=valid.filter(e=>e.sets.length&&e.sets.every(r=>Number.isFinite(r)&&r>=0)).map(e=>({...e,volume:e.weight*e.sets.reduce((a,b)=>a+b,0)}));
+ const volume=volumes.length?volumes.reduce((a,b)=>b.volume>a.volume?b:a):null;
+ return `<div class="history-row">Charge maximale <b>${esc(refWithUnit(heavy.weight))} · ${esc(formatDate(heavy.date))}</b></div><div class="history-row">Répétitions à ${esc(refWithUnit(repWeight))} <b>${rep.reps} · ${esc(formatDate(rep.date))}</b></div><div class="history-row">Volume connu maximal <b>${volume?`${Math.round(volume.volume)} kg × reps · ${esc(formatDate(volume.date))}`:'Non disponible sans détail des séries'}</b></div>${equipment?`<div class="tiny muted">Machine : ${esc(equipment)}. Les séances sans machine identifiée ne sont pas mélangées.</div>`:''}`;
+}
+
 function progressSettingsContent(id){
   const p=Object.assign({type:"Charge + répétitions",objective:repetitionTargetFor(id)||"Libre"},state.progressionSettings[id]||{});
-  return `<div class="history-row">Type de progression <span style="float:right">${esc(p.type)}</span></div><div class="history-row">Objectif actuel <span style="float:right">${esc(p.objective)}</span></div><div class="history-row">Référence prévue <span style="float:right">${esc(refWithUnit(referenceFor(id)))}</span></div>`;
+  return `<div class="history-row">Type de progression <span style="float:right">${esc(p.type)}</span></div><div class="history-row">Objectif actuel <span style="float:right">${esc(p.objective)}</span></div><div class="history-row">Incrément <span style="float:right">${esc(p.increment||2.5)} kg</span></div><div class="history-row">Équipement <span style="float:right">${esc(p.equipment||"Non précisé")}</span></div><div class="history-row">Référence prévue <span style="float:right">${esc(refWithUnit(referenceFor(id)))}</span></div>`;
 }
 function openProgressSettingsModal(id){
   const p=Object.assign({type:"Charge + répétitions",objective:repetitionTargetFor(id)||"Libre"},state.progressionSettings[id]||{});
-  openModal(`<h3>Paramètres de progression</h3><div class="field"><label>Type</label><input id="ps-type" value="${esc(p.type)}"></div><div class="field" style="margin-top:6px"><label>Objectif</label><input id="ps-obj" value="${esc(p.objective)}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="ps-save">Enregistrer</button></div>`,()=>{
-    $("#ps-save").onclick=()=>{state.progressionSettings[id]={type:$("#ps-type").value,objective:$("#ps-obj").value};save();closeOverlay(true);render();};
+  openModal(`<h3>Paramètres de progression</h3><div class="field"><label>Type</label><input id="ps-type" value="${esc(p.type)}"></div><div class="field" style="margin-top:6px"><label>Objectif</label><input id="ps-obj" value="${esc(p.objective)}"></div><div class="field"><label>Incrément de charge (kg)</label><input id="ps-increment" inputmode="decimal" type="number" min="0.1" step="any" value="${esc(p.increment||2.5)}"></div><div class="field"><label>Équipement / machine (facultatif)</label><input id="ps-equipment" value="${esc(p.equipment||"")}" placeholder="Ex. : machine convergente"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="ps-save">Enregistrer</button></div>`,()=>{
+    $("#ps-save").onclick=()=>{state.progressionSettings[id]={type:$("#ps-type").value,objective:$("#ps-obj").value,increment:Math.max(.1,Number($("#ps-increment").value)||2.5),equipment:$("#ps-equipment").value.trim()};save();closeOverlay(true);render();};
   });
 }
 
@@ -1170,7 +1243,7 @@ function renderHistoryDetail(id){
   const h=(state.history||[]).find(x=>x.id===id);if(!h){history.back();return;}
   shell(`${header("Historique",`${formatDate(h.date)} · ${niceSession(h.session)}`,"","compact")}<button class="backlink" id="back-hdetail">‹ Retour</button>
     <div class="card"><div class="row-between"><div><div class="section-title" style="margin:0">${esc(niceSession(h.session))}</div><div class="tiny muted">${esc(h.start||"")}${h.end?` → ${esc(h.end)}`:""}</div></div><span class="cycle-chip"><b>${formatMinutes(+h.duration||0)}</b><span>Durée</span></span></div>
-    ${(h.exercises||[]).map((e,i)=>`<div class="history-row"><span class="gold">${String(i+1).padStart(2,"0")}</span> <b>${esc(e.name)}</b><span style="float:right">${esc(e.status)}</span><div class="tiny muted">${esc(refWithUnit(e.actual||"—"))}${e.next?` · prochaine : ${esc(refWithUnit(e.next))}`:""}</div></div>`).join("")||`<div class="empty">Cette séance ne contient pas de détail d’exercice exploitable.</div>`}</div>`);
+    ${(h.exercises||[]).map((e,i)=>`<div class="history-row"><span class="gold">${String(i+1).padStart(2,"0")}</span> <b>${esc(e.name)}</b><span style="float:right">${esc(e.status)}</span><div class="tiny muted">${esc(refWithUnit(e.actual||"—"))}${Array.isArray(e.setReps)?` · séries : ${esc(e.setReps.join(" / "))}`:""}${e.next?` · prochaine : ${esc(refWithUnit(e.next))}`:""}</div></div>`).join("")||`<div class="empty">Cette séance ne contient pas de détail d’exercice exploitable.</div>`}</div>`);
   $("#back-hdetail").onclick=()=>history.back();
 }
 
@@ -1185,9 +1258,58 @@ function openSheet(id,session,no){
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
   const sheetCanvas=$(".fiche-visual",overlay);
   const sheetImg=$(".fiche-visual img",overlay);
-  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);bindSheetDoubleTapZoom(sheetImg,sheetCanvas);}
+  if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);sheetCanvas.setAttribute("role","button");sheetCanvas.setAttribute("aria-label","Ouvrir l’image en plein écran");sheetCanvas.onclick=()=>openFullscreenSheet(sheetImg.src,e.name);}
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
+function openFullscreenSheet(src,name){
+  const ov=document.createElement("div");ov.className="fullscreen-sheet";
+  ov.innerHTML=`<div class="fullscreen-toolbar"><span>${esc(name)}</span><button data-zoom-out aria-label="Réduire">−</button><button data-zoom-in aria-label="Agrandir">+</button><button data-zoom-close aria-label="Fermer">Fermer</button></div><div class="fullscreen-stage"><img src="${esc(src)}" alt="${esc(name)}" draggable="false"></div>`;
+  document.body.appendChild(ov);
+  const stage=$(".fullscreen-stage",ov),img=$("img",stage),points=new Map();
+  let scale=1,tx=0,ty=0,gesture=null,lastTap=0,hadPinch=false;
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);};
+  const onKey=e=>{if(e.key==='Escape')close();};document.addEventListener('keydown',onKey);
+  function apply(){
+    const r=stage.getBoundingClientRect();
+    const maxX=Math.max(0,(img.clientWidth*scale-r.width)/2),maxY=Math.max(0,(img.clientHeight*scale-r.height)/2);
+    tx=Math.min(maxX,Math.max(-maxX,tx));ty=Math.min(maxY,Math.max(-maxY,ty));
+    img.style.transform=`translate(calc(-50% + ${tx}px),calc(-50% + ${ty}px)) scale(${scale})`;
+  }
+  function zoom(next,x,y){
+    const r=stage.getBoundingClientRect(),newScale=Math.max(1,Math.min(5,next)),ratio=newScale/scale;
+    tx=(tx-(x-r.left-r.width/2)) * ratio+(x-r.left-r.width/2);
+    ty=(ty-(y-r.top-r.height/2)) * ratio+(y-r.top-r.height/2);
+    scale=newScale;if(scale===1)tx=ty=0;apply();
+  }
+  $("[data-zoom-in]",ov).onclick=()=>{const r=stage.getBoundingClientRect();zoom(scale+.5,r.left+r.width/2,r.top+r.height/2);};
+  $("[data-zoom-out]",ov).onclick=()=>{const r=stage.getBoundingClientRect();zoom(scale-.5,r.left+r.width/2,r.top+r.height/2);};
+  $("[data-zoom-close]",ov).onclick=close;
+  stage.addEventListener('pointerdown',e=>{
+    e.preventDefault();stage.setPointerCapture(e.pointerId);points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(points.size===1){gesture={type:'pan',x:e.clientX,y:e.clientY,tx,ty};hadPinch=false;}
+    else if(points.size===2){const a=[...points.values()];gesture={type:'pinch',dist:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),scale};hadPinch=true;}
+  },{passive:false});
+  stage.addEventListener('pointermove',e=>{
+    if(!points.has(e.pointerId))return;e.preventDefault();points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(points.size>=2){const a=[...points.values()].slice(0,2),dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      if(gesture?.type!=='pinch')gesture={type:'pinch',dist,scale};
+      zoom(gesture.scale*dist/Math.max(1,gesture.dist),(a[0].x+a[1].x)/2,(a[0].y+a[1].y)/2);
+    }else if(scale>1&&gesture?.type==='pan'){
+      tx=gesture.tx+e.clientX-gesture.x;ty=gesture.ty+e.clientY-gesture.y;apply();
+    }
+  },{passive:false});
+  const end=e=>{
+    if(!points.has(e.pointerId))return;
+    const mayTap=points.size===1&&!hadPinch&&gesture?.type==='pan'&&Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y)<12;
+    points.delete(e.pointerId);
+    if(points.size===1){const a=[...points.values()][0];gesture={type:'pan',x:a.x,y:a.y,tx,ty};}
+    else gesture=null;
+    if(mayTap){const now=Date.now();if(now-lastTap<330){zoom(scale>1?1:2,e.clientX,e.clientY);lastTap=0;}else lastTap=now;}
+  };
+  stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',end);
+  img.onload=apply;window.requestAnimationFrame(apply);
+}
+
 function bindSheetDoubleTapZoom(img,canvas){
   if(!img||!canvas)return;
   let scale=1,tx=0,ty=0,lastTap=0,panStart=null,pinchStart=null;
@@ -1274,15 +1396,196 @@ function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");r
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
 function round1(v){return Math.round(v*10)/10;}
 
-function backupJSON(){download("fitness-sauvegarde-v9.json",JSON.stringify(state,null,2),"application/json");}
+let guideTicker=null,guideEnd=0,guideRemaining=0,guideRunning=false,guideStage=0,guideSteps=[],guideRound=1,guideRounds=1,guideWork=45,guideRest=20,guideVoice=true,guidePhase='ready',guideConfigKey="";
+function guideSay(message){if(!guideVoice||!('speechSynthesis' in window))return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang='fr-FR';u.rate=.92;speechSynthesis.speak(u);}catch(e){console.warn('Voix indisponible',e);}}
+function guideStop(cancelVoice=true){if(guideTicker)clearInterval(guideTicker);guideTicker=null;guideRunning=false;if(cancelVoice)try{speechSynthesis.cancel();}catch{}}
+function guideScreen(title,steps,options={}){
+ guideStop();document.querySelectorAll('.v2418-guide').forEach(el=>el.remove());
+ guideConfigKey=options.configKey||"";guideSteps=steps.slice();guideStage=0;guideRound=1;
+ guideWork=options.work||45;guideRest=options.rest??20;guideRounds=options.rounds||1;
+ guideRemaining=0;guidePhase='ready';guideVoice=options.voice!==false;
+ let started=false,paused=false,previousRemaining=0;
+ const ov=document.createElement('div');ov.className='v2418-guide';
+ ov.innerHTML=`<div class="v2418-guide-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="row-between"><b class="serif gold">${esc(title)}</b><button class="btn" id="guide-close">Fermer</button></div><p id="guide-step-name" aria-live="polite"></p><div class="v2418-guide-clock" id="guide-clock">00:00</div><p class="tiny muted" id="guide-progress"></p><div class="param-grid"><div class="field"><label>Travail (secondes)</label><input id="guide-work" type="number" min="5" max="3600" value="${guideWork}"></div><div class="field"><label>Repos (secondes)</label><input id="guide-rest" type="number" min="0" max="600" value="${guideRest}"></div><div class="field"><label>Tours</label><input id="guide-rounds" type="number" min="1" max="30" value="${guideRounds}"></div></div><label class="tiny"><input id="guide-voice" type="checkbox" ${guideVoice?'checked':''}> Coach vocal français</label>${options.editable?`<div class="field"><label>Exercices du circuit (un nom par ligne, dans l’ordre)</label><textarea id="guide-exercises" rows="6">${esc(guideSteps.map(x=>x.name).join('\n'))}</textarea></div><p class="tiny muted">Personnalisez les exercices avant de démarrer.</p>`:''}<div class="v2418-guide-actions"><button class="btn gold" id="guide-start">Démarrer</button><button class="btn" id="guide-done" disabled>Exercice terminé / suivant</button><button class="btn" id="guide-pause" disabled>Pause</button></div><p class="tiny muted">Après le premier démarrage, les exercices chronométrés s’enchaînent automatiquement. Les séries en répétitions se terminent manuellement. La voix peut être interrompue lorsque le téléphone est verrouillé.</p></div>`;
+ document.body.appendChild(ov);
+ const startButton=$('#guide-start',ov),doneButton=$('#guide-done',ov),pauseButton=$('#guide-pause',ov);
+ const update=()=>{
+   const current=guideSteps[guideStage];
+   if(!current){$('#guide-step-name',ov).textContent='Séance guidée terminée';$('#guide-progress',ov).textContent='Terminé';$('#guide-clock',ov).textContent='00:00';}
+   else{
+     $('#guide-step-name',ov).textContent=guidePhase==='prep'?'Préparez-vous · '+current.name:guidePhase==='rest'?'Récupération · ensuite : '+current.name:current.name;
+     $('#guide-progress',ov).textContent=`Exercice ${guideStage+1}/${guideSteps.length} · Tour ${guideRound}/${guideRounds}${guidePhase==='work'&&current.manual?' · Répétitions à valider':''}`;
+     $('#guide-clock',ov).textContent=`${String(Math.floor(guideRemaining/60)).padStart(2,'0')}:${String(guideRemaining%60).padStart(2,'0')}`;
+   }
+   startButton.disabled=started;
+   doneButton.disabled=!['work','rest'].includes(guidePhase)||paused;
+   doneButton.textContent=guidePhase==='rest'?'Passer la récupération':'Exercice terminé / suivant';
+   pauseButton.disabled=guidePhase==='ready'||guidePhase==='done'||(guidePhase==='work'&&!!current?.manual);
+   pauseButton.textContent=paused?'Reprendre':'Pause';
+ };
+ const readOptions=()=>{
+   const work=Number($('#guide-work',ov).value),rest=Number($('#guide-rest',ov).value),rounds=Number($('#guide-rounds',ov).value);
+   if(!Number.isInteger(work)||work<5||work>3600||!Number.isInteger(rest)||rest<0||rest>600||!Number.isInteger(rounds)||rounds<1||rounds>30){alert('Réglages invalides : travail 5–3600 s, repos 0–600 s, tours 1–30.');return false;}
+   guideWork=work;guideRest=rest;guideRounds=rounds;guideVoice=$('#guide-voice',ov).checked;
+   if(options.editable){const names=$('#guide-exercises',ov).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,50);if(!names.length){alert('Indiquez au moins un exercice.');return false;}guideSteps=names.map(name=>({name,seconds:guideWork}));}
+   if(guideConfigKey){state.guideConfigs=state.guideConfigs||{};state.guideConfigs[guideConfigKey]={work:guideWork,rest:guideRest,rounds:guideRounds,voice:guideVoice,...(options.editable?{names:guideSteps.map(x=>x.name)}:{})};save();}
+   $$('#guide-work,#guide-rest,#guide-rounds,#guide-voice,#guide-exercises',ov).forEach(el=>el.disabled=true);
+   return true;
+ };
+ const completed=()=>{guideStop();guideStage=guideSteps.length;guidePhase='done';paused=false;update();guideSay('Séance terminée');};
+ const startTimed=(phase,seconds)=>{
+   guidePhase=phase;guideRemaining=seconds;previousRemaining=seconds;paused=false;
+   if(guideTicker)clearInterval(guideTicker);
+   guideEnd=Date.now()+seconds*1000;guideRunning=true;
+   guideTicker=setInterval(()=>{
+     const before=guideRemaining;guideRemaining=Math.max(0,Math.ceil((guideEnd-Date.now())/1000));
+     if(guidePhase==='prep'&&guideRemaining!==before&&guideRemaining>0&&guideRemaining<3)guideSay(guideRemaining===2?'Deux':'Un');
+     previousRemaining=guideRemaining;update();
+     if(guideRemaining>0)return;
+     guideStop(false);
+     if(guidePhase==='prep')startWork();
+     else if(guidePhase==='rest')nextExercise();
+     else finishExercise();
+   },150);
+   update();
+ };
+ const startWork=()=>{
+   const current=guideSteps[guideStage];if(!current){completed();return;}
+   guideSay('GO. '+current.name);
+   if(current.manual){guidePhase='work';guideRemaining=0;guideRunning=false;update();return;}
+   startTimed('work',current.seconds||guideWork);
+ };
+ const prepare=()=>{const current=guideSteps[guideStage];if(!current){completed();return;}guideSay('Préparez-vous. '+current.name+'. Trois');startTimed('prep',3);};
+ const nextExercise=()=>{
+   guideStage++;if(guideStage>=guideSteps.length){guideStage=0;guideRound++;}
+   if(guideRound>guideRounds){completed();return;}
+   prepare();
+ };
+ const finishExercise=()=>{
+   if(guideStage===guideSteps.length-1&&guideRound===guideRounds){completed();return;}
+   if(guideRest){guideSay('Stop. Récupération');startTimed('rest',guideRest);}
+   else{guideSay('Stop');nextExercise();}
+ };
+ const onKey=e=>{if(e.key==='Escape'){guideStop();ov.remove();document.removeEventListener('keydown',onKey);}};
+ document.addEventListener('keydown',onKey);
+ $('#guide-close',ov).onclick=()=>{guideStop();ov.remove();document.removeEventListener('keydown',onKey);};
+ startButton.onclick=()=>{if(started||!readOptions())return;started=true;prepare();};
+ doneButton.onclick=()=>{if(paused)return;if(guidePhase==='rest'){guideStop();nextExercise();}else if(guidePhase==='work'){guideStop();finishExercise();}};
+ pauseButton.onclick=()=>{
+   if(pauseButton.disabled)return;
+   if(!paused){guideRemaining=Math.max(0,Math.ceil((guideEnd-Date.now())/1000));guideStop();paused=true;update();}
+   else{paused=false;guideSay('Reprise');startTimed(guidePhase,guideRemaining);}
+ };
+ update();
+}
+function openExerciseGuide(id,no){
+ const p=defaultParams(id),name=exercise(id).name,isCircuit=p.type==='circuit';
+ const configKey='exercise:'+id,stored=state.guideConfigs?.[configKey]||{};
+ const names=stored.names?.length?stored.names:['Crunch','Relevés de jambes','Gainage','Bicycle crunch','Crunch inversé','Planche latérale droite','Planche latérale gauche','Mountain climbers'];
+ const work=stored.work||45,rest=stored.rest??15,rounds=stored.rounds||Math.max(1,parseInt(p.tours)||1);
+ const seconds=p.type==='gainage'?Math.max(5,parseInt(p.duree)||60):45;
+ const steps=isCircuit?names.map(n=>({name:n,seconds:work})):[{name,seconds,manual:p.type==='strength'}];
+ guideScreen(name,steps,{work:isCircuit?work:seconds,rest:isCircuit?rest:(parseInt(p.reposSeries)||60),rounds:isCircuit?rounds:Math.max(1,parseInt(p.series)||1),editable:isCircuit,configKey,voice:stored.voice});
+}
+function athDurationSeconds(value){const text=String(value||'').toLowerCase(),m=text.match(/(\d+)\s*(min|minute|s|sec|seconde)/);return m?Number(m[1])*(m[2].startsWith('min')?60:1):null;}
+function openAthGuide(session){
+ const configKey='ath:'+session,stored=state.guideConfigs?.[configKey]||{};
+ const steps=[];
+ for(const item of DATA.ath?.[session]||[]){
+   const duration=athDurationSeconds(item.duration),interval=(item.fields||[]).map(String).find(x=>/\d+\s*s.*\d+\s*s/i.test(x));
+   const match=interval?.match(/(\d+)\s*s[^\d]+(\d+)\s*s/i);
+   if(match&&duration){let elapsed=0,n=1;while(elapsed<duration){const work=Math.min(+match[1],duration-elapsed);steps.push({name:item.name+' — effort '+n,seconds:work});elapsed+=work;if(elapsed<duration){const recovery=Math.min(+match[2],duration-elapsed);steps.push({name:item.name+' — récupération '+n,seconds:recovery});elapsed+=recovery;}n++;}}
+   else steps.push({name:item.name,seconds:duration||45,manual:!duration});
+ }
+ guideScreen(niceSession(session),steps.length?steps:[{name:'Séance ATH',seconds:45}],{work:stored.work||45,rest:stored.rest??0,rounds:stored.rounds||1,configKey,voice:stored.voice});
+}
+function lastBackupLabel(){
+ const verified=localStorage.getItem(BACKUP_FILE_VERIFIED_KEY),legacy=localStorage.getItem(BACKUP_DATE_KEY);
+ return verified?new Date(verified).toLocaleDateString("fr-FR")+" (fichier relu)":legacy?new Date(legacy).toLocaleDateString("fr-FR")+" (ancienne confirmation)":"Aucun fichier vérifié";
+}
+function backupChecksum(value){const text=JSON.stringify(value);let hash=2166136261;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(16).padStart(8,'0');}
+function backupPayload(){const b={format:"fitness-backup",version:2,createdAt:new Date().toISOString(),state:clone(state),ui:localStorage.getItem(UI_KEY),scroll:sessionStorage.getItem(SCROLL_KEY)};b.checksum=backupChecksum({state:b.state,ui:b.ui,scroll:b.scroll});return b;}
+function validateBackup(b){
+  if(!b||b.format!=="fitness-backup"||![1,2].includes(b.version)||!b.state||typeof b.state!=="object"||Array.isArray(b.state))throw Error("Format de sauvegarde invalide");
+  const required=["history","measurements","ephemeralSessions","completedG"];
+  if(required.some(k=>!Array.isArray(b.state[k])))throw Error("Données de sauvegarde incomplètes");
+  if(b.state.history.some(h=>!h||typeof h!=="object"||!Array.isArray(h.exercises)))throw Error("Historique invalide");
+  if(b.state.ephemeralSessions.some(x=>!x||!Array.isArray(x.exerciseIds)))throw Error("Séances éphémères invalides");
+  for(const key of ["refs","params","progressionSettings","sessionOrder","programOverrides","customExercises"]){
+    const v=b.state[key];if(v!==undefined&&(!v||typeof v!=="object"||Array.isArray(v)))throw Error("Paramètres de sauvegarde invalides : "+key);
+  }
+  if(Object.prototype.hasOwnProperty.call(b.state,"__proto__")||Object.prototype.hasOwnProperty.call(b.state,"constructor"))throw Error("Clés interdites dans le fichier");
+  if(b.version===2&&b.checksum!==backupChecksum({state:b.state,ui:b.ui,scroll:b.scroll}))throw Error("Le fichier est endommagé ou a été modifié");
+  if(b.ui!==null&&b.ui!==undefined){if(typeof b.ui!=="string")throw Error("Préférences invalides");const ui=JSON.parse(b.ui);if(!ui||typeof ui!=="object"||Array.isArray(ui))throw Error("Préférences invalides");}
+  return b;
+}
+function backupJSON(){
+  try{
+    const payload=backupPayload(),text=JSON.stringify(payload),parsed=validateBackup(JSON.parse(text));
+    if(JSON.stringify(parsed.state)!==JSON.stringify(state))throw Error("Vérification impossible");
+    // Do not advance the annual reminder until the DOWNLOADED file has been read back.
+    localStorage.setItem(BACKUP_PENDING_KEY,JSON.stringify({checksum:payload.checksum,createdAt:payload.createdAt}));
+    download("fitness-sauvegarde-"+localISODate()+".json",text,"application/json");
+    openBackupVerification();
+  }catch(e){alert("Export impossible : "+e.message);}
+}
+function openBackupVerification(){
+  openModal(`<h3>Vérifier la sauvegarde téléchargée</h3><p>Choisissez le fichier JSON que vous venez d’enregistrer. Le rappel annuel ne sera repoussé qu’après relecture de ce fichier.</p><label class="btn gold block" style="display:block;text-align:center">Choisir le fichier JSON<input id="verify-backup-modal" type="file" accept=".json,application/json" hidden></label><div class="modal-actions"><button class="btn ghost" data-close-modal>Vérifier plus tard</button></div>`,ov=>{$('#verify-backup-modal',ov).onchange=verifyBackupFile;});
+}
+function verifyBackupFile(e){
+ const f=e.target.files?.[0];e.target.value="";if(!f)return;
+ const reader=new FileReader();reader.onload=()=>{
+  try{
+   const b=validateBackup(JSON.parse(reader.result));
+   const pending=JSON.parse(localStorage.getItem(BACKUP_PENDING_KEY)||"null");
+   if(!pending||b.version!==2||pending.checksum!==b.checksum||pending.createdAt!==b.createdAt)throw Error("Ce fichier n’est pas celui du dernier export. Relancez un export et sélectionnez son fichier JSON.");
+   if(JSON.stringify(b.state)!==JSON.stringify(state))throw Error("Les données ont changé depuis cet export. Réexportez vos données pour sauvegarder l’état actuel.");
+   const now=new Date().toISOString();localStorage.setItem(BACKUP_FILE_VERIFIED_KEY,now);localStorage.setItem(BACKUP_DATE_KEY,now);
+   localStorage.removeItem(BACKUP_PENDING_KEY);localStorage.removeItem(BACKUP_SNOOZE_KEY);
+   if(overlayRoot.firstElementChild)closeOverlay(true);
+   render();alert("Fichier JSON relu et vérifié. Prochain rappel dans un an. Conservez ce fichier hors du téléphone.");
+  }catch(err){alert("Vérification refusée : "+err.message);}
+ };reader.onerror=()=>alert("Impossible de relire le fichier.");reader.readAsText(f);
+}
 function exportCSV(){
   const rows=[["date","séance","début","fin","durée_min","exercice","valeur","statut","prochaine"]];
   (state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>rows.push([h.date,h.session,h.start,h.end,h.duration,e.name,e.actual,e.status,e.next])));
   download("fitness-export.csv",rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\n"),"text/csv");
 }
-function download(name,content,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function download(name,content,type){const a=document.createElement("a"),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 function restoreJSON(e){
-  const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const incoming=JSON.parse(r.result);state=Object.assign(defaultState(),incoming,{appRev:APP_REV});save();alert("Sauvegarde restaurée.");render();}catch{alert("Sauvegarde invalide.");}};r.readAsText(f);
+  const f=e.target.files?.[0];if(!f)return;e.target.value="";const r=new FileReader();r.onload=()=>{
+    try{const incoming=validateBackup(JSON.parse(r.result));if(!confirm("Restaurer cette sauvegarde du "+new Date(incoming.createdAt).toLocaleDateString("fr-FR")+" ? Les données actuelles seront remplacées. Une copie locale sera conservée sur cet appareil."))return;
+      const previous=localStorage.getItem(KEY),previousUI=localStorage.getItem(UI_KEY);
+      if(previous===null)throw Error("Aucune donnée actuelle à protéger : restauration interrompue");
+      // Fail closed if the device cannot store the recovery copy (e.g. storage quota).
+      localStorage.setItem("fitness-before-restore-v2418",previous);
+      if(localStorage.getItem("fitness-before-restore-v2418")!==previous)throw Error("Copie de sécurité non vérifiée");
+      const next=Object.assign(defaultState(),incoming.state,{appRev:APP_REV});if(!Array.isArray(next.history)||!Array.isArray(next.measurements))throw Error("Données restaurées invalides");
+      const serialized=JSON.stringify(next);
+      try{
+        localStorage.setItem(KEY,serialized);
+        if(localStorage.getItem(KEY)!==serialized)throw Error("Écriture des données non vérifiée");
+        if(typeof incoming.ui==="string")localStorage.setItem(UI_KEY,incoming.ui);
+      }catch(writeError){
+        try{
+          localStorage.setItem(KEY,previous);
+          if(previousUI===null)localStorage.removeItem(UI_KEY);else localStorage.setItem(UI_KEY,previousUI);
+        }catch(rollbackError){throw Error("Restauration et retour arrière impossibles : conservez votre fichier JSON. "+rollbackError.message);}
+        throw writeError;
+      }
+      state=next;alert("Sauvegarde restaurée. Une copie locale des données précédentes a été conservée.");location.reload();
+    }catch(err){alert("Restauration refusée : "+err.message);}
+  };r.onerror=()=>alert("Lecture du fichier impossible.");r.readAsText(f);
+}
+function showBackupReminder(){
+  // No annual-export prompt in front of first-run setup or on an empty installation.
+  if(!state.installed||(!(state.history||[]).length&&!(state.measurements||[]).length&&!(state.ephemeralSessions||[]).length))return;
+  const last=localStorage.getItem(BACKUP_DATE_KEY),snooze=localStorage.getItem(BACKUP_SNOOZE_KEY),now=Date.now();
+  if(snooze&&now-Number(snooze)<7*86400000)return;
+  if(last){const due=new Date(last);due.setFullYear(due.getFullYear()+1);if(now<due.getTime())return;}
+  if(document.querySelector(".backup-reminder"))return;const ov=document.createElement("div");ov.className="backup-reminder";ov.innerHTML=`<div class="card"><h3>Sauvegarde annuelle</h3><p>Il est temps d’exporter vos données pour les conserver hors de ce téléphone.</p><button class="btn gold block" id="reminder-export">Exporter mes données</button><button class="btn block" id="reminder-later">Me le rappeler plus tard</button></div>`;document.body.appendChild(ov);
+  $("#reminder-export",ov).onclick=()=>{ov.remove();backupJSON();};$("#reminder-later",ov).onclick=()=>{localStorage.setItem(BACKUP_SNOOZE_KEY,String(Date.now()));ov.remove();};
 }
 
 let tabSwipe=null;
@@ -1307,5 +1610,6 @@ window.addEventListener("pagehide",()=>{rememberTabScroll();persistUI();});
 window.addEventListener("beforeunload",()=>{rememberTabScroll();persistUI();});
 render();
 if(view.type==="root")restoreTabScroll(tab);
+showBackupReminder();
 if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
 })();

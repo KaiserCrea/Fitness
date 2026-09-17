@@ -1,13 +1,13 @@
-const CACHE = "fitness-v24-16-progression-20260915-1";
+const CACHE = "fitness-v24-18-build-20260917-7";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
-  "./assets/card-g1-v22.png",
-  "./assets/card-g2-v22.png",
-  "./assets/hero-today-v20.png",
-  "./assets/hero-progress-v20.png",
-  "./assets/hero-history-v20.png",
-  "./assets/today-waiting-v20.png",
+  "./assets/card-g1-v22.jpg",
+  "./assets/card-g2-v22.jpg",
+  "./assets/hero-today-v20.jpg",
+  "./assets/hero-progress-v20.jpg",
+  "./assets/hero-history-v20.jpg",
+  "./assets/today-waiting-v20.jpg",
   "./",
   "./index.html",
   "./app.css",
@@ -16,17 +16,17 @@ const ROOT = [
   "./manifest.webmanifest",
   "./icon-192-v241.png",
   "./icon-512-v241.png",
-  "./assets/hero-program-v2412.png",
-  "./assets/hero-program-official.png",
-  "./assets/hero-today-official.png",
-  "./assets/hero-progress-official.png",
-  "./assets/hero-history-official.png",
-  "./assets/today-waiting-gym-official.png",
-  "./assets/card-g1-official.png",
-  "./assets/card-g2-official.png",
-  "./assets/card-g3-official.png",
-  "./assets/card-ath-official.png",
-  "./assets/card-fm-official.png"
+  "./assets/hero-program-v2412.jpg",
+  "./assets/hero-program-official.jpg",
+  "./assets/hero-today-official.jpg",
+  "./assets/hero-progress-official.jpg",
+  "./assets/hero-history-official.jpg",
+  "./assets/today-waiting-gym-official.jpg",
+  "./assets/card-g1-official.jpg",
+  "./assets/card-g2-official.jpg",
+  "./assets/card-g3-official.jpg",
+  "./assets/card-ath-official.jpg",
+  "./assets/card-fm-official.jpg"
 ];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ROOT)).then(() => self.skipWaiting()));
@@ -45,6 +45,12 @@ self.addEventListener("fetch", event => {
         caches.open(CACHE).then(cache => cache.put(event.request, copy));
       }
       return response;
-    }).catch(() => caches.match(event.request).then(hit => hit || caches.match("./index.html")))
+    }).catch(async () => {
+      const hit = await caches.match(event.request);
+      if(hit) return hit;
+      // Only navigation requests may receive the HTML app shell. Never serve HTML as JS, CSS or an image.
+      if(event.request.mode === "navigate") return caches.match("./index.html");
+      return Response.error();
+    })
   );
 });
