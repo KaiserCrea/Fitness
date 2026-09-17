@@ -1,4 +1,5 @@
-const CACHE = "fitness-v24-18-build-20260917-8";
+const CACHE = "fitness-v24-18-build-20260918-6";
+const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
@@ -32,7 +33,22 @@ self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ROOT)).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  event.waitUntil((async () => {
+    const keys=await caches.keys(),imageCache=await caches.open(IMAGE_CACHE);
+    // Migrate only the previously cached JPEG thumbnails/guide assets, never entire old releases.
+    for(const key of keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&k.startsWith("fitness-v24-18-"))){
+      const cache=await caches.open(key);
+      for(const request of await cache.keys()){
+        const url=new URL(request.url);
+        if(/\/(?:miniatures|assets\/guide)\/.*\.jpe?g$/i.test(url.pathname)){
+          const existing=await imageCache.match(request);
+          if(!existing){const response=await cache.match(request);if(response){try{await imageCache.put(request,response);}catch(error){console.warn("Cache image non copié ; téléchargement à la demande",error);}}}
+        }
+      }
+    }
+    await Promise.all(keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&k.startsWith("fitness-v24-18-")).map(k=>caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
@@ -42,7 +58,7 @@ self.addEventListener("fetch", event => {
   // immediately on subsequent visits instead of waiting for the network.
   if (/\/(?:miniatures|fiches|assets\/guide)\//.test(url.pathname)) {
     event.respondWith(caches.match(event.request).then(hit => hit || fetch(event.request).then(response => {
-      if (response.ok) { const copy=response.clone(); caches.open(CACHE).then(cache=>cache.put(event.request,copy)).catch(()=>{}); }
+      if (response.ok) { const copy=response.clone(); caches.open(IMAGE_CACHE).then(cache=>cache.put(event.request,copy)).catch(()=>{}); }
       return response;
     }).catch(()=>Response.error())));
     return;

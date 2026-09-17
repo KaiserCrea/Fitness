@@ -7,12 +7,13 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 37;
+const APP_REV = 38;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
 const BACKUP_SNOOZE_KEY="fitness-backup-snooze-v2418";
 let calendarAnchor=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0");
+let calendarSelectedDay=null;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -220,7 +221,7 @@ function buildRegistry(){
   return reg;
 }
 let registryCache=null,occurrenceCache=new Map();
-function invalidateDerivedCaches(){registryCache=null;occurrenceCache.clear();}
+function invalidateDerivedCaches(){registryCache=null;occurrenceCache.clear();perfCache=null;performanceMarkupCache.clear();overviewMarkupCache.clear();}
 function registry(){return registryCache||(registryCache=buildRegistry());}
 function exercise(id){const cid=canonicalId(id);return registry()[cid]||{id:cid,name:canonicalDisplayName(id),remark:""};}
 function occurrenceList(id){
@@ -869,8 +870,11 @@ function renderAthProgram(session){
   $("#program-ath-guide").onclick=()=>openAthGuide(session);
 }
 
+let perfCache=null;
+const performanceMarkupCache=new Map(),overviewMarkupCache=new Map();
 function allPerf(){
-  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,reps:e.reps,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return m;
+  if(perfCache)return perfCache;
+  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,reps:e.reps,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return perfCache=m;
 }
 function periodStart(period){
   const d=new Date(); if(period==="1m")d.setMonth(d.getMonth()-1);else if(period==="3m")d.setMonth(d.getMonth()-3);else if(period==="6m")d.setMonth(d.getMonth()-6);else if(period==="1y")d.setFullYear(d.getFullYear()-1);else return null;return localISODate(d);
@@ -951,15 +955,47 @@ function overviewDonut(distribution,total){
   if(cursor<100)stops.push(`#2b2924 ${cursor}% 100%`);
   return `<div class="overview-donut-wrap"><div class="overview-donut" style="background:conic-gradient(${stops.join(",")})"><div><b>${total}</b><span>exercices</span></div></div><div class="overview-legend">${distribution.map((x,i)=>`<div><span><i style="background:${palette[i]}"></i>${x.name}</span><b>${x.pct}%</b></div>`).join("")}</div></div>`;
 }
-function trainingCalendar(){
-  const [year,month]=calendarAnchor.split("-").map(Number),first=new Date(year,month-1,1),count=new Date(year,month,0).getDate(),offset=(first.getDay()+6)%7,byDay={};
-  (state.history||[]).forEach(h=>{if(h.date?.startsWith(calendarAnchor))byDay[h.date]=(byDay[h.date]||0)+1;});
-  const cells=Array.from({length:offset},()=>`<span></span>`).concat(Array.from({length:count},(_,i)=>{const day=calendarAnchor+"-"+String(i+1).padStart(2,"0"),n=byDay[day]||0;return `<button type="button" data-calendar-day="${day}" class="training-day ${n?"trained":""}" aria-label="${i+1} : ${n} séance(s)"><b>${i+1}</b>${n?`<small>${n}</small>`:""}</button>`;}));
-  return `<section class="card training-calendar"><div class="row-between"><h2>Calendrier des entraînements</h2><div><button class="btn ghost" data-calendar-shift="-1" aria-label="Mois précédent">‹</button> <button class="btn ghost" data-calendar-shift="1" aria-label="Mois suivant">›</button></div></div><p class="gold">${esc(first.toLocaleDateString("fr-FR",{month:"long",year:"numeric"}))}</p><div class="training-calendar-grid">${["L","M","M","J","V","S","D"].map(x=>`<span class="tiny muted">${x}</span>`).join("")}${cells.join("")}</div></section>`;
+function calendarDayDetails(day){
+  if(!day)return '<div class="calendar-hint">Touchez une date pour consulter les séances de cette journée.</div>';
+  const sessions=(state.history||[]).filter(h=>h.date===day).slice().sort((a,b)=>String(a.start||'').localeCompare(String(b.start||'')));
+  return `<div class="calendar-detail-heading">Séances du ${esc(formatDate(day))}</div>${sessions.length?sessions.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||'Séance'))}</b><span>${esc(h.start||'')}${h.end?' → '+esc(h.end):''}</span></div><div><b>${Number(h.duration)>0?formatMinutes(h.duration):'Durée non renseignée'}</b><span>${(h.exercises||[]).filter(e=>e.status!=='Non réalisé').length} exercices</span></div><i>›</i></button>`).join(''):'<div class="calendar-hint">Aucune séance enregistrée ce jour.</div>'}`;
 }
+function trainingCalendar(){
+  const [year,month]=calendarAnchor.split('-').map(Number),first=new Date(year,month-1,1),count=new Date(year,month,0).getDate(),offset=(first.getDay()+6)%7,byDay={};
+  (state.history||[]).forEach(h=>{if(h.date?.startsWith(calendarAnchor))byDay[h.date]=(byDay[h.date]||0)+1;});
+  const monthCount=Object.values(byDay).reduce((n,v)=>n+v,0);
+  const legacyCount=(state.oldWeeks||[]).reduce((n,w)=>n+(Number(w.count)||0),0);
+  const totalCount=(state.history||[]).length+legacyCount;
+  const cells=Array.from({length:offset},(_,i)=>`<span class="calendar-blank" aria-hidden="true" data-blank="${i}"></span>`).concat(Array.from({length:count},(_,i)=>{
+    const day=calendarAnchor+'-'+String(i+1).padStart(2,'0'),n=byDay[day]||0;
+    return `<button type="button" data-calendar-day="${day}" class="training-day ${n?'trained':''} ${calendarSelectedDay===day?'selected':''}" aria-pressed="${calendarSelectedDay===day}" aria-label="${i+1} : ${n} séance${n>1?'s':''}"><b>${i+1}</b>${n?`<small aria-hidden="true">${n===1?'✓':n}</small>`:''}</button>`;
+  }));
+  return `<section class="card training-calendar" id="history-training-calendar"><h2>Calendrier d'entraînement</h2><div class="calendar-stats"><div><span>Ce mois-ci</span><b>${monthCount}</b><small>Séances réalisées</small></div><div><span>Total</span><b>${totalCount}</b><small>Séances enregistrées</small></div></div>
+    <div class="calendar-month-bar"><button type="button" data-calendar-shift="-1" aria-label="Mois précédent">‹</button><h3>${esc(first.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))}</h3><button type="button" data-calendar-shift="1" aria-label="Mois suivant">›</button></div>
+    <div class="training-calendar-grid">${['L','M','M','J','V','S','D'].map(x=>`<span class="calendar-weekday">${x}</span>`).join('')}${cells.join('')}</div><div id="calendar-day-details" class="calendar-day-details" aria-live="polite">${calendarDayDetails(calendarSelectedDay)}</div>
+    ${legacyCount?'<p class="calendar-archive-hint">Les anciennes séances archivées sans date précise sont incluses dans le total, mais ne peuvent pas être positionnées sur un jour.</p>':''}</section>`;
+}
+function bindTrainingCalendar(){
+  const root=$('#history-training-calendar');if(!root)return;
+  $$('[data-calendar-shift]',root).forEach(b=>b.onclick=()=>{
+    const d=new Date(calendarAnchor+'-01T12:00:00');d.setMonth(d.getMonth()+Number(b.dataset.calendarShift));
+    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;
+    root.outerHTML=trainingCalendar();bindTrainingCalendar();
+  });
+  $$('[data-calendar-day]',root).forEach(b=>b.onclick=()=>{
+    calendarSelectedDay=b.dataset.calendarDay;
+    $$('[data-calendar-day]',root).forEach(day=>{const selected=day.dataset.calendarDay===calendarSelectedDay;day.classList.toggle('selected',selected);day.setAttribute('aria-pressed',String(selected));});
+    $('#calendar-day-details',root).innerHTML=calendarDayDetails(calendarSelectedDay);
+    $$('[data-history-session]',root).forEach(row=>row.onclick=()=>pushNav({type:'historyDetail',id:row.dataset.historySession}));
+  });
+  $$('[data-history-session]',root).forEach(row=>row.onclick=()=>pushNav({type:'historyDetail',id:row.dataset.historySession}));
+}
+
 function renderProgressOverview(){
+  const cacheKey=overviewPeriod+"|"+periodAnchor+"|"+state.cycle+"|"+state.weekKey;
+  if(overviewMarkupCache.has(cacheKey))return overviewMarkupCache.get(cacheKey);
   const d=progressOverviewData(),hours=Math.floor(d.minutes/60),mins=d.minutes%60;
-  return `${progressHomeTabs()}
+  const html=`${progressHomeTabs()}
     <div class="tabs overview-period-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"]].map(([p,l])=>`<button data-overview-period="${p}" class="${overviewPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <button class="period-picker-button" id="overview-period-picker">${esc(periodLabel(overviewPeriod,periodAnchor))}</button>
     <div class="overview-title-row"><h2>Résumé global</h2><div><span>Cycle actuel</span><b>Cycle G - Semaine ${state.cycle}</b></div></div>
@@ -971,19 +1007,22 @@ function renderProgressOverview(){
     </div>
     <div class="overview-section-head"><h2>${overviewPeriod==="week"?"Exercices réalisés par jour":overviewPeriod==="month"?"Exercices réalisés par semaine":"Exercices réalisés par mois"}</h2><span>${esc(periodLabel(overviewPeriod,periodAnchor))}</span></div>
     <div class="overview-panel">${overviewBars(d.weeks)}</div>
-    ${trainingCalendar()}
     <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
     <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
+  overviewMarkupCache.set(cacheKey,html);return html;
 }
 function renderProgressPerformance(){
+  const cacheKey=progressionPeriod+"|"+progressionGroup+"|"+localISODate();
+  if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
   const perf=allPerf(),reg=registry();let ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id));
   if(progressionGroup!=="Tous")ids=ids.filter(id=>groupForId(id)===progressionGroup);
   const start=periodStart(progressionPeriod);if(start)ids=ids.filter(id=>(perf[id]||[]).some(x=>x.date>=start));
   const active=ids.filter(id=>(perf[id]||[]).length),progressing=active.filter(id=>["up","slow"].includes(trendFor(id,perf[id]).key)).length;
-  return `${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
+  const html=`${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <div class="metrics"><div class="metric"><b>${active.length}</b><span>Exercices suivis</span></div><div class="metric"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></div><div class="metric"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></div></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
     <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`;
+  performanceMarkupCache.set(cacheKey,html);return html;
 }
 function renderProgressHistoryHome(){
   const recent=[...(state.history||[])].slice().reverse().slice(0,20);
@@ -1059,8 +1098,6 @@ function renderProgress(){
   if($("#measure-height"))$("#measure-height").onclick=openHeightModal;
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
-  $$(`[data-calendar-shift]`).forEach(b=>b.onclick=()=>{const d=new Date(calendarAnchor+"-01T12:00:00");d.setMonth(d.getMonth()+Number(b.dataset.calendarShift));calendarAnchor=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");render();});
-  $$(`[data-calendar-day]`).forEach(b=>b.onclick=()=>{const day=b.dataset.calendarDay,hs=(state.history||[]).filter(h=>h.date===day);openModal(`<h3>${esc(formatDate(day))}</h3>${hs.map(h=>`<p><b>${esc(niceSession(h.session))}</b> · ${formatMinutes(h.duration)}</p>`).join("")||"<p>Aucune séance.</p>"}<button class="btn block" data-close-modal>Fermer</button>`);});
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
@@ -1154,24 +1191,22 @@ function openAllSessionHistory(){
 function renderHistory(){
   const scoped=historyScope(historyPeriod,historyYear),hs=scoped.history,old=scoped.old;
   const total=hs.reduce((a,h)=>a+(+h.duration||0),0),count=hs.length+old.reduce((a,w)=>a+(+w.count||0),0);
-  const weekDur=weeklyDurations(hs),weekCounts=weeklySessionCounts(hs,old),knownWeeks=Object.keys(weekDur),best=Math.max(...Object.values(weekDur),0),avgWeek=knownWeeks.length?Math.round(total/knownWeeks.length):0,attendance=attendancePct(historyYear,hs,old);
+  const weekDur=weeklyDurations(hs),weekCounts=weeklySessionCounts(hs,old),best=Math.max(...Object.values(weekDur),0),knownDurations=hs.map(h=>Number(h.duration)).filter(n=>Number.isFinite(n)&&n>0),avgSession=knownDurations.length?formatAverageSession(knownDurations):"—",attendance=attendancePct(historyYear,hs,old);
   shell(`${header("Historique","Suivi du parcours","","compact")}
     <div class="progress-home-tabs history-home-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"],["all","Toutes"]].map(([p,l])=>`<button data-hperiod="${p}" class="${historyPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <div class="history-year"><button id="prev-year">‹</button><button class="history-period-title" id="history-period-picker">${esc(scoped.label)}</button><button id="next-year">›</button></div><button class="today-period-btn" id="history-today">Aujourd’hui</button>
     <div class="history-grid">
-      <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${formatMinutes(avgWeek)}</b><span>Moyenne / semaine</span></div>
+      <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${avgSession}</b><span>Durée moyenne / séance</span></div>
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Volume d’entraînement</div><div class="filter-row history-volume-tabs">${[["duration","Durée"],["count","Nombre de séances"],["average","Moyenne"]].map(([m,l])=>`<button data-volume-mode="${m}" class="${historyVolumeMode===m?"on":""}">${l}</button>`).join("")}</div>${historyVolumeBars(hs,old,historyVolumeMode)}</div>
+    ${trainingCalendar()}
     <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>
-    <div class="card session-history-card"><div class="row-between"><div class="section-title" style="margin:0">Historique des séances</div><span class="tiny muted">5 dernières</span></div><div class="session-history-list">${historySessionRows(5)}</div>${(state.history||[]).length>5?`<button class="btn ghost block" id="all-session-history">Voir toutes les séances</button>`:""}</div>`,"history-screen");
+    `,"history-screen");
   $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
   $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
   $("#history-period-picker").onclick=()=>openPeriodPicker("history");
   $("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
-  $$('[data-volume-mode]').forEach(b=>b.onclick=()=>{historyVolumeMode=b.dataset.volumeMode;render();});
-  $$('[data-history-session]').forEach(b=>b.onclick=()=>pushNav({type:"historyDetail",id:b.dataset.historySession}));
-  if($("#all-session-history"))$("#all-session-history").onclick=openAllSessionHistory;
+  bindTrainingCalendar();
 }
 function historyScope(period,year){
   const allH=state.history||[], allOld=state.oldWeeks||[];
@@ -1400,6 +1435,11 @@ function openPeriodPicker(target){
 }
 function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");return d.toLocaleDateString("fr-FR");}
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
+function formatAverageSession(knownMinutes){
+ const seconds=Math.round(knownMinutes.reduce((total,n)=>total+n,0)*60/knownMinutes.length);
+ const h=Math.floor(seconds/3600),m=Math.floor((seconds%3600)/60),sec=seconds%60;
+ return `${h?`${h} h `:""}${String(m).padStart(h?2:1,"0")} min${sec?` ${String(sec).padStart(2,"0")} s`:""}`;
+}
 function round1(v){return Math.round(v*10)/10;}
 
 // V24.18.5 — Guidance is exclusive to ATH A/B and the circuit exercises.
@@ -1456,7 +1496,7 @@ function openCircuitGuide(id,session,no){
  const defaults=circuitGuideSteps(id,session,no);
  const steps=Array.isArray(cfg.steps)&&cfg.steps.length&&cfg.steps.every(x=>x&&typeof x.name==='string')?cfg.steps:defaults;
  const title=intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name;
- guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds:cfg.rounds||1,loopToTarget:cfg.loopToTarget??intensive,targetSeconds:480,voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
+ guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds:1,loopToTarget:true,targetSeconds:480,voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
 }
 function athDurationSeconds(value){
  const m=String(value||'').toLowerCase().match(/(\d+)\s*(min|minute|s|sec|seconde)/);
@@ -1495,6 +1535,8 @@ function guideScreen(title,providedSteps,options={}){
  const isResume=!!draft&&draft.key===key;
  const model=isResume?draft:{key,title,steps:providedSteps.map(x=>({...x})),index:0,round:1,rounds:options.rounds||1,rest:options.rest??0,roundRest:options.roundRest??0,loopToTarget:!!options.loopToTarget,targetSeconds:options.targetSeconds||0,voice:options.voice!==false,source:options.source||'',phase:'ready',remaining:0,elapsed:0,manualElapsed:0,started:false,paused:false,finished:false};
  model.title=title;
+ // Existing paused circuits/configurations may have saved loopToTarget=false in V24.18.5.
+ if(model.source==='circuit'){model.loopToTarget=true;model.targetSeconds=480;model.rounds=1;}
  if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
  let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1;
  const ov=document.createElement('div');ov.className='v2418-guide';
@@ -1502,8 +1544,8 @@ function guideScreen(title,providedSteps,options={}){
    <div class="guide-heading"><div><div class="guide-eyebrow">SÉANCE GUIDÉE</div><h2>${esc(title)}</h2></div><button class="btn guide-close" id="guide-close">Fermer</button></div>
    <div class="guide-active" id="guide-active"><div class="guide-eyebrow" id="guide-step-counter"></div><h3 id="guide-step-name" aria-live="polite"></h3><div class="guide-target" id="guide-step-target"></div><img id="guide-step-visual" class="guide-visual" alt="Aperçu du mouvement indiqué sur la fiche" loading="eager"></div>
    <div class="guide-time"><div class="guide-eyebrow" id="guide-phase"></div><div id="guide-clock" class="v2418-guide-clock">00:00</div><div class="guide-next" id="guide-next"></div><div class="guide-elapsed" id="guide-elapsed"></div></div>
-   <div class="guide-config" id="guide-config"><div class="param-grid"><div class="field"><label>Repos entre exercices (s)</label><input id="guide-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.rest}"></div><div class="field"><label>Repos entre tours (s)</label><input id="guide-round-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.roundRest}"></div><div class="field"><label>Tours</label><input id="guide-rounds" type="number" inputmode="numeric" min="1" max="30" value="${model.rounds}"></div></div>
-   ${model.source==='circuit'&&model.targetSeconds?`<label class="guide-check"><input id="guide-loop" type="checkbox" ${model.loopToTarget?'checked':''}> Répéter jusqu’à l’objectif de 8 minutes</label>`:''}
+   <div class="guide-config" id="guide-config"><div class="param-grid"><div class="field"><label>Repos entre exercices (s)</label><input id="guide-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.rest}"></div><div class="field"><label>Repos entre tours (s)</label><input id="guide-round-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.roundRest}"></div>${model.source==='ath'?'<div class="field"><label>Tours</label><input id="guide-rounds" type="number" inputmode="numeric" min="1" max="30" value="1" disabled></div>':'<div class="guide-auto-rounds">Tours automatiques jusqu’à 8 minutes</div>'}</div>
+   ${model.source==='circuit'?'<p class="guide-loop-label">À la fin du dernier mouvement, un nouveau tour commence tant que les 8 minutes ne sont pas atteintes.</p>':''}
    <label class="guide-check"><input id="guide-voice" type="checkbox" ${model.voice?'checked':''}> Coach vocal français</label></div>
    <div class="guide-list-heading"><h3>Déroulement</h3>${options.editable?'<button class="btn guide-edit-btn" id="guide-edit" type="button">Modifier</button>':''}</div>
    <div id="guide-list" class="guide-list"></div><p id="guide-status" class="guide-status" role="status"></p>
@@ -1530,7 +1572,7 @@ function guideScreen(title,providedSteps,options={}){
  function nextStep(){if(model.index+1<model.steps.length)return model.steps[model.index+1];if(model.loopToTarget&&model.elapsed<model.targetSeconds||model.round<model.rounds)return model.steps[0];return null;}
  function renderList(){
   list.innerHTML=model.steps.map((s,i)=>`<div class="guide-list-item ${i===model.index?'active':''} ${i<model.index?'past':''}" data-guide-row="${i}">
-    <span class="guide-list-no">${esc(s.ficheNo||i+1)}</span><div class="guide-list-text">${editing?`<input class="guide-name-input" aria-label="Nom du mouvement ${i+1}" data-guide-name="${i}" value="${esc(s.name)}"><input aria-label="Objectif du mouvement ${i+1}" data-guide-target="${i}" value="${esc(s.target||'')}">${!s.manual?`<label class="tiny">Durée (s) <input aria-label="Durée ${i+1}" data-guide-seconds="${i}" type="number" min="5" max="3600" value="${s.seconds||45}"></label>`:''}`:`<b>${esc(s.name)}</b><small>${esc(s.target||'')}</small>`}</div>
+    <span class="guide-list-no">${i+1}</span><div class="guide-list-text">${editing?`<input class="guide-name-input" aria-label="Nom du mouvement ${i+1}" data-guide-name="${i}" value="${esc(s.name)}"><input aria-label="Objectif du mouvement ${i+1}" data-guide-target="${i}" value="${esc(s.target||'')}">${!s.manual?`<label class="tiny">Durée (s) <input aria-label="Durée ${i+1}" data-guide-seconds="${i}" type="number" min="5" max="3600" value="${s.seconds||45}"></label>`:''}`:`<b>${esc(s.name)}</b><small>${esc(s.target||'')}</small>`}</div>
     ${editing?`<div class="guide-move-actions"><button class="btn" data-guide-up="${i}" aria-label="Monter ${esc(s.name)}" ${i===0?'disabled':''}>↑</button><button class="btn" data-guide-down="${i}" aria-label="Descendre ${esc(s.name)}" ${i===model.steps.length-1?'disabled':''}>↓</button></div>`:(i===model.index?'<span class="guide-current-mark">EN COURS</span>':'')}
    </div>`).join('');
   if(editing){
@@ -1541,8 +1583,7 @@ function guideScreen(title,providedSteps,options={}){
  }
  function renderActive(){
   const step=model.steps[model.index];if(!step)return;
-  const count=new Set(model.steps.map(s=>s.ficheNo).filter(Boolean)).size||model.steps.length;
-  el('guide-step-counter').textContent=`MOUVEMENT ${step.ficheNo||model.index+1}/${count} · TOUR ${model.round}${model.loopToTarget?' · OBJECTIF 8 MIN':'/'+model.rounds}`;
+  el('guide-step-counter').textContent=`MOUVEMENT ${model.index+1}/${model.steps.length} · TOUR ${model.round}${model.loopToTarget?' · OBJECTIF 8 MIN':'/'+model.rounds}`;
   el('guide-step-name').textContent=step.name;
   el('guide-step-target').textContent=step.target|| (step.manual?'Validez à la fin des répétitions':'');
   const preview=el('guide-step-visual');if(step.preview){const src=pathUrl(step.preview);if(preview.dataset.current!==src){preview.src=src;preview.dataset.current=src;}preview.hidden=false;}else{preview.removeAttribute('src');preview.dataset.current='';preview.hidden=true;}
@@ -1556,7 +1597,7 @@ function guideScreen(title,providedSteps,options={}){
   pause.disabled=!model.started||model.paused||model.finished||model.phase==='ready';pause.textContent='Pause';
   el('guide-config').hidden=model.started;
   if(el('guide-edit'))el('guide-edit').disabled=model.started;
-  if(model.finished)el('guide-status').textContent='Séance terminée. Vous pouvez fermer cette fenêtre.';
+  el('guide-status').textContent=model.finished?'Séance terminée. Vous pouvez fermer cette fenêtre.':model.loopToTarget&&model.elapsed>=model.targetSeconds?'Objectif atteint : terminez le mouvement en cours pour clôturer la séance.':'';
  }
  function tick(){
   if(model.paused||model.finished)return;
@@ -1567,7 +1608,7 @@ function guideScreen(title,providedSteps,options={}){
   if(Math.floor(model.elapsed)!==savingTick){savingTick=Math.floor(model.elapsed);persist();}
   renderActive();
   if(model.phase!=='work' || !model.steps[model.index].manual){
-    if(model.remaining<=0){stopTicker();if(model.phase==='prep')startWork();else if(model.phase==='rest'){if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();}
+    if(model.remaining<=0){stopTicker();if(model.phase==='prep'){if(model.loopToTarget&&model.elapsed>=model.targetSeconds)finish();else startWork();}else if(model.phase==='rest'){if(model.loopToTarget&&model.elapsed>=model.targetSeconds)finish();else if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();}
   }
  }
  function beginTicker(seconds){
@@ -1584,6 +1625,7 @@ function guideScreen(title,providedSteps,options={}){
   else beginTicker(step.seconds||45);
  }
  function advance(){
+  if(model.loopToTarget&&model.elapsed>=model.targetSeconds){finish();return;}
   if(model.index+1<model.steps.length){model.index++;prepare();return;}
   if((model.loopToTarget&&model.elapsed<model.targetSeconds)||(!model.loopToTarget&&model.round<model.rounds)){
    model.index=0;model.round++;if(model.roundRest){model.phase='rest';model.afterRest='round';voiceGuide('Tour terminé. Récupération',model.voice);beginTicker(model.roundRest);}else prepare();return;
@@ -1592,6 +1634,8 @@ function guideScreen(title,providedSteps,options={}){
  }
  function completeStep(){
   stopTicker();if(model.finished)return;
+  // The eight-minute objective ends AFTER the current movement, never mid-repetition.
+  if(model.loopToTarget&&model.elapsed>=model.targetSeconds){voiceGuide('Stop',model.voice);finish();return;}
   // Round recovery is handled only at round boundaries, never after the final exercise.
   if(model.index===model.steps.length-1){voiceGuide('Stop',model.voice);advance();return;}
   if(model.rest){model.phase='rest';model.afterRest='next';voiceGuide('Stop. Récupération. Ensuite : '+model.steps[model.index+1].name,model.voice);beginTicker(model.rest);renderList();}
@@ -1605,10 +1649,10 @@ function guideScreen(title,providedSteps,options={}){
   if(!model.finished){model.paused=true;stopVoiceGuide();renderActive();persist();}
  }
  function readSettings(){
-  const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=Number(el('guide-rounds').value);
+  const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=model.source==='circuit'?1:Number(el('guide-rounds').value);
   if(![rest,roundRest].every(x=>Number.isInteger(x)&&x>=0&&x<=600)||!Number.isInteger(rounds)||rounds<1||rounds>30){alert('Réglages invalides : repos 0–600 secondes et tours 1–30.');return false;}
   model.rest=rest;model.roundRest=model.source==='ath'?0:roundRest;model.rounds=model.source==='ath'?1:rounds;model.voice=el('guide-voice').checked;
-  if(el('guide-loop'))model.loopToTarget=el('guide-loop').checked;
+  if(model.source==='circuit')model.loopToTarget=true;
   if(editing)toggleEdit();storeConfig();return true;
  }
  function toggleEdit(){

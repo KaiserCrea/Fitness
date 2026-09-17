@@ -1369,3 +1369,40 @@ body.lock-program-home{
 .v2418-guide-actions .guide-abandon{grid-column:1/-1;min-height:38px;border-color:#5a5042;background:transparent;color:#bdb5a8}
 .guide-footnote{line-height:1.5;margin:8px 1px}
 @media(max-width:365px){.v2418-guide-card{padding:13px 10px}.guide-heading h2{font-size:22px}.guide-visual{height:125px}.guide-list-item{gap:5px;padding:7px}.guide-current-mark{font-size:7px}}
+
+/* V24.18.6 — calendar takes the old History volume-chart slot. Keep session details in place. */
+.history-screen .training-calendar{padding:17px 15px 19px;margin:10px 0 13px;background:#171717;border:1px solid #665132;border-radius:16px}
+.history-screen .training-calendar h2{font:600 clamp(19px,5.5vw,25px)/1.2 system-ui,sans-serif;color:#f1cd86;margin:1px 0 17px;letter-spacing:-.025em}
+.calendar-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:19px}
+.calendar-stats>div{min-width:0;min-height:112px;padding:13px 12px;background:#232323;border:1px solid #76603e;border-radius:11px;display:flex;flex-direction:column;align-items:flex-start}
+.calendar-stats span{color:#b8b5b0;font-size:12px}
+.calendar-stats b{display:block;margin:6px 0 7px;color:#f0cd80;font:bold 28px/1.15 Georgia,serif;font-variant-numeric:tabular-nums}
+.calendar-stats small{font-size:10px;color:#b8b5b0;margin-top:auto}
+.calendar-month-bar{display:grid;grid-template-columns:38px minmax(0,1fr) 38px;gap:6px;align-items:center;margin:3px 0 13px}
+.calendar-month-bar h3{font:600 clamp(14px,4.3vw,19px)/1.3 system-ui,sans-serif;color:#f4f0e8;text-align:center;margin:0;text-transform:capitalize}
+.calendar-month-bar>button{background:transparent;color:#cbbba1;font-size:27px;border:0;border-radius:9px;min-height:43px;cursor:pointer}
+.calendar-month-bar>button:focus-visible,.training-day:focus-visible,.calendar-day-details button:focus-visible{outline:2px solid #f1cd86;outline-offset:2px}
+.history-screen .training-calendar-grid{gap:4px;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center}
+.history-screen .training-calendar-grid .calendar-weekday{font-size:10px;color:#aaa6a0;padding:0 0 6px}
+.history-screen .training-calendar-grid .calendar-blank{min-width:0;padding:0}
+.history-screen .training-day{min-width:0;min-height:48px;border-radius:9px;background:#222;border:1px solid #3b3935;gap:1px;color:#f3ede4;padding:4px 0;cursor:pointer}
+.history-screen .training-day b{font-size:15px;font-weight:600;line-height:1.2}
+.history-screen .training-day small{color:#edc878;font-weight:600;font-size:11px;line-height:1.1}
+.history-screen .training-day.trained{background:#32291d;border-color:#68553b;color:#efce8d}
+.history-screen .training-day.selected{background:#4a3822;border:2px solid #f0cb7e}
+.history-screen .training-day.selected b{color:#ffe2a3}
+.calendar-day-details{min-width:0;margin-top:20px;padding-top:14px;border-top:1px solid #56442f}
+.calendar-hint{font-size:12px;color:#aca69d;padding:6px 0}
+.calendar-detail-heading{font:600 16px/1.35 Georgia,serif;color:#f0cf88;margin:0 0 8px}
+.calendar-day-details .history-session-row{grid-template-columns:minmax(0,1fr) minmax(75px,auto) 12px;gap:7px;border-bottom:1px solid #4b4031;padding:12px 2px;background:transparent;color:#e8e2d5;cursor:pointer}
+.calendar-day-details .history-session-row b{font-size:12px;overflow-wrap:anywhere}
+.calendar-day-details .history-session-row span{font-size:10px;line-height:1.3}
+.calendar-day-details .history-session-row>div:nth-child(2){max-width:122px}
+.calendar-archive-hint{font-size:10px;line-height:1.45;color:#a49d8f;margin:9px 0 0}
+.history-grid>div:nth-child(3) span{line-height:1.25}
+.guide-auto-rounds{min-height:42px;border:1px solid #57472e;border-radius:9px;display:flex;align-items:center;padding:9px;color:#f0ca7b;font-size:11px;line-height:1.3}
+.guide-loop-label{font-size:11px;line-height:1.5;color:#bcad91;margin:9px 0 2px}
+@media(max-width:370px){.history-screen .training-calendar{padding:13px 10px}.history-screen .training-calendar-grid{gap:3px}.history-screen .training-day{min-height:43px}.history-screen .training-day b{font-size:13px}.calendar-stats{gap:7px}.calendar-stats>div{padding:10px}}
+/* Keep the average-session figure readable in the narrow third statistics tile. */
+.history-grid>div:nth-child(3)>b{font-size:clamp(15px,4vw,19px);line-height:1.25;overflow-wrap:normal}
+.history-grid>div:nth-child(3)>span{font-size:9px;line-height:1.3}
