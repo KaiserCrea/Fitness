@@ -1316,3 +1316,56 @@ body.lock-program-home{
 .v2418-guide-card{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px)}
 .v2418-guide button:disabled{opacity:.45;cursor:not-allowed}
 .fullscreen-toolbar{padding-bottom:8px;padding-right:calc(env(safe-area-inset-right) + 12px)}
+
+/* V24.18.5 — ATH/circuit-only guidance and a compact premium circuit editor. */
+.circuit-guide-entry{grid-column:2/4;grid-row:3;padding-top:7px}
+.circuit-guide-entry .guide-entry{width:100%;min-height:38px;color:#f2d58e;border-color:#927040;background:#211c14;font-size:12px}
+.guide-program-btn{grid-column:1/-1;min-height:43px;margin:2px 0 4px;border-color:#b28b4b;background:#252015;color:#f1d38c;font-size:12px;position:relative;z-index:2}
+.guide-program-ath{margin:10px 0 12px;min-height:48px;font-size:13px}
+.sheet-guide-start{min-height:47px;margin-bottom:14px;font-size:13px}
+.v2418-guide{align-items:flex-start;overscroll-behavior:contain;scrollbar-color:#69542c #151515}
+.v2418-guide-card{width:min(100%,560px);max-height:none;min-height:0;margin:auto;padding:17px 14px 20px;background:linear-gradient(145deg,#1e1e1e,#131313);border:1px solid #99804b;box-shadow:0 18px 60px #000b;color:#eee;border-radius:19px}
+.guide-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.guide-heading h2{font:normal 25px/1.1 Georgia,serif;margin:3px 0 8px;color:#f0d18d}
+.guide-eyebrow{font:600 10px/1.35 system-ui,sans-serif;letter-spacing:.12em;color:#c5a367}
+.guide-close{min-width:77px;flex-shrink:0}
+.guide-active{background:linear-gradient(130deg,#2a2317,#151515);border:1px solid #af884a;border-radius:14px;padding:13px;margin-top:9px}
+.guide-active h3{font:normal 26px/1.13 Georgia,serif;color:#fff;margin:7px 0}
+.guide-target{font-size:13px;font-weight:600;color:#e2bc76}
+.guide-visual{width:100%;height:144px;object-fit:contain;object-position:center;background:#0a0a0a;border:1px solid #4c3d25;border-radius:10px;margin-top:10px;display:block}
+.guide-visual[hidden],.guide-config[hidden]{display:none!important}
+.guide-time{text-align:center;padding:7px 3px 12px;border-bottom:1px solid #463923}
+.v2418-guide-clock{font-size:clamp(46px,13vw,70px);margin:4px 0 5px;line-height:1.18}
+.guide-next{text-align:left;font-size:12px;color:#f1d392;background:#242016;border-radius:9px;padding:10px;border:1px solid #4c3c24;overflow-wrap:anywhere}
+.guide-elapsed{font-size:11px;color:#aaa49b;margin:7px 0 0}
+.guide-config{margin:13px 0;border:1px solid #40382b;border-radius:11px;padding:10px;background:#181818}
+.guide-config .param-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.guide-config .field label{font-size:10px;line-height:1.3}
+.guide-config input[type=number]{background:#101112;color:#f4eee3;border:1px solid #665334;border-radius:8px;max-width:100%;width:100%;min-height:42px;padding:8px}
+.guide-check{display:flex;align-items:center;gap:9px;color:#ddd1bd;font-size:12px;padding:7px 0}
+.guide-check input[type=checkbox]{accent-color:#eec66d;width:17px;height:17px;flex-shrink:0}
+.guide-list-heading{display:flex;justify-content:space-between;align-items:center;gap:9px;margin-top:12px;margin-bottom:8px}
+.guide-list-heading h3{font:normal 20px Georgia,serif;color:#f0ce82;margin:0}
+.guide-edit-btn{min-height:37px;padding:7px 12px}
+.guide-list{display:grid;gap:6px}
+.guide-list-item{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:8px;background:#1d1d1d;border:1px solid #36332f;border-radius:9px;padding:8px;min-height:54px}
+.guide-list-item.active{border-color:#c29a54;background:linear-gradient(115deg,#33291b,#1c1a17)}
+.guide-list-item.past:not(.active){opacity:.7}
+.guide-list-no{width:29px;height:30px;display:grid;place-items:center;border-radius:7px;background:#3d3931;color:#eee0c4;font-size:13px;font-weight:700}
+.guide-list-item.active .guide-list-no{background:#e7bc67;color:#181309}
+.guide-list-text{min-width:0;overflow-wrap:anywhere}
+.guide-list-text b{display:block;font-size:12px;line-height:1.25;color:#f2e9d8}
+.guide-list-item.active .guide-list-text b{color:#f8d991}
+.guide-list-text small{display:block;font-size:10px;color:#afa9a0;margin-top:4px}
+.guide-current-mark{color:#eac577;font-size:8px;letter-spacing:.05em;max-width:52px;text-align:right}
+.guide-move-actions{display:flex;gap:3px}
+.guide-move-actions .btn{min-height:36px;min-width:30px;padding:5px 7px}
+.guide-list-text input{display:block;width:100%;min-height:37px;margin:4px 0;padding:8px;background:#121212;border:1px solid #77603a;color:#fff;border-radius:7px;font-size:12px}
+.guide-list-text label{display:flex;align-items:center;gap:6px;color:#bbb}
+.guide-list-text label input{width:74px}
+.guide-status{font-size:11px;color:#e6c681;margin:9px 0}
+.v2418-guide-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0 6px}
+.v2418-guide-actions .btn{width:100%;min-width:0;min-height:48px;white-space:normal;font-size:12px;line-height:1.25}
+.v2418-guide-actions .guide-abandon{grid-column:1/-1;min-height:38px;border-color:#5a5042;background:transparent;color:#bdb5a8}
+.guide-footnote{line-height:1.5;margin:8px 1px}
+@media(max-width:365px){.v2418-guide-card{padding:13px 10px}.guide-heading h2{font-size:22px}.guide-visual{height:125px}.guide-list-item{gap:5px;padding:7px}.guide-current-mark{font-size:7px}}

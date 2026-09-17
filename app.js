@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 36;
+const APP_REV = 37;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -496,20 +496,21 @@ function renderActiveToday(cur,date){
       <div><div class="tiny serif gold" style="text-align:center;margin-bottom:3px">Bilan</div><div class="bilan"><div><b>${success}</b><span>Réussis</span></div><div><b>${fail}</b><span>Échoués</span></div><div><b>${skip}</b><span>Non réalisés</span></div></div></div></div>
       <button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button>
     </div>`,"today-screen");
-  $$('[data-guide]').forEach(b=>b.onclick=()=>openExerciseGuide(b.dataset.guide,+b.dataset.guideNo));
+  $$('[data-circuit-guide]').forEach(b=>b.onclick=()=>openCircuitGuide(b.dataset.circuitGuide,b.dataset.session,+b.dataset.no));
   $$('[data-status]').forEach(b=>b.onclick=()=>setExerciseStatus(b.dataset.id,b.dataset.status,+b.dataset.no));
   $$('[data-sheet]').forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet,b.dataset.session,+b.dataset.no));
   $("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");
   $("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
+function isAbCircuit(id){return ['ex-circuit-abdos-8-min','ex-circuit-abdos-complet-8-min','ex-circuit-abdos-intensif-8-min'].includes(id);}
 function todayExerciseCard(id,session,no,cur){
   const e=exercise(id),st=occurrenceStatus(cur,id,no),img=thumbnailFor(id,session,no),ref=occurrenceValue(cur,id,no);
   const firstPendingNo=activeSessionIds(cur).findIndex((x,i)=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,x,i+1)))+1;
   return `<div class="exercise-card ${firstPendingNo===no?"current":""}">
-    <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""></div>
+    <div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""></div>
     <div class="ex-info"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div>${actualSetsFor(id)?`<div class="tiny muted">Dernière fois : ${esc(actualSetsFor(id).sets.join(" / "))} · ${esc(refWithUnit(actualSetsFor(id).weight))}</div>`:""}${cur.setReps?.[occKey(id,no)]?`<div class="tiny gold">Aujourd’hui : ${esc(cur.setReps[occKey(id,no)].join(" / "))}</div>`:""}</div>
     <button class="backlink chev" data-sheet="${esc(id)}" data-session="${esc(session)}" data-no="${no}" aria-label="Voir la fiche">${icon("chevron")}</button>
-    <div class="v2418-timer-entry"><button class="btn" data-guide="${esc(id)}" data-guide-no="${no}">Chronomètre et coach vocal</button></div><div class="status-actions">
+    ${isAbCircuit(id)?`<div class="circuit-guide-entry"><button class="btn guide-entry" data-circuit-guide="${esc(id)}" data-session="${esc(session)}" data-no="${no}">${esc(guideEntryLabel('circuit:'+session+':'+no+':'+id))}</button></div>`:''}<div class="status-actions">
       ${[["Réussi","check"],["Échoué","x"],["Non réalisé","ban"]].map(([x,ic])=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}">${icon(ic)} ${x}</button>`).join("")}
     </div>
   </div>`;
@@ -644,7 +645,7 @@ function renderActiveAth(cur,date){
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
-    <button class="btn gold block" id="ath-guide">Démarrer le guidage ATH (manuel)</button><div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
+    <button class="btn gold block" id="ath-guide">${esc(guideEntryLabel("ath:"+cur.session))}</button><div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
     <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
   $("#ath-guide").onclick=()=>openAthGuide(cur.session);$("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
@@ -700,7 +701,7 @@ function programExercises(group){
   return `<div class="group-detail-head"><button class="backlink" data-back-groups>${icon("arrowleft")} Retour aux groupes</button><h2 class="section-title">${esc(group)}</h2><span>${ids.length} exercice${ids.length>1?"s":""}</span></div>
     <section class="library-section"><div class="panel">${ids.map(id=>{
       const o=occurrenceList(id).find(x=>groupForId(id)===group)||occurrenceList(id)[0]||{s:reg[id].firstSession,n:reg[id].firstNo},img=thumbnailFor(id,o.s,o.n),count=occurrenceList(id).length;
-      return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div><div class="library-copy"><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(group)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
+      return `<div class="library-row" data-open-ex="${esc(id)}" data-s="${esc(o.s||"")}" data-n="${o.n||1}"><div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div><div class="library-copy"><div class="ex-name">${esc(reg[id].name)}</div><div class="ex-sub">${esc(group)}</div></div><div class="trend">${count} séance${count>1?"s":""}</div><div class="chev">${icon("chevron")}</div></div>`;
     }).join("")||`<div class="empty">Aucun exercice dans ce groupe.</div>`}</div></section>`;
 }
 function programGroups(){
@@ -809,14 +810,16 @@ function renderProgramDetail(session){
   $("#edit-session").onclick=()=>{editing=!editing;$("#session-list").classList.toggle("editing",editing);$("#edit-session").textContent=editing?"✓ Terminer":"✎ Modifier";};
   $$("[data-session-row]").forEach(row=>row.onclick=e=>{if(!editing&&!e.target.closest(".handle")&&!e.target.closest(".row-menu"))openSheet(row.dataset.id,session,+row.dataset.no);});
   $$(".row-menu").forEach(b=>b.onclick=e=>{e.stopPropagation();openExerciseActionModal(session,b.closest("[data-session-row]").dataset.id);});
+  $$('[data-program-circuit]').forEach(b=>b.onclick=e=>{e.stopPropagation();openCircuitGuide(b.dataset.programCircuit,session,+b.dataset.no);});
   enableSort($("#session-list"),session);
   $("#add-exercise").onclick=()=>openAddExerciseModal(session);
 }
 function sessionRow(id,session,no){
   const e=exercise(id),img=thumbnailFor(id,session,no);
   return `<div class="session-row" data-session-row data-id="${esc(id)}" data-no="${no}">
-    <div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div>
-    <div class="session-copy"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div></div>`;
+    <div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div>
+    <div class="session-copy"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div>
+    ${isAbCircuit(id)?`<button class="btn guide-program-btn" data-program-circuit="${esc(id)}" data-no="${no}">${esc(guideEntryLabel('circuit:'+session+':'+no+':'+id))}</button>`:''}</div>`;
 }
 function enableSort(list,session){
   let drag=null;
@@ -859,9 +862,11 @@ function renderAthProgram(session){
   const img=pathUrl(ATH_SHEETS[session]||"");
   shell(`<header class="session-header" style="--session-image:url('./assets/card-ath-official.jpg')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-program-official.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
+    <button class="btn gold block guide-program-ath" id="program-ath-guide">${esc(guideEntryLabel('ath:'+session))}</button>
     <div class="card">${(DATA.ath?.[session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(session,i,x))}</div></div>`).join("")}</div>`);
   $("#back-program").onclick=()=>history.back();
   $("#open-ath-sheet").onclick=()=>openAthSheet(session);
+  $("#program-ath-guide").onclick=()=>openAthGuide(session);
 }
 
 function allPerf(){
@@ -1065,7 +1070,7 @@ function averageIncrease(perf,ids){
 }
 function progressRow(id,no,arr){
   const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),trend=trendFor(id,arr),last=arr.at(-1);
-  return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
+  return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
     <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">${Number.isFinite(repNumber(last.reps))?`${repNumber(last.reps)} reps · `:""}Dernière séance ${formatDate(last.date)}</div>`:""}</div>
     <div class="trend ${trend.key==="slow"?"slow":trend.key==="flat"?"flat":trend.key==="down"?"down":""}">${trend.key==="up"?"↗ ":trend.key==="down"?"↘ ":trend.key==="flat"?"→ ":""}${trend.label}</div></div>`;
 }
@@ -1252,13 +1257,14 @@ function openSheet(id,session,no){
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <button class="sheet-close" data-close-sheet>Fermer</button>
     <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
-    <div class="sheet-params"><h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
+    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel('circuit:'+session+':'+no+':'+id))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
   const sheetCanvas=$(".fiche-visual",overlay);
   const sheetImg=$(".fiche-visual img",overlay);
   if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);sheetCanvas.setAttribute("role","button");sheetCanvas.setAttribute("aria-label","Ouvrir l’image en plein écran");sheetCanvas.onclick=()=>openFullscreenSheet(sheetImg.src,e.name);}
+  if(isAbCircuit(id))$("#sheet-guide-start",overlay).onclick=()=>openCircuitGuide(id,session,no);
   $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
 }
 function openFullscreenSheet(src,name){
@@ -1396,109 +1402,236 @@ function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");r
 function formatMinutes(min){min=Math.max(0,Math.round(+min||0));return `${Math.floor(min/60)} h ${String(min%60).padStart(2,"0")}`;}
 function round1(v){return Math.round(v*10)/10;}
 
-let guideTicker=null,guideEnd=0,guideRemaining=0,guideRunning=false,guideStage=0,guideSteps=[],guideRound=1,guideRounds=1,guideWork=45,guideRest=20,guideVoice=true,guidePhase='ready',guideConfigKey="";
-function guideSay(message){if(!guideVoice||!('speechSynthesis' in window))return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(message);u.lang='fr-FR';u.rate=.92;speechSynthesis.speak(u);}catch(e){console.warn('Voix indisponible',e);}}
-function guideStop(cancelVoice=true){if(guideTicker)clearInterval(guideTicker);guideTicker=null;guideRunning=false;if(cancelVoice)try{speechSynthesis.cancel();}catch{}}
-function guideScreen(title,steps,options={}){
- guideStop();document.querySelectorAll('.v2418-guide').forEach(el=>el.remove());
- guideConfigKey=options.configKey||"";guideSteps=steps.slice();guideStage=0;guideRound=1;
- guideWork=options.work||45;guideRest=options.rest??20;guideRounds=options.rounds||1;
- guideRemaining=0;guidePhase='ready';guideVoice=options.voice!==false;
- let started=false,paused=false,previousRemaining=0;
- const ov=document.createElement('div');ov.className='v2418-guide';
- ov.innerHTML=`<div class="v2418-guide-card" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="row-between"><b class="serif gold">${esc(title)}</b><button class="btn" id="guide-close">Fermer</button></div><p id="guide-step-name" aria-live="polite"></p><div class="v2418-guide-clock" id="guide-clock">00:00</div><p class="tiny muted" id="guide-progress"></p><div class="param-grid"><div class="field"><label>Travail (secondes)</label><input id="guide-work" type="number" min="5" max="3600" value="${guideWork}"></div><div class="field"><label>Repos (secondes)</label><input id="guide-rest" type="number" min="0" max="600" value="${guideRest}"></div><div class="field"><label>Tours</label><input id="guide-rounds" type="number" min="1" max="30" value="${guideRounds}"></div></div><label class="tiny"><input id="guide-voice" type="checkbox" ${guideVoice?'checked':''}> Coach vocal français</label>${options.editable?`<div class="field"><label>Exercices du circuit (un nom par ligne, dans l’ordre)</label><textarea id="guide-exercises" rows="6">${esc(guideSteps.map(x=>x.name).join('\n'))}</textarea></div><p class="tiny muted">Personnalisez les exercices avant de démarrer.</p>`:''}<div class="v2418-guide-actions"><button class="btn gold" id="guide-start">Démarrer</button><button class="btn" id="guide-done" disabled>Exercice terminé / suivant</button><button class="btn" id="guide-pause" disabled>Pause</button></div><p class="tiny muted">Après le premier démarrage, les exercices chronométrés s’enchaînent automatiquement. Les séries en répétitions se terminent manuellement. La voix peut être interrompue lorsque le téléphone est verrouillé.</p></div>`;
- document.body.appendChild(ov);
- const startButton=$('#guide-start',ov),doneButton=$('#guide-done',ov),pauseButton=$('#guide-pause',ov);
- const update=()=>{
-   const current=guideSteps[guideStage];
-   if(!current){$('#guide-step-name',ov).textContent='Séance guidée terminée';$('#guide-progress',ov).textContent='Terminé';$('#guide-clock',ov).textContent='00:00';}
-   else{
-     $('#guide-step-name',ov).textContent=guidePhase==='prep'?'Préparez-vous · '+current.name:guidePhase==='rest'?'Récupération · ensuite : '+current.name:current.name;
-     $('#guide-progress',ov).textContent=`Exercice ${guideStage+1}/${guideSteps.length} · Tour ${guideRound}/${guideRounds}${guidePhase==='work'&&current.manual?' · Répétitions à valider':''}`;
-     $('#guide-clock',ov).textContent=`${String(Math.floor(guideRemaining/60)).padStart(2,'0')}:${String(guideRemaining%60).padStart(2,'0')}`;
-   }
-   startButton.disabled=started;
-   doneButton.disabled=!['work','rest'].includes(guidePhase)||paused;
-   doneButton.textContent=guidePhase==='rest'?'Passer la récupération':'Exercice terminé / suivant';
-   pauseButton.disabled=guidePhase==='ready'||guidePhase==='done'||(guidePhase==='work'&&!!current?.manual);
-   pauseButton.textContent=paused?'Reprendre':'Pause';
- };
- const readOptions=()=>{
-   const work=Number($('#guide-work',ov).value),rest=Number($('#guide-rest',ov).value),rounds=Number($('#guide-rounds',ov).value);
-   if(!Number.isInteger(work)||work<5||work>3600||!Number.isInteger(rest)||rest<0||rest>600||!Number.isInteger(rounds)||rounds<1||rounds>30){alert('Réglages invalides : travail 5–3600 s, repos 0–600 s, tours 1–30.');return false;}
-   guideWork=work;guideRest=rest;guideRounds=rounds;guideVoice=$('#guide-voice',ov).checked;
-   if(options.editable){const names=$('#guide-exercises',ov).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,50);if(!names.length){alert('Indiquez au moins un exercice.');return false;}guideSteps=names.map(name=>({name,seconds:guideWork}));}
-   if(guideConfigKey){state.guideConfigs=state.guideConfigs||{};state.guideConfigs[guideConfigKey]={work:guideWork,rest:guideRest,rounds:guideRounds,voice:guideVoice,...(options.editable?{names:guideSteps.map(x=>x.name)}:{})};save();}
-   $$('#guide-work,#guide-rest,#guide-rounds,#guide-voice,#guide-exercises',ov).forEach(el=>el.disabled=true);
-   return true;
- };
- const completed=()=>{guideStop();guideStage=guideSteps.length;guidePhase='done';paused=false;update();guideSay('Séance terminée');};
- const startTimed=(phase,seconds)=>{
-   guidePhase=phase;guideRemaining=seconds;previousRemaining=seconds;paused=false;
-   if(guideTicker)clearInterval(guideTicker);
-   guideEnd=Date.now()+seconds*1000;guideRunning=true;
-   guideTicker=setInterval(()=>{
-     const before=guideRemaining;guideRemaining=Math.max(0,Math.ceil((guideEnd-Date.now())/1000));
-     if(guidePhase==='prep'&&guideRemaining!==before&&guideRemaining>0&&guideRemaining<3)guideSay(guideRemaining===2?'Deux':'Un');
-     previousRemaining=guideRemaining;update();
-     if(guideRemaining>0)return;
-     guideStop(false);
-     if(guidePhase==='prep')startWork();
-     else if(guidePhase==='rest')nextExercise();
-     else finishExercise();
-   },150);
-   update();
- };
- const startWork=()=>{
-   const current=guideSteps[guideStage];if(!current){completed();return;}
-   guideSay('GO. '+current.name);
-   if(current.manual){guidePhase='work';guideRemaining=0;guideRunning=false;update();return;}
-   startTimed('work',current.seconds||guideWork);
- };
- const prepare=()=>{const current=guideSteps[guideStage];if(!current){completed();return;}guideSay('Préparez-vous. '+current.name+'. Trois');startTimed('prep',3);};
- const nextExercise=()=>{
-   guideStage++;if(guideStage>=guideSteps.length){guideStage=0;guideRound++;}
-   if(guideRound>guideRounds){completed();return;}
-   prepare();
- };
- const finishExercise=()=>{
-   if(guideStage===guideSteps.length-1&&guideRound===guideRounds){completed();return;}
-   if(guideRest){guideSay('Stop. Récupération');startTimed('rest',guideRest);}
-   else{guideSay('Stop');nextExercise();}
- };
- const onKey=e=>{if(e.key==='Escape'){guideStop();ov.remove();document.removeEventListener('keydown',onKey);}};
- document.addEventListener('keydown',onKey);
- $('#guide-close',ov).onclick=()=>{guideStop();ov.remove();document.removeEventListener('keydown',onKey);};
- startButton.onclick=()=>{if(started||!readOptions())return;started=true;prepare();};
- doneButton.onclick=()=>{if(paused)return;if(guidePhase==='rest'){guideStop();nextExercise();}else if(guidePhase==='work'){guideStop();finishExercise();}};
- pauseButton.onclick=()=>{
-   if(pauseButton.disabled)return;
-   if(!paused){guideRemaining=Math.max(0,Math.ceil((guideEnd-Date.now())/1000));guideStop();paused=true;update();}
-   else{paused=false;guideSay('Reprise');startTimed(guidePhase,guideRemaining);}
- };
- update();
+// V24.18.5 — Guidance is exclusive to ATH A/B and the circuit exercises.
+// Store only the paused in-progress guide separately from training history.
+const GUIDE_DRAFT_KEY='fitness-guide-pause-v24185';
+let activeGuideClose=null;
+function pendingGuide(){
+ try{const d=JSON.parse(localStorage.getItem(GUIDE_DRAFT_KEY)||'null');return d&&d.started&&!d.finished&&Array.isArray(d.steps)&&d.steps.length?d:null;}catch{return null;}
 }
-function openExerciseGuide(id,no){
- const p=defaultParams(id),name=exercise(id).name,isCircuit=p.type==='circuit';
- const configKey='exercise:'+id,stored=state.guideConfigs?.[configKey]||{};
- const names=stored.names?.length?stored.names:['Crunch','Relevés de jambes','Gainage','Bicycle crunch','Crunch inversé','Planche latérale droite','Planche latérale gauche','Mountain climbers'];
- const work=stored.work||45,rest=stored.rest??15,rounds=stored.rounds||Math.max(1,parseInt(p.tours)||1);
- const seconds=p.type==='gainage'?Math.max(5,parseInt(p.duree)||60):45;
- const steps=isCircuit?names.map(n=>({name:n,seconds:work})):[{name,seconds,manual:p.type==='strength'}];
- guideScreen(name,steps,{work:isCircuit?work:seconds,rest:isCircuit?rest:(parseInt(p.reposSeries)||60),rounds:isCircuit?rounds:Math.max(1,parseInt(p.series)||1),editable:isCircuit,configKey,voice:stored.voice});
+function guideEntryLabel(key){return pendingGuide()?.key===key?'Reprendre la séance guidée':'Démarrer la séance guidée';}
+function refreshGuideEntrypoints(){
+ $$('[data-circuit-guide]').forEach(b=>{b.textContent=guideEntryLabel('circuit:'+b.dataset.session+':'+b.dataset.no+':'+b.dataset.circuitGuide);});
+ $$('[data-program-circuit]').forEach(b=>{b.textContent=guideEntryLabel('circuit:'+view.session+':'+b.dataset.no+':'+b.dataset.programCircuit);});
+ if($('#program-ath-guide')&&view.session)$('#program-ath-guide').textContent=guideEntryLabel('ath:'+view.session);
+ if($('#ath-guide')&&state.today)$('#ath-guide').textContent=guideEntryLabel('ath:'+state.today.session);
 }
-function athDurationSeconds(value){const text=String(value||'').toLowerCase(),m=text.match(/(\d+)\s*(min|minute|s|sec|seconde)/);return m?Number(m[1])*(m[2].startsWith('min')?60:1):null;}
-function openAthGuide(session){
- const configKey='ath:'+session,stored=state.guideConfigs?.[configKey]||{};
- const steps=[];
- for(const item of DATA.ath?.[session]||[]){
-   const duration=athDurationSeconds(item.duration),interval=(item.fields||[]).map(String).find(x=>/\d+\s*s.*\d+\s*s/i.test(x));
-   const match=interval?.match(/(\d+)\s*s[^\d]+(\d+)\s*s/i);
-   if(match&&duration){let elapsed=0,n=1;while(elapsed<duration){const work=Math.min(+match[1],duration-elapsed);steps.push({name:item.name+' — effort '+n,seconds:work});elapsed+=work;if(elapsed<duration){const recovery=Math.min(+match[2],duration-elapsed);steps.push({name:item.name+' — récupération '+n,seconds:recovery});elapsed+=recovery;}n++;}}
-   else steps.push({name:item.name,seconds:duration||45,manual:!duration});
+function voiceGuide(text,enabled){
+ if(!enabled||!('speechSynthesis' in window))return;
+ try{speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang='fr-FR';utterance.rate=.93;speechSynthesis.speak(utterance);}catch(e){console.warn('Coach vocal indisponible',e);}
+}
+function stopVoiceGuide(){try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch{}}
+const CIRCUIT_FULL=[
+ {name:'Crunch classique',target:'10 à 20 répétitions',manual:true},
+ {name:'Ciseaux',target:'20 à 40 secondes',seconds:30},
+ {name:'Relevé de jambes',target:'10 à 20 répétitions',manual:true},
+ {name:'Planche',target:'30 à 60 secondes',seconds:45},
+ {name:'Toucher talons',target:'15 à 25 répétitions',manual:true},
+ {name:'Crunch inversé',target:'10 à 15 répétitions',manual:true},
+ {name:'Gainage latéral — côté droit',target:'30 à 45 secondes · côté droit',seconds:40,ficheNo:7},
+ {name:'Gainage latéral — côté gauche',target:'30 à 45 secondes · côté gauche',seconds:40,ficheNo:7},
+ {name:'Mountain climbers',target:'30 à 60 secondes',seconds:45,ficheNo:8}
+];
+const CIRCUIT_INTENSIVE=[
+ {name:'V-ups',target:'15 répétitions',manual:true},
+ {name:'Sit-ups explosifs',target:'15 répétitions',manual:true},
+ {name:'Mountain climbers croisés',target:'30 répétitions au total',manual:true},
+ {name:'Relevés de jambes tendues au sol',target:'15 répétitions',manual:true},
+ {name:'Russian twists',target:'20 répétitions au total',manual:true}
+];
+function circuitGuideSteps(id,session,no){
+ const intensive=id==='ex-circuit-abdos-intensif-8-min';
+ const sheetSession=intensive?'FM2':(['G1B','G2C','G3A','G3B'].includes(session)?session:(id==='ex-circuit-abdos-8-min'?'G1B':'G3B'));
+ const raw=(intensive?CIRCUIT_INTENSIVE:CIRCUIT_FULL).map(x=>({...x}));
+ if(sheetSession==='G3A'){
+   raw[5]={name:'Rouleau abdominal',target:'10 à 15 répétitions',manual:true};
  }
- guideScreen(niceSession(session),steps.length?steps:[{name:'Séance ATH',seconds:45}],{work:stored.work||45,rest:stored.rest??0,rounds:stored.rounds||1,configKey,voice:stored.voice});
+ return raw.map((x,i)=>({...x,ficheNo:x.ficheNo||i+1,preview:`assets/guide/${sheetSession}-${String(x.ficheNo||i+1).padStart(2,'0')}.jpg`}));
 }
+function openCircuitGuide(id,session,no){
+ if(!['ex-circuit-abdos-8-min','ex-circuit-abdos-complet-8-min','ex-circuit-abdos-intensif-8-min'].includes(id))return;
+ const intensive=id==='ex-circuit-abdos-intensif-8-min';
+ const key='circuit:'+session+':'+no+':'+id;
+ const cfg=state.guideConfigs?.[key]||{};
+ const defaults=circuitGuideSteps(id,session,no);
+ const steps=Array.isArray(cfg.steps)&&cfg.steps.length&&cfg.steps.every(x=>x&&typeof x.name==='string')?cfg.steps:defaults;
+ const title=intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name;
+ guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds:cfg.rounds||1,loopToTarget:cfg.loopToTarget??intensive,targetSeconds:480,voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
+}
+function athDurationSeconds(value){
+ const m=String(value||'').toLowerCase().match(/(\d+)\s*(min|minute|s|sec|seconde)/);
+ return m?Number(m[1])*(m[2].startsWith('min')?60:1):null;
+}
+function openAthGuide(session){
+ const key='ath:'+session,cfg=state.guideConfigs?.[key]||{},steps=[];
+ for(const [itemIndex,item] of (DATA.ath?.[session]||[]).entries()){
+   const duration=athDurationSeconds(item.duration);
+   const interval=(item.fields||[]).map(String).find(x=>/\d+\s*s.*\d+\s*s/i.test(x));
+   const match=interval?.match(/(\d+)\s*s[^\d]+(\d+)\s*s/i);
+   if(match&&duration){
+     let elapsed=0,n=1;
+     while(elapsed<duration){
+       const work=Math.min(+match[1],duration-elapsed);
+       steps.push({name:item.name+' · effort '+n,target:work+' secondes',seconds:work,ficheNo:itemIndex+1});elapsed+=work;
+       if(elapsed<duration){const rec=Math.min(+match[2],duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1});elapsed+=rec;}
+       n++;
+     }
+   }else if(/temps restant/i.test(item.duration)){
+     steps.push({name:item.name,target:'Temps restant pour atteindre 60 min',remainingTo60:true,ficheNo:itemIndex+1});
+   }else if(duration){steps.push({name:item.name,target:item.duration,seconds:duration,ficheNo:itemIndex+1});}
+   else{steps.push({name:item.name,target:item.duration,manual:true,ficheNo:itemIndex+1});}
+ }
+ if(!steps.length)return;
+ guideScreen(niceSession(session),steps,{key,source:'ath',session,editable:false,rest:cfg.rest??0,roundRest:0,rounds:1,voice:cfg.voice!==false});
+}
+function guideScreen(title,providedSteps,options={}){
+ if(activeGuideClose)activeGuideClose();
+ const key=options.key||'';
+ let draft=pendingGuide();
+ if(draft&&draft.key!==key){
+   if(!confirm('Une autre séance guidée est en pause. L’abandonner pour ouvrir celle-ci ?'))return;
+   localStorage.removeItem(GUIDE_DRAFT_KEY);draft=null;
+ }
+ const isResume=!!draft&&draft.key===key;
+ const model=isResume?draft:{key,title,steps:providedSteps.map(x=>({...x})),index:0,round:1,rounds:options.rounds||1,rest:options.rest??0,roundRest:options.roundRest??0,loopToTarget:!!options.loopToTarget,targetSeconds:options.targetSeconds||0,voice:options.voice!==false,source:options.source||'',phase:'ready',remaining:0,elapsed:0,manualElapsed:0,started:false,paused:false,finished:false};
+ model.title=title;
+ if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
+ let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1;
+ const ov=document.createElement('div');ov.className='v2418-guide';
+ ov.innerHTML=`<div class="v2418-guide-card" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+   <div class="guide-heading"><div><div class="guide-eyebrow">SÉANCE GUIDÉE</div><h2>${esc(title)}</h2></div><button class="btn guide-close" id="guide-close">Fermer</button></div>
+   <div class="guide-active" id="guide-active"><div class="guide-eyebrow" id="guide-step-counter"></div><h3 id="guide-step-name" aria-live="polite"></h3><div class="guide-target" id="guide-step-target"></div><img id="guide-step-visual" class="guide-visual" alt="Aperçu du mouvement indiqué sur la fiche" loading="eager"></div>
+   <div class="guide-time"><div class="guide-eyebrow" id="guide-phase"></div><div id="guide-clock" class="v2418-guide-clock">00:00</div><div class="guide-next" id="guide-next"></div><div class="guide-elapsed" id="guide-elapsed"></div></div>
+   <div class="guide-config" id="guide-config"><div class="param-grid"><div class="field"><label>Repos entre exercices (s)</label><input id="guide-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.rest}"></div><div class="field"><label>Repos entre tours (s)</label><input id="guide-round-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.roundRest}"></div><div class="field"><label>Tours</label><input id="guide-rounds" type="number" inputmode="numeric" min="1" max="30" value="${model.rounds}"></div></div>
+   ${model.source==='circuit'&&model.targetSeconds?`<label class="guide-check"><input id="guide-loop" type="checkbox" ${model.loopToTarget?'checked':''}> Répéter jusqu’à l’objectif de 8 minutes</label>`:''}
+   <label class="guide-check"><input id="guide-voice" type="checkbox" ${model.voice?'checked':''}> Coach vocal français</label></div>
+   <div class="guide-list-heading"><h3>Déroulement</h3>${options.editable?'<button class="btn guide-edit-btn" id="guide-edit" type="button">Modifier</button>':''}</div>
+   <div id="guide-list" class="guide-list"></div><p id="guide-status" class="guide-status" role="status"></p>
+   <div class="v2418-guide-actions"><button class="btn gold" id="guide-start">${isResume?'Reprendre':'Démarrer'}</button><button class="btn" id="guide-done" disabled>Exercice terminé / suivant</button><button class="btn" id="guide-pause" disabled>Pause</button><button class="btn guide-abandon" id="guide-abandon">Terminer définitivement</button></div>
+   <p class="tiny muted guide-footnote">Le démarrage est manuel. Les exercices en répétitions passent au suivant uniquement après validation. En fermant cette fenêtre, la séance reste en pause et peut être reprise. La voix peut être interrompue si Android verrouille l’écran.</p>
+  </div>`;
+ document.body.appendChild(ov);
+ const el=id=>document.getElementById(id),start=el('guide-start'),pause=el('guide-pause'),done=el('guide-done'),list=el('guide-list');
+ function persist(){if(model.started&&!model.finished)localStorage.setItem(GUIDE_DRAFT_KEY,JSON.stringify({...model,paused:true}));}
+ function storeConfig(){
+  state.guideConfigs=state.guideConfigs||{};
+  state.guideConfigs[key]={steps:model.steps.map(s=>({...s})),rest:model.rest,roundRest:model.roundRest,rounds:model.rounds,loopToTarget:model.loopToTarget,voice:model.voice};save();
+ }
+ function stopTicker(){if(ticker)clearInterval(ticker);ticker=null;lastTick=0;}
+ function close(){
+  if(!ov.isConnected)return;
+  if(model.started&&!model.finished){freeze();persist();}
+  stopTicker();stopVoiceGuide();ov.remove();document.removeEventListener('keydown',onKey);if(activeGuideClose===close)activeGuideClose=null;refreshGuideEntrypoints();
+ }
+ activeGuideClose=close;
+ const onKey=e=>{if(e.key==='Escape')close();};document.addEventListener('keydown',onKey);
+ el('guide-close').onclick=close;
+ function timeText(value){const n=Math.max(0,Math.floor(value||0));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
+ function nextStep(){if(model.index+1<model.steps.length)return model.steps[model.index+1];if(model.loopToTarget&&model.elapsed<model.targetSeconds||model.round<model.rounds)return model.steps[0];return null;}
+ function renderList(){
+  list.innerHTML=model.steps.map((s,i)=>`<div class="guide-list-item ${i===model.index?'active':''} ${i<model.index?'past':''}" data-guide-row="${i}">
+    <span class="guide-list-no">${esc(s.ficheNo||i+1)}</span><div class="guide-list-text">${editing?`<input class="guide-name-input" aria-label="Nom du mouvement ${i+1}" data-guide-name="${i}" value="${esc(s.name)}"><input aria-label="Objectif du mouvement ${i+1}" data-guide-target="${i}" value="${esc(s.target||'')}">${!s.manual?`<label class="tiny">Durée (s) <input aria-label="Durée ${i+1}" data-guide-seconds="${i}" type="number" min="5" max="3600" value="${s.seconds||45}"></label>`:''}`:`<b>${esc(s.name)}</b><small>${esc(s.target||'')}</small>`}</div>
+    ${editing?`<div class="guide-move-actions"><button class="btn" data-guide-up="${i}" aria-label="Monter ${esc(s.name)}" ${i===0?'disabled':''}>↑</button><button class="btn" data-guide-down="${i}" aria-label="Descendre ${esc(s.name)}" ${i===model.steps.length-1?'disabled':''}>↓</button></div>`:(i===model.index?'<span class="guide-current-mark">EN COURS</span>':'')}
+   </div>`).join('');
+  if(editing){
+   function updateRow(i){const s=model.steps[i];const name=$(`[data-guide-name="${i}"]`,list),target=$(`[data-guide-target="${i}"]`,list),seconds=$(`[data-guide-seconds="${i}"]`,list);if(name)s.name=name.value.slice(0,100);if(target)s.target=target.value.slice(0,90);if(seconds){const n=Number(seconds.value);if(Number.isInteger(n)&&n>=5&&n<=3600)s.seconds=n;}}
+   $$('[data-guide-name],[data-guide-target],[data-guide-seconds]',list).forEach(input=>input.onchange=()=>{updateRow(Number(input.dataset.guideName??input.dataset.guideTarget??input.dataset.guideSeconds));renderActive();});
+   $$('[data-guide-up],[data-guide-down]',list).forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.guideUp??btn.dataset.guideDown),next=btn.dataset.guideUp!==undefined?i-1:i+1;model.steps.forEach((s,j)=>updateRow(j));[model.steps[i],model.steps[next]]=[model.steps[next],model.steps[i]];renderList();renderActive();});
+  }
+ }
+ function renderActive(){
+  const step=model.steps[model.index];if(!step)return;
+  const count=new Set(model.steps.map(s=>s.ficheNo).filter(Boolean)).size||model.steps.length;
+  el('guide-step-counter').textContent=`MOUVEMENT ${step.ficheNo||model.index+1}/${count} · TOUR ${model.round}${model.loopToTarget?' · OBJECTIF 8 MIN':'/'+model.rounds}`;
+  el('guide-step-name').textContent=step.name;
+  el('guide-step-target').textContent=step.target|| (step.manual?'Validez à la fin des répétitions':'');
+  const preview=el('guide-step-visual');if(step.preview){const src=pathUrl(step.preview);if(preview.dataset.current!==src){preview.src=src;preview.dataset.current=src;}preview.hidden=false;}else{preview.removeAttribute('src');preview.dataset.current='';preview.hidden=true;}
+  const next=nextStep();el('guide-next').textContent=next?'À suivre : '+next.name+(next.target?' · '+next.target:''):'Dernier mouvement du circuit';
+  el('guide-phase').textContent=model.finished?'SÉANCE TERMINÉE':model.paused?'EN PAUSE':model.phase==='prep'?'PRÉPAREZ-VOUS':model.phase==='rest'?'RÉCUPÉRATION':model.phase==='work'?(step.manual?'RÉPÉTITIONS · VALIDATION MANUELLE':'TRAVAIL'):'PRÊT';
+  el('guide-clock').textContent=timeText(model.phase==='work'&&step.manual?model.manualElapsed:model.remaining);
+  el('guide-elapsed').textContent=`Temps écoulé : ${timeText(model.elapsed)}${model.targetSeconds?' · Objectif : '+timeText(model.targetSeconds):''}`;
+  start.disabled=model.started&&!model.paused||model.finished;start.textContent=model.started?'Reprendre':'Démarrer';
+  done.disabled=!model.started||model.paused||model.finished||!['work','rest'].includes(model.phase);
+  done.textContent=model.phase==='rest'?'Passer la récupération':'Exercice terminé / suivant';
+  pause.disabled=!model.started||model.paused||model.finished||model.phase==='ready';pause.textContent='Pause';
+  el('guide-config').hidden=model.started;
+  if(el('guide-edit'))el('guide-edit').disabled=model.started;
+  if(model.finished)el('guide-status').textContent='Séance terminée. Vous pouvez fermer cette fenêtre.';
+ }
+ function tick(){
+  if(model.paused||model.finished)return;
+  const now=Date.now(),delta=Math.max(0,(now-lastTick)/1000);lastTick=now;
+  if(delta>0)model.elapsed+=delta;
+  if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=Math.max(0,delta);
+  else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));
+  if(Math.floor(model.elapsed)!==savingTick){savingTick=Math.floor(model.elapsed);persist();}
+  renderActive();
+  if(model.phase!=='work' || !model.steps[model.index].manual){
+    if(model.remaining<=0){stopTicker();if(model.phase==='prep')startWork();else if(model.phase==='rest'){if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();}
+  }
+ }
+ function beginTicker(seconds){
+  stopTicker();model.remaining=Math.max(0,seconds);deadline=Date.now()+model.remaining*1000;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();
+ }
+ function prepare(){
+  model.phase='prep';voiceGuide('Préparez-vous. '+model.steps[model.index].name+'. Trois, deux, un',model.voice);beginTicker(3);renderList();
+ }
+ function startWork(){
+  const step=model.steps[model.index];model.phase='work';model.manualElapsed=0;
+  if(step.remainingTo60){step.seconds=Math.max(1,Math.round(3600-model.elapsed));step.target='Temps restant : '+timeText(step.seconds)+' pour atteindre 60 min';}
+  voiceGuide('GO. '+step.name+'. '+(step.target||''),model.voice);
+  if(step.manual){stopTicker();model.remaining=0;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();}
+  else beginTicker(step.seconds||45);
+ }
+ function advance(){
+  if(model.index+1<model.steps.length){model.index++;prepare();return;}
+  if((model.loopToTarget&&model.elapsed<model.targetSeconds)||(!model.loopToTarget&&model.round<model.rounds)){
+   model.index=0;model.round++;if(model.roundRest){model.phase='rest';model.afterRest='round';voiceGuide('Tour terminé. Récupération',model.voice);beginTicker(model.roundRest);}else prepare();return;
+  }
+  finish();
+ }
+ function completeStep(){
+  stopTicker();if(model.finished)return;
+  // Round recovery is handled only at round boundaries, never after the final exercise.
+  if(model.index===model.steps.length-1){voiceGuide('Stop',model.voice);advance();return;}
+  if(model.rest){model.phase='rest';model.afterRest='next';voiceGuide('Stop. Récupération. Ensuite : '+model.steps[model.index+1].name,model.voice);beginTicker(model.rest);renderList();}
+  else{voiceGuide('Stop',model.voice);advance();}
+ }
+ function finish(){
+  stopTicker();model.finished=true;model.paused=false;model.phase='done';localStorage.removeItem(GUIDE_DRAFT_KEY);refreshGuideEntrypoints();renderActive();renderList();voiceGuide('Séance terminée',model.voice);
+ }
+ function freeze(){
+  if(ticker){const now=Date.now();model.elapsed+=Math.max(0,Math.max(0,(now-lastTick)/1000));if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=Math.max(0,Math.max(0,(now-lastTick)/1000));else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));stopTicker();}
+  if(!model.finished){model.paused=true;stopVoiceGuide();renderActive();persist();}
+ }
+ function readSettings(){
+  const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=Number(el('guide-rounds').value);
+  if(![rest,roundRest].every(x=>Number.isInteger(x)&&x>=0&&x<=600)||!Number.isInteger(rounds)||rounds<1||rounds>30){alert('Réglages invalides : repos 0–600 secondes et tours 1–30.');return false;}
+  model.rest=rest;model.roundRest=model.source==='ath'?0:roundRest;model.rounds=model.source==='ath'?1:rounds;model.voice=el('guide-voice').checked;
+  if(el('guide-loop'))model.loopToTarget=el('guide-loop').checked;
+  if(editing)toggleEdit();storeConfig();return true;
+ }
+ function toggleEdit(){
+  if(editing){model.steps.forEach((s,i)=>{const name=$(`[data-guide-name="${i}"]`,list),target=$(`[data-guide-target="${i}"]`,list),seconds=$(`[data-guide-seconds="${i}"]`,list);if(name&&name.value.trim())s.name=name.value.trim().slice(0,100);if(target)s.target=target.value.trim().slice(0,90);if(seconds){const n=Number(seconds.value);if(Number.isInteger(n)&&n>=5&&n<=3600)s.seconds=n;}});}
+  editing=!editing;el('guide-edit').textContent=editing?'Terminer':'Modifier';renderList();renderActive();
+ }
+ if(el('guide-edit'))el('guide-edit').onclick=toggleEdit;
+ start.onclick=()=>{
+  if(model.finished)return;
+  if(!model.started){if(!readSettings())return;model.started=true;model.paused=false;prepare();}
+  else if(model.paused){model.paused=false;voiceGuide('Reprise. '+model.steps[model.index].name,model.voice);if(model.phase==='ready')prepare();else beginTicker(model.phase==='work'&&model.steps[model.index].manual?0:model.remaining);}
+  renderActive();
+ };
+ done.onclick=()=>{if(model.paused||model.finished)return;if(model.phase==='rest'){stopTicker();if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();};
+ pause.onclick=()=>freeze();
+ el('guide-abandon').onclick=()=>{
+  if(model.started&&!model.finished&&!confirm('Terminer définitivement ce guidage ? La progression du chronomètre ne pourra plus être reprise.'))return;
+  model.finished=true;localStorage.removeItem(GUIDE_DRAFT_KEY);close();
+ };
+ if(isResume){el('guide-status').textContent='Séance conservée en pause. Appuyez sur Reprendre pour continuer.';}
+ renderList();renderActive();
+}
+
 function lastBackupLabel(){
  const verified=localStorage.getItem(BACKUP_FILE_VERIFIED_KEY),legacy=localStorage.getItem(BACKUP_DATE_KEY);
  return verified?new Date(verified).toLocaleDateString("fr-FR")+" (fichier relu)":legacy?new Date(legacy).toLocaleDateString("fr-FR")+" (ancienne confirmation)":"Aucun fichier vérifié";
