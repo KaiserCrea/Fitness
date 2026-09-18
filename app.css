@@ -1464,3 +1464,15 @@ body.lock-program-home{
 .failure-bodyweight{display:flex;align-items:center;gap:8px;margin:10px 0;color:#d5c5a6;font-size:12px}
 .failure-bodyweight input{width:17px;height:17px;accent-color:#efc76d}
 @media(max-width:355px){.today-waiting-screen .today-complement-picker{margin-left:10px;margin-right:10px}.today-complement-section{padding:8px}.today-complement-options{gap:6px}.today-complement-option{padding:8px 6px;min-height:92px}}
+
+/* V24.18.9: compact complementary selector, accessible drill-down. */
+.today-waiting-screen .today-complement-picker{margin-bottom:55px}
+.today-complement-compact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.today-complement-card{position:relative;min-width:0;min-height:105px;border:1px solid #a18a5c;border-radius:15px;background:linear-gradient(145deg,#24211be8,#121311ee);color:#f1d08c;padding:17px 12px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:10px;cursor:pointer}
+.today-complement-card b{font:600 clamp(17px,4.6vw,22px)/1.2 Georgia,serif}
+.today-complement-card span{color:#cfc4ae;font-size:11px}.today-complement-card .icon{position:absolute;right:8px;top:calc(50% - 10px);width:18px;height:18px;color:#d8b36e}
+.today-complement-card:focus-visible{outline:2px solid #ffdb89;outline-offset:2px}
+.today-complement-modal-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:18px 0 15px}
+.today-complement-modal-options .today-complement-option{min-height:86px}
+.duration-bar-space>i.duration-zero{min-height:4px;opacity:.7;border-radius:4px 4px 0 0;box-shadow:none}
+@media(max-width:355px){.today-complement-card{padding:12px 7px;min-height:99px}.today-complement-card b{font-size:16px}.today-complement-modal-options{gap:6px}}

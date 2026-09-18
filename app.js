@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 39;
+const APP_REV = 40;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -159,6 +159,26 @@ function ensureWeek(){
   let idx=Math.max(0,cycles.indexOf(state.cycle));
   state.cycle=cycles[(idx+steps)%3];
   state.weekKey=wk; state.completedG=[]; state.nextG=1; state.today=null;state.complementAccessWeek=null;
+  save();
+}
+function reconcileRecordedCycle(){
+  if(!state.installed || state.weekKey!==currentWeekKey())return;
+  const confirmed=new Set((state.history||[])
+    .filter(h=>h.date>=state.weekKey&&h.date<localISODate(new Date(new Date(state.weekKey+'T12:00:00').getTime()+7*86400000)))
+    .map(h=>String(h.session||''))
+    .filter(code=>new RegExp('^G[123]'+state.cycle+'$').test(code))
+    .map(code=>Number(code[1])));
+  if(!confirmed.size)return;
+  const merged=[...new Set([...(state.completedG||[]),...confirmed])].filter(n=>[1,2,3].includes(n)).sort((a,b)=>a-b);
+  const next=Math.max(Number(state.nextG)||1,Math.min(3,Math.max(...confirmed)+1));
+  const completedChanged=merged.join(',')!==state.completedG.join(',');
+  const nextChanged=next!==state.nextG;
+  const accessChanged=confirmed.has(3)&&state.complementAccessWeek!==state.weekKey;
+  const staleDismissal=state.todayDismissed?.session&&confirmed.has(Number(state.todayDismissed.session[1]))&&state.todayDismissed.session.endsWith(state.cycle);
+  if(!completedChanged&&!nextChanged&&!accessChanged&&!staleDismissal)return;
+  state.completedG=merged;state.nextG=next;
+  if(confirmed.has(3))state.complementAccessWeek=state.weekKey;
+  if(staleDismissal)state.todayDismissed=null;
   save();
 }
 function pathUrl(p){return p?"./"+p.split("/").map(encodeURIComponent).join("/"):"";}
@@ -406,6 +426,7 @@ function bindGlobalInView(){
 }
 function render(){
   ensureWeek();
+  reconcileRecordedCycle();
   if(!state.installed){renderInstall();return;}
   if(view.type==="programDetail"){renderProgramDetail(view.session);return;}
   if(view.type==="progressDetail"){renderProgressDetail(view.id,view.sub||"evolution");return;}
@@ -443,14 +464,23 @@ function complementaryLastDate(session){
   const latest=records.map(h=>h.date).sort().at(-1);
   return latest?'Dernière réalisation : '+formatDate(latest):(state.lastComplement?.[session]?'Dernière réalisation : '+state.lastComplement[session]:'Jamais réalisée');
 }
+const COMPLEMENT_CATEGORIES={ath:{name:'Athlétique',sessions:['ATHLÉTIQUE A','ATHLÉTIQUE B']},fm:{name:'Full Mix',sessions:['FULL MIX 1','FULL MIX 2','FULL MIX 3','FULL MIX 4']}};
 function complementarySelector(){
-  const categories=[['Athlétique',['ATHLÉTIQUE A','ATHLÉTIQUE B']],['Full Mix',['FULL MIX 1','FULL MIX 2','FULL MIX 3','FULL MIX 4']]];
-  return `<section class="today-complement-picker"><h2 class="section-title">Séances complémentaires</h2>
-    ${categories.map(([label,sessions])=>`<div class="today-complement-section"><h3>${esc(label)}</h3><div class="today-complement-options">${sessions.map(session=>`<button type="button" class="today-complement-option" data-start-session="${esc(session)}"><b>${esc(niceSession(session))}</b><span>${esc(complementaryLastDate(session))}</span>${icon('chevron')}</button>`).join('')}</div></div>`).join('')}
-  </section>`;
+  return `<section class="today-complement-picker"><h2 class="section-title">Séances complémentaires</h2><div class="today-complement-compact">
+    ${Object.entries(COMPLEMENT_CATEGORIES).map(([key,group])=>`<button type="button" class="today-complement-card" data-complement-category="${key}"><b>${esc(group.name)}</b><span>${group.sessions.length} séances · Choisir</span>${icon('chevron')}</button>`).join('')}
+  </div></section>`;
 }
 function bindComplementarySelector(){
-  $$('[data-start-session]').forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);tabScroll.today=0;render();window.scrollTo(0,0);});
+  $$('[data-complement-category]').forEach(button=>button.onclick=()=>{
+    const group=COMPLEMENT_CATEGORIES[button.dataset.complementCategory];if(!group)return;
+    openModal(`<h3>Choisir une séance ${esc(group.name)}</h3><div class="today-complement-modal-options">${group.sessions.map(session=>`<button type="button" class="today-complement-option" data-start-session="${esc(session)}"><b>${esc(niceSession(session))}</b><span>${esc(complementaryLastDate(session))}</span>${icon('chevron')}</button>`).join('')}</div><div class="modal-actions"><button type="button" class="btn ghost" data-close-modal>Retour</button></div>`,modal=>{
+      $$('[data-start-session]',modal).forEach(choice=>choice.onclick=()=>{
+        // Avoid discarding an unrelated workout draft; modal is available only on the waiting screen.
+        if(state.today)return;
+        initToday(choice.dataset.startSession);tabScroll.today=0;closeOverlay(true);render();window.scrollTo(0,0);
+      });
+    });
+  });
 }
 function renderToday(){
   const rawDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -459,12 +489,11 @@ function renderToday(){
   if(!cur){
     const expected=sessionCode();
     const cancelled=state.todayDismissed?.date===localISODate()&&state.todayDismissed?.session===expected;
-    const unlocked=state.completedG.includes(3)||(state.complementAccessWeek===state.weekKey&&/^G3[ABC]$/.test(expected));
+    const unlocked=state.completedG.includes(3);
     if(unlocked){
       shell(`${waitingTodayHeader(date)}
-        ${!state.completedG.includes(3)?`<div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">${cancelled?'Séance annulée':'Cycle G3 en attente'}</div><div class="small muted">${esc(niceSession(expected))} reste la prochaine séance prévue. Le cycle n’a pas avancé.</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`:`<div class="card comp-choice"><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez librement votre séance complémentaire.</div></div>`}
+        <div class="card comp-choice"><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez librement votre séance complémentaire.</div></div>
         ${complementarySelector()}`,'today-waiting-screen');
-      if($('#resume-session'))$('#resume-session').onclick=()=>{initToday(expected);render();};
       bindComplementarySelector();return;
     }
     shell(`${waitingTodayHeader(date,expected)}
@@ -530,8 +559,9 @@ function sessionHasDraftData(cur){
 function cancelCurrentSession(){
   const cur=state.today;if(!cur)return;
   const finish=()=>{
-    if(/^G3[ABC]$/.test(cur.session))state.complementAccessWeek=state.weekKey;
-    state.todayDismissed=cur.ephemeral?null:{date:localISODate(),session:cur.session};
+    // Cancelling a draft never unlocks complements or invalidates a recorded G session.
+    const recorded=(state.history||[]).some(h=>h.session===cur.session&&h.date>=state.weekKey&&weekKeyFromDate(h.date)===state.weekKey);
+    state.todayDismissed=cur.ephemeral||recorded?null:{date:localISODate(),session:cur.session};
     state.today=null;
     save();
     rememberTabScroll();
@@ -995,13 +1025,23 @@ function progressOverviewData(){
   const distribution=Object.entries(groups).map(([name,value])=>({name,value,pct:Math.round(value/total*100)}));
   return{sessions,exercises,minutes,global,weeks,distribution};
 }
+function isoWeekInfo(value){
+ const d=new Date(typeof value==='string'?value+'T12:00:00':value);
+ const utc=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+ utc.setUTCDate(utc.getUTCDate()+4-(utc.getUTCDay()||7));
+ const year=utc.getUTCFullYear();
+ const first=new Date(Date.UTC(year,0,1));
+ const week=Math.ceil((((utc-first)/86400000)+1)/7);
+ return {year,week};
+}
+function isoWeekCount(year){return isoWeekInfo(new Date(year,11,28)).week;}
 function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
   const range=selectedRange(period,anchor),entries=(state.history||[]).filter(h=>typeof h.date==='string');
   const durationOf=rows=>({value:rows.reduce((total,h)=>total+(Number(h.duration)>0?Number(h.duration):0),0),missing:rows.filter(h=>!(Number(h.duration)>0)).length});
   if(period==='week'){
     const end=new Date(range.start+'T12:00:00');
     return Array.from({length:6},(_,i)=>{const d=new Date(end);d.setDate(d.getDate()-(5-i)*7);const begin=localISODate(d);d.setDate(d.getDate()+7);const finish=localISODate(d);
-      return {label:i===5?'Actuelle':'S-'+(5-i),...durationOf(entries.filter(h=>h.date>=begin&&h.date<finish))};});
+      return {label:'S'+isoWeekInfo(begin).week,...durationOf(entries.filter(h=>h.date>=begin&&h.date<finish))};});
   }
   if(period==='month'){
     const byWeek=new Map();const cursor=new Date(range.start+'T12:00:00');
@@ -1014,7 +1054,7 @@ function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
 function overviewDurationBars(series){
   const max=Math.max(60,...series.map(x=>x.value)),ceil=Math.ceil(max/60)*60;
   const show=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'):m+' min';};
-  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');return `<div class="duration-bar-col" title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i style="height:${pct}%"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
+  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');return `<div class="duration-bar-col" title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
 }
 function overviewDonut(distribution,total){
   const palette=["#f2cf72","#d7ad50","#f0d596","#9e8655","#c9973d","#b9934b"];
@@ -1073,7 +1113,7 @@ function renderProgressOverview(){
       <div class="overview-metric"><span class="overview-metric-icon">${icon("clock")}</span><b>${hours}h ${String(mins).padStart(2,"0")}</b><span>Temps total</span></div>
       <div class="overview-metric"><span class="overview-metric-icon">${icon("trend")}</span><b>${d.global>0?"+":""}${d.global}%</b><span>Progression<br>globale</span></div>
     </div>
-    <div class="overview-section-head duration-heading"><h2>Évolution du temps d’entraînement</h2><span>${overviewPeriod==="week"?"6 dernières semaines":overviewPeriod==="month"?"Par semaine · mois sélectionné":"Par mois · année sélectionnée"}</span></div>
+    <div class="overview-section-head duration-heading"><h2>Évolution du temps d’entraînement</h2><span>${overviewPeriod==="week"?(()=>{const w=isoWeekInfo(periodAnchor);return 'Semaine '+w.week+' / '+isoWeekCount(w.year);})():overviewPeriod==="month"?"Par semaine · mois sélectionné":"Par mois · année sélectionnée"}</span></div>
     <div class="overview-panel duration-panel">${overviewDurationBars(trainingDurationSeries())}</div>
     <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
     <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
@@ -1615,7 +1655,7 @@ function guideScreen(title,providedSteps,options={}){
  // Preserve paused ATH B sessions created before continuous-interval metadata existed.
  if(isResume&&model.source==='ath'&&model.steps.length===providedSteps.length){model.steps=model.steps.map((step,i)=>({...providedSteps[i],...step,intervalBlock:providedSteps[i].intervalBlock,recovery:providedSteps[i].recovery}));}
  if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
- let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1,prepToken=0,countdownTimerDone=false,countdownVoiceDone=false;
+ let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1,prepToken=0,prepStarted=false,prepLength=3,previousCountdown=0,announcedCues=new Set();
  const ov=document.createElement('div');ov.className='v2418-guide';
  ov.innerHTML=`<div class="v2418-guide-card" role="dialog" aria-modal="true" aria-label="${esc(title)}">
    <div class="guide-heading"><div><div class="guide-eyebrow">SÉANCE GUIDÉE</div><h2>${esc(title)}</h2></div><button class="btn guide-close" id="guide-close">Fermer</button></div>
@@ -1689,9 +1729,27 @@ function guideScreen(title,providedSteps,options={}){
    if(['work','rest'].includes(model.phase))model.elapsed+=delta;
    if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=delta;
    else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));
-   if(model.phase==='work'&&model.steps[model.index].recovery&&model.remaining<=4&&model.remaining>0&&!model.countdownSpoken&&isContinuousTransition()){
-     model.countdownSpoken=true;
-     voiceGuide('Trois, deux, un',model.voice,undefined,{interrupt:false});
+   const previousRemaining=previousCountdown;
+   previousCountdown=model.remaining;
+   if(model.voice&&model.remaining>0&&model.remaining!==previousRemaining){
+     const step=model.steps[model.index];
+     const isWorkCue=model.phase==='work'&&!step.manual&&(model.source==='circuit'||(model.source==='ath'&&step.intervalBlock));
+     if(model.phase==='prep'){
+       const remaining=model.remaining;
+       if(remaining<prepLength&&remaining<=previousRemaining&&remaining>=1&&!announcedCues.has('prep'+remaining)){
+         announcedCues.add('prep'+remaining);
+         voiceGuide(({5:'Cinq',4:'Quatre',3:'Trois',2:'Deux',1:'Un'})[remaining],true,undefined,{interrupt:false});
+       }
+     }else if(isWorkCue){
+       const remaining=model.remaining;
+       const transitionToEffort=step.recovery&&isContinuousTransition();
+       const cue=transitionToEffort?(remaining<=3?remaining:0):step.recovery?0:(remaining<=5?remaining:remaining<=10?10:remaining<=20?20:0);
+       if(cue&&!announcedCues.has('work'+cue)){
+         announcedCues.add('work'+cue);
+         const text=cue>5?cue+' secondes':({5:'Cinq',4:'Quatre',3:'Trois',2:'Deux',1:'Un'})[cue];
+         voiceGuide(text,true,undefined,{interrupt:false});
+       }
+     }
    }
    if(Math.floor(model.elapsed)!==savingTick){savingTick=Math.floor(model.elapsed);persist();}
    renderActive();
@@ -1699,8 +1757,7 @@ function guideScreen(title,providedSteps,options={}){
    if(model.remaining>0)return;
    stopTicker();
    if(model.phase==='prep'){
-     countdownTimerDone=true;
-     if(countdownVoiceDone&&!model.paused)startWork({fromPrep:true});
+     startWork({fromPrep:true});
    }else if(model.phase==='rest'){
      if(model.loopToTarget&&model.elapsed>=model.targetSeconds)finish();
      else if(model.afterRest==='round'){model.afterRest='';prepare();}
@@ -1709,28 +1766,23 @@ function guideScreen(title,providedSteps,options={}){
  }
  function beginTicker(seconds){
    stopTicker();model.remaining=Math.max(0,seconds);deadline=Date.now()+model.remaining*1000;
-   lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();
+   lastTick=Date.now();previousCountdown=model.remaining;model.paused=false;ticker=setInterval(tick,200);persist();renderActive();
  }
  function countdown(token){
    if(token!==prepToken||model.paused||model.finished)return;
-   model.phase='prep';model.remaining=3;countdownTimerDone=false;countdownVoiceDone=!model.voice;
-   let started=false,finished=false;
+   const seconds=model.source==='circuit'?5:3;
+   model.phase='prep';model.remaining=seconds;
+   prepLength=seconds;prepStarted=false;announcedCues=new Set();
+   let fallback=null;
    const beginVisual=()=>{
-     if(started||token!==prepToken||model.paused||model.finished)return;
-     started=true;beginTicker(3);
+     if(prepStarted||token!==prepToken||model.paused||model.finished)return;
+     prepStarted=true;clearTimeout(fallback);beginTicker(seconds);
    };
-   const fallbackStart=setTimeout(beginVisual,1800);
-   const fallbackDone=setTimeout(()=>{
-     if(token!==prepToken||model.paused||model.finished||finished)return;
-     finished=true;countdownVoiceDone=true;
-     if(countdownTimerDone)startWork({fromPrep:true});
-   },7500);
-   const voiced=voiceGuide('Trois, deux, un',model.voice,()=>{
-     if(token!==prepToken||model.paused||model.finished||finished)return;
-     finished=true;clearTimeout(fallbackDone);countdownVoiceDone=true;
-     if(countdownTimerDone)startWork({fromPrep:true});
-   },{onStart:()=>{clearTimeout(fallbackStart);beginVisual();}});
-   if(!voiced){clearTimeout(fallbackStart);beginVisual();}
+   if(model.voice){
+     // The first number starts the countdown; subsequent numbers follow the true clock.
+     fallback=setTimeout(beginVisual,2500);
+     if(!voiceGuide(seconds===5?'Cinq':'Trois',true,undefined,{onStart:beginVisual}))beginVisual();
+   }else beginVisual();
    renderActive();
  }
  function prepare(){
@@ -1751,7 +1803,7 @@ function guideScreen(title,providedSteps,options={}){
    if(step.remainingTo60){step.seconds=Math.max(1,Math.round(3600-model.elapsed));step.target='Temps restant : '+timeText(step.seconds)+' pour atteindre 60 min';}
    const beginClock=()=>{
      if(model.finished||model.paused)return;
-     model.phase='work';model.manualElapsed=0;model.countdownSpoken=false;
+     model.phase='work';model.manualElapsed=0;model.countdownSpoken=false;announcedCues=new Set();
      if(step.manual){stopTicker();model.remaining=0;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();}
      else beginTicker(step.seconds||45);
      renderList();
@@ -1792,7 +1844,7 @@ function guideScreen(title,providedSteps,options={}){
   // Round recovery is handled only at round boundaries, never after the final exercise.
   if(model.index===model.steps.length-1){voiceGuide('Stop',model.voice);advance();return;}
   if(model.rest){model.phase='rest';model.afterRest='next';voiceGuide('Stop. Récupération. Ensuite : '+model.steps[model.index+1].name,model.voice);beginTicker(model.rest);renderList();}
-  else{voiceGuide('Stop',model.voice);advance();}
+  else{advance();}
  }
  function finish(){
   stopTicker();model.finished=true;model.paused=false;model.phase='done';localStorage.removeItem(GUIDE_DRAFT_KEY);refreshGuideEntrypoints();renderActive();renderList();voiceGuide('Séance terminée',model.voice);
