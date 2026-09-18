@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 38;
+const APP_REV = 39;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -94,7 +94,7 @@ function weeksBetween(a,b){
 }
 function defaultState(){
   return {
-    installed:false,cycle:"A",nextG:1,weekKey:currentWeekKey(),completedG:[],
+    installed:false,cycle:"A",nextG:1,weekKey:currentWeekKey(),completedG:[],complementAccessWeek:null,
     history:[],oldWeeks:[],refs:{},params:{},progressionSettings:{},
     sessionOrder:{},programOverrides:{},customExercises:{},archivedExercises:[],ephemeralSessions:[],
     today:null,todayDismissed:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},measurements:[],bodySettings:{heightCm:""},appRev:APP_REV
@@ -158,7 +158,7 @@ function ensureWeek(){
   const steps=weeksBetween(state.weekKey||wk,wk) || 1;
   let idx=Math.max(0,cycles.indexOf(state.cycle));
   state.cycle=cycles[(idx+steps)%3];
-  state.weekKey=wk; state.completedG=[]; state.nextG=1; state.today=null;
+  state.weekKey=wk; state.completedG=[]; state.nextG=1; state.today=null;state.complementAccessWeek=null;
   save();
 }
 function pathUrl(p){return p?"./"+p.split("/").map(encodeURIComponent).join("/"):"";}
@@ -438,35 +438,41 @@ function waitingTodayHeader(date,session=""){
     ${session?`<div class="session-code">${esc(niceSession(session))}</div><div class="session-groups">${esc(groupLabel(session))}</div>`:""}</div>
     <button class="cycle-chip waiting-cycle-chip" data-cycle-menu aria-label="Réglages du cycle G, semaine ${state.cycle}"><b>Cycle G</b><span>Semaine ${state.cycle}</span></button>`;
 }
+function complementaryLastDate(session){
+  const records=(state.history||[]).filter(h=>h.session===session&&/^\d{4}-\d{2}-\d{2}$/.test(String(h.date||'')));
+  const latest=records.map(h=>h.date).sort().at(-1);
+  return latest?'Dernière réalisation : '+formatDate(latest):(state.lastComplement?.[session]?'Dernière réalisation : '+state.lastComplement[session]:'Jamais réalisée');
+}
+function complementarySelector(){
+  const categories=[['Athlétique',['ATHLÉTIQUE A','ATHLÉTIQUE B']],['Full Mix',['FULL MIX 1','FULL MIX 2','FULL MIX 3','FULL MIX 4']]];
+  return `<section class="today-complement-picker"><h2 class="section-title">Séances complémentaires</h2>
+    ${categories.map(([label,sessions])=>`<div class="today-complement-section"><h3>${esc(label)}</h3><div class="today-complement-options">${sessions.map(session=>`<button type="button" class="today-complement-option" data-start-session="${esc(session)}"><b>${esc(niceSession(session))}</b><span>${esc(complementaryLastDate(session))}</span>${icon('chevron')}</button>`).join('')}</div></div>`).join('')}
+  </section>`;
+}
+function bindComplementarySelector(){
+  $$('[data-start-session]').forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);tabScroll.today=0;render();window.scrollTo(0,0);});
+}
 function renderToday(){
-  const rawDate=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const rawDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const date=rawDate.charAt(0).toUpperCase()+rawDate.slice(1);
   const cur=state.today;
   if(!cur){
-    if(state.completedG.includes(3)){
-      const ath=`ATHLÉTIQUE ${state.nextAth}`,fm=`FULL MIX ${state.nextFm}`;
-      shell(`${waitingTodayHeader(date)}
-        <div class="card comp-choice"><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez la séance complémentaire à ouvrir.</div></div>
-        <h2 class="section-title">Séances complémentaires</h2>
-        <div class="complement-grid">${complementChoiceCard(ath,"ATHLÉTIQUE",state.nextAth)}${complementChoiceCard(fm,"FULL MIX",String(state.nextFm))}</div>`,"today-waiting-screen");
-      $$('[data-start-session]').forEach(b=>b.onclick=()=>{initToday(b.dataset.startSession);render();});
-      return;
-    }
     const expected=sessionCode();
     const cancelled=state.todayDismissed?.date===localISODate()&&state.todayDismissed?.session===expected;
+    const unlocked=state.completedG.includes(3)||(state.complementAccessWeek===state.weekKey&&/^G3[ABC]$/.test(expected));
+    if(unlocked){
+      shell(`${waitingTodayHeader(date)}
+        ${!state.completedG.includes(3)?`<div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">${cancelled?'Séance annulée':'Cycle G3 en attente'}</div><div class="small muted">${esc(niceSession(expected))} reste la prochaine séance prévue. Le cycle n’a pas avancé.</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`:`<div class="card comp-choice"><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez librement votre séance complémentaire.</div></div>`}
+        ${complementarySelector()}`,'today-waiting-screen');
+      if($('#resume-session'))$('#resume-session').onclick=()=>{initToday(expected);render();};
+      bindComplementarySelector();return;
+    }
     shell(`${waitingTodayHeader(date,expected)}
-      <div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">${cancelled?"Séance annulée":"Prêt à s’entraîner"}</div><div class="small muted">${cancelled?`${esc(niceSession(expected))} reste la prochaine séance prévue. Le cycle n’a pas avancé.`:"Ouvrez votre prochaine séance pour commencer."}</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`,"today-waiting-screen");
-    $("#resume-session").onclick=()=>{initToday(expected);render();};
+      <div class="card cancelled-session-card"><div><div class="section-title" style="margin:0">${cancelled?'Séance annulée':'Prêt à s’entraîner'}</div><div class="small muted">${cancelled?`${esc(niceSession(expected))} reste la prochaine séance prévue. Le cycle n’a pas avancé.`:'Ouvrez votre prochaine séance pour commencer.'}</div></div><button class="btn gold" id="resume-session">Ouvrir ${esc(niceSession(expected))}</button></div>`,'today-waiting-screen');
+    $('#resume-session').onclick=()=>{initToday(expected);render();};
     return;
   }
   renderActiveToday(cur,date);
-}
-function complementChoiceCard(session,title,variant){
-  const last=state.lastComplement[session]||"—";
-  return `<button class="program-card comp-card" data-start-session="${esc(session)}">
-    <span class="code">${esc(title)}</span><span class="groups">${esc(groupLabel(session))}<br><span class="muted">Dernière réalisation : ${esc(last)}</span></span>
-    <span class="variant-row"><span class="variant-chip on">${esc(variant)}</span></span>
-  </button>`;
 }
 function initToday(session){
   const snapshot={}; sessionIds(session).forEach((id,i)=>snapshot[occKey(id,i+1)]=referenceFor(id));
@@ -524,6 +530,7 @@ function sessionHasDraftData(cur){
 function cancelCurrentSession(){
   const cur=state.today;if(!cur)return;
   const finish=()=>{
+    if(/^G3[ABC]$/.test(cur.session))state.complementAccessWeek=state.weekKey;
     state.todayDismissed=cur.ephemeral?null:{date:localISODate(),session:cur.session};
     state.today=null;
     save();
@@ -539,16 +546,17 @@ function cancelCurrentSession(){
 function setExerciseStatus(id,status,no){
   const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};cur.reps=cur.reps||{};cur.nextReps=cur.nextReps||{};cur.setReps=cur.setReps||{};
   const key=occKey(id,no),current=occurrenceValue(cur,id,no);
-  if(!cur.values[key])cur.values[key]=current;
   if(cur.status[key]===status){delete cur.status[key];delete cur.nextRefs[key];if(cur.setReps)delete cur.setReps[key];save();render();return;}
+  // The failed-exercise form must not modify the workout until the user saves it.
+  if(status==='Échoué'){openSetResultsModal(id,no,current,null,{markFailed:true});return;}
+  if(!cur.values[key])cur.values[key]=current;
   cur.status[key]=status;
   // Remove the legacy canonical status only when this active session has already started using occurrence keys.
   if(Object.prototype.hasOwnProperty.call(cur.status,id))delete cur.status[id];
   if(status==="Réussi"){
     openNextRefModal(id,current,(next,doneReps,nextReps)=>{cur.nextRefs[key]=next;if(Number.isFinite(doneReps))cur.reps[key]=doneReps;if(Number.isFinite(nextReps))cur.nextReps[key]=nextReps;save();render();openSetResultsModal(id,no,current);});
   }else{
-    if(status==="Échoué"){cur.nextRefs[key]=current;openSetResultsModal(id,no,current);return;}
-    else delete cur.nextRefs[key];
+    delete cur.nextRefs[key];
     save();render();
   }
 }
@@ -572,9 +580,51 @@ function targetSuggestion(id,sets,weight){
  const next=Math.min(bounds.max,Math.max(goal,Math.min(...sets))+1);
  return {weight,reps:next,description:`Toutes les séries ont atteint ${goal}. Proposer ${next} répétitions à charge identique.`};
 }
-function openSetResultsModal(id,no,current,onDone){
+function exerciseWithoutRequiredLoad(id){
+  if(paramType(id)!=='strength')return true;
+  const n=exerciseNameKey(exercise(id).name);
+  return /(?:dips sur banc|tractions|pompes|gainage|circuit abdos|abdominaux|releve de genoux|releve de jambes|crunch abdominal(?! a la machine)|flexions laterales du buste)/.test(n);
+}
+function isNumericWeight(value){
+  const text=String(value||'').trim().replace(/\s/g,'').replace(/,/g,'.');
+  return /^(?:\d+(?:\.\d+)?(?:kg)?|\d+(?:\.\d+)?[x×]\d+(?:\.\d+)?(?:kg)?)$/i.test(text);
+}
+function latestExerciseWeight(id){
+  const equip=state.progressionSettings?.[id]?.equipment||'';
+  const history=[...(state.history||[])].reverse();
+  for(const h of history)for(const e of [...(h.exercises||[])].reverse()){
+    if(canonicalId(e.id)===canonicalId(id)&&String(e.equipment||'')===equip&&isNumericWeight(e.actual))return e.actual;
+  }
+  return '';
+}
+function openSetResultsModal(id,no,current,onDone,options={}){
  const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id);
- openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(current))}</p>${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{$('#save-set-results').onclick=()=>{const values=$$('[data-set-reps]').map(x=>Number(x.value));if(values.some((v,i)=>!Number.isInteger(v)||v<0||v>200||!$$('[data-set-reps]')[i].value.trim())){alert('Saisissez chaque série (0 à 200).');return;}cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);const suggestion=targetSuggestion(id,values,current);cur.nextRefs=cur.nextRefs||{};cur.nextRefs[key]=current;cur.nextReps=cur.nextReps||{};if(suggestion)cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();if(suggestion)openModal(`<h3>Progression proposée</h3><p>${esc(suggestion.description)}</p><p>Prochaine cible : <b>${esc(suggestion.weight)} · ${suggestion.reps} répétitions</b></p><div class="modal-actions"><button class="btn ghost" id="suggest-ignore">Conserver ma référence</button><button class="btn gold" id="suggest-accept">Accepter la proposition</button></div>`,()=>{$("#suggest-ignore").onclick=()=>{closeOverlay(true);render();};$("#suggest-accept").onclick=()=>{cur.nextRefs[key]=suggestion.weight;cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();};});if(onDone)onDone(values);};});
+ const loadApplicable=!exerciseWithoutRequiredLoad(id),last=loadApplicable?(isNumericWeight(current)?current:latestExerciseWeight(id)):'';
+ const noLoadYet=options.markFailed&&loadApplicable&&!last;
+ const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label><input id="failed-weight" inputmode="decimal" autocomplete="off" placeholder="Ex. : 40 ou 2 × 20" required><label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<details class="failure-change-load"><summary>Modifier la charge utilisée (actuellement ${esc(refWithUnit(last))})</summary><div class="field"><label for="failed-weight">Charge utilisée (kg)</label><input id="failed-weight" inputmode="decimal" value="${esc(last)}" placeholder="Ex. : 40"></div></details>`):'';
+ openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(last||current))}</p>${loadMarkup}${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{
+   const noLoad=$('#failed-no-load'),weightInput=$('#failed-weight');
+   if(noLoad&&weightInput)noLoad.onchange=()=>{weightInput.disabled=noLoad.checked;weightInput.required=!noLoad.checked;};
+   $('#save-set-results').onclick=()=>{
+     const inputs=$$('[data-set-reps]'),values=inputs.map(x=>Number(x.value));
+     if(values.some((v,i)=>!Number.isInteger(v)||v<0||v>200||!inputs[i].value.trim())){alert('Saisissez chaque série (0 à 200).');return;}
+     let actualWeight=last||current;
+     if(options.markFailed&&loadApplicable){
+       if(noLoad?.checked)actualWeight='Poids du corps';
+       else if(weightInput){const entered=weightInput.value.trim();if(!isNumericWeight(entered)){alert('Indiquez la charge utilisée (ex. 40 ou 2 × 20), ou cochez « sans charge ».');weightInput.focus();return;}actualWeight=normalizeWeight(entered);}
+     }
+     if(options.markFailed){
+       cur.status=cur.status||{};cur.status[key]='Échoué';delete cur.status[id];
+       cur.values=cur.values||{};cur.values[key]=actualWeight;
+     }
+     cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);
+     const suggestion=targetSuggestion(id,values,actualWeight);cur.nextRefs=cur.nextRefs||{};cur.nextRefs[key]=actualWeight;
+     cur.nextReps=cur.nextReps||{};if(suggestion)cur.nextReps[key]=suggestion.reps;
+     save();closeOverlay(true);render();
+     if(suggestion)openModal(`<h3>Progression proposée</h3><p>${esc(suggestion.description)}</p><p>Prochaine cible : <b>${esc(refWithUnit(suggestion.weight))} · ${suggestion.reps} répétitions</b></p><div class="modal-actions"><button class="btn ghost" id="suggest-ignore">Conserver ma référence</button><button class="btn gold" id="suggest-accept">Accepter la proposition</button></div>`,()=>{$('#suggest-ignore').onclick=()=>{closeOverlay(true);render();};$('#suggest-accept').onclick=()=>{cur.nextRefs[key]=suggestion.weight;cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();};});
+     if(onDone)onDone(values);
+   };
+ });
 }
 function openNextRefModal(id,current,done){
   const p=defaultParams(id),target=repetitionTargetFor(id),bounds=repetitionBounds(id); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
@@ -1474,9 +1524,16 @@ function refreshGuideEntrypoints(){
  if($('#program-ath-guide')&&view.session)$('#program-ath-guide').textContent=guideEntryLabel('ath:'+view.session);
  if($('#ath-guide')&&state.today)$('#ath-guide').textContent=guideEntryLabel('ath:'+state.today.session);
 }
-function voiceGuide(text,enabled){
- if(!enabled||!('speechSynthesis' in window))return;
- try{speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang='fr-FR';utterance.rate=.93;speechSynthesis.speak(utterance);}catch(e){console.warn('Coach vocal indisponible',e);}
+function voiceGuide(text,enabled,onDone,options={}){
+ if(!enabled||!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){onDone?.();return false;}
+ try{
+   if(options.interrupt!==false)speechSynthesis.cancel();
+   const utterance=new SpeechSynthesisUtterance(text);utterance.lang='fr-FR';utterance.rate=.93;
+   let resolved=false;const finish=()=>{if(!resolved){resolved=true;onDone?.();}};
+   utterance.onend=finish;utterance.onerror=finish;
+   if(options.onStart)utterance.onstart=options.onStart;
+   speechSynthesis.speak(utterance);return true;
+ }catch(e){console.warn('Coach vocal indisponible',e);onDone?.();return false;}
 }
 function stopVoiceGuide(){try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch{}}
 const CIRCUIT_FULL=[
@@ -1530,8 +1587,8 @@ function openAthGuide(session){
      let elapsed=0,n=1;
      while(elapsed<duration){
        const work=Math.min(+match[1],duration-elapsed);
-       steps.push({name:item.name+' · effort '+n,target:work+' secondes',seconds:work,ficheNo:itemIndex+1});elapsed+=work;
-       if(elapsed<duration){const rec=Math.min(+match[2],duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1});elapsed+=rec;}
+       steps.push({name:item.name+' · effort '+n,target:work+' secondes',seconds:work,ficheNo:itemIndex+1,intervalBlock:itemIndex+1,recovery:false});elapsed+=work;
+       if(elapsed<duration){const rec=Math.min(+match[2],duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1,intervalBlock:itemIndex+1});elapsed+=rec;}
        n++;
      }
    }else if(/temps restant/i.test(item.duration)){
@@ -1555,8 +1612,10 @@ function guideScreen(title,providedSteps,options={}){
  model.title=title;
  // Existing paused circuits/configurations may have saved loopToTarget=false in V24.18.5.
  if(model.source==='circuit'){model.loopToTarget=true;model.targetSeconds=480;model.rounds=1;}
+ // Preserve paused ATH B sessions created before continuous-interval metadata existed.
+ if(isResume&&model.source==='ath'&&model.steps.length===providedSteps.length){model.steps=model.steps.map((step,i)=>({...providedSteps[i],...step,intervalBlock:providedSteps[i].intervalBlock,recovery:providedSteps[i].recovery}));}
  if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
- let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1;
+ let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1,prepToken=0,countdownTimerDone=false,countdownVoiceDone=false;
  const ov=document.createElement('div');ov.className='v2418-guide';
  ov.innerHTML=`<div class="v2418-guide-card" role="dialog" aria-modal="true" aria-label="${esc(title)}">
    <div class="guide-heading"><div><div class="guide-eyebrow">SÉANCE GUIDÉE</div><h2>${esc(title)}</h2></div><button class="btn guide-close" id="guide-close">Fermer</button></div>
@@ -1608,7 +1667,7 @@ function guideScreen(title,providedSteps,options={}){
   el('guide-step-target').textContent=step.target|| (step.manual?'Validez à la fin des répétitions':'');
   const preview=el('guide-step-visual');if(step.preview){const src=pathUrl(step.preview);if(preview.dataset.current!==src){preview.src=src;preview.dataset.current=src;}preview.hidden=false;}else{preview.removeAttribute('src');preview.dataset.current='';preview.hidden=true;}
   const next=nextStep();el('guide-next').textContent=next?'À suivre : '+next.name+(next.target?' · '+next.target:''):'Dernier mouvement du circuit';
-  el('guide-phase').textContent=model.finished?'SÉANCE TERMINÉE':model.paused?'EN PAUSE':model.phase==='prep'?'PRÉPAREZ-VOUS':model.phase==='rest'?'RÉCUPÉRATION':model.phase==='work'?(step.manual?'RÉPÉTITIONS · VALIDATION MANUELLE':'TRAVAIL'):'PRÊT';
+  el('guide-phase').textContent=model.finished?'SÉANCE TERMINÉE':model.paused?'EN PAUSE':model.phase==='intro'?'PRÉSENTATION':model.phase==='prep'?'COMPTE À REBOURS':model.phase==='go'?'DÉPART':model.phase==='rest'?'RÉCUPÉRATION':model.phase==='work'?(step.manual?'RÉPÉTITIONS · VALIDATION MANUELLE':'TRAVAIL'):'PRÊT';
   el('guide-clock').textContent=timeText(model.phase==='work'&&step.manual?model.manualElapsed:model.remaining);
   el('guide-elapsed-value').textContent=timeText(model.elapsed);
   el('guide-elapsed-goal').textContent=model.targetSeconds?'Objectif : '+timeText(model.targetSeconds):'';
@@ -1619,30 +1678,99 @@ function guideScreen(title,providedSteps,options={}){
   if(el('guide-edit'))el('guide-edit').disabled=model.started;
   el('guide-status').textContent=model.finished?'Séance terminée. Vous pouvez fermer cette fenêtre.':model.loopToTarget&&model.elapsed>=model.targetSeconds?'Objectif atteint : terminez le mouvement en cours pour clôturer la séance.':'';
  }
+ function isContinuousTransition(){
+   const current=model.steps[model.index],next=model.steps[model.index+1];
+   return !!(model.source==='ath'&&current?.intervalBlock&&next?.intervalBlock===current.intervalBlock&&current.recovery!==next.recovery);
+ }
  function tick(){
-  if(model.paused||model.finished)return;
-  const now=Date.now(),delta=Math.max(0,(now-lastTick)/1000);lastTick=now;
-  if(delta>0)model.elapsed+=delta;
-  if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=Math.max(0,delta);
-  else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));
-  if(Math.floor(model.elapsed)!==savingTick){savingTick=Math.floor(model.elapsed);persist();}
-  renderActive();
-  if(model.phase!=='work' || !model.steps[model.index].manual){
-    if(model.remaining<=0){stopTicker();if(model.phase==='prep'){if(model.loopToTarget&&model.elapsed>=model.targetSeconds)finish();else startWork();}else if(model.phase==='rest'){if(model.loopToTarget&&model.elapsed>=model.targetSeconds)finish();else if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();}
-  }
+   if(model.paused||model.finished)return;
+   const now=Date.now(),delta=Math.max(0,(now-lastTick)/1000);lastTick=now;
+   // Presentation and countdown must NOT consume training time.
+   if(['work','rest'].includes(model.phase))model.elapsed+=delta;
+   if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=delta;
+   else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));
+   if(model.phase==='work'&&model.steps[model.index].recovery&&model.remaining<=4&&model.remaining>0&&!model.countdownSpoken&&isContinuousTransition()){
+     model.countdownSpoken=true;
+     voiceGuide('Trois, deux, un',model.voice,undefined,{interrupt:false});
+   }
+   if(Math.floor(model.elapsed)!==savingTick){savingTick=Math.floor(model.elapsed);persist();}
+   renderActive();
+   if(model.phase==='work'&&model.steps[model.index].manual)return;
+   if(model.remaining>0)return;
+   stopTicker();
+   if(model.phase==='prep'){
+     countdownTimerDone=true;
+     if(countdownVoiceDone&&!model.paused)startWork({fromPrep:true});
+   }else if(model.phase==='rest'){
+     if(model.loopToTarget&&model.elapsed>=model.targetSeconds)finish();
+     else if(model.afterRest==='round'){model.afterRest='';prepare();}
+     else advance();
+   }else if(model.phase==='work')completeStep();
  }
  function beginTicker(seconds){
-  stopTicker();model.remaining=Math.max(0,seconds);deadline=Date.now()+model.remaining*1000;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();
+   stopTicker();model.remaining=Math.max(0,seconds);deadline=Date.now()+model.remaining*1000;
+   lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();
+ }
+ function countdown(token){
+   if(token!==prepToken||model.paused||model.finished)return;
+   model.phase='prep';model.remaining=3;countdownTimerDone=false;countdownVoiceDone=!model.voice;
+   let started=false,finished=false;
+   const beginVisual=()=>{
+     if(started||token!==prepToken||model.paused||model.finished)return;
+     started=true;beginTicker(3);
+   };
+   const fallbackStart=setTimeout(beginVisual,1800);
+   const fallbackDone=setTimeout(()=>{
+     if(token!==prepToken||model.paused||model.finished||finished)return;
+     finished=true;countdownVoiceDone=true;
+     if(countdownTimerDone)startWork({fromPrep:true});
+   },7500);
+   const voiced=voiceGuide('Trois, deux, un',model.voice,()=>{
+     if(token!==prepToken||model.paused||model.finished||finished)return;
+     finished=true;clearTimeout(fallbackDone);countdownVoiceDone=true;
+     if(countdownTimerDone)startWork({fromPrep:true});
+   },{onStart:()=>{clearTimeout(fallbackStart);beginVisual();}});
+   if(!voiced){clearTimeout(fallbackStart);beginVisual();}
+   renderActive();
  }
  function prepare(){
-  model.phase='prep';voiceGuide('Préparez-vous. '+model.steps[model.index].name+'. Trois, deux, un',model.voice);beginTicker(3);renderList();
+   stopTicker();stopVoiceGuide();const token=++prepToken;
+   model.phase='intro';model.remaining=3;model.countdownSpoken=false;
+   renderList();renderActive();persist();
+   let completed=false;
+   const next=()=>{
+     if(completed||token!==prepToken||model.paused||model.finished)return;
+     completed=true;clearTimeout(fallback);countdown(token);
+   };
+   const fallback=setTimeout(next,14000);
+   voiceGuide('Préparez-vous. '+model.steps[model.index].name+'. '+(model.steps[model.index].target||''),model.voice,next);
  }
- function startWork(){
-  const step=model.steps[model.index];model.phase='work';model.manualElapsed=0;
-  if(step.remainingTo60){step.seconds=Math.max(1,Math.round(3600-model.elapsed));step.target='Temps restant : '+timeText(step.seconds)+' pour atteindre 60 min';}
-  voiceGuide('GO. '+step.name+'. '+(step.target||''),model.voice);
-  if(step.manual){stopTicker();model.remaining=0;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();}
-  else beginTicker(step.seconds||45);
+ function startWork(options={}){
+   if(model.finished||model.paused)return;
+   const step=model.steps[model.index];
+   if(step.remainingTo60){step.seconds=Math.max(1,Math.round(3600-model.elapsed));step.target='Temps restant : '+timeText(step.seconds)+' pour atteindre 60 min';}
+   const beginClock=()=>{
+     if(model.finished||model.paused)return;
+     model.phase='work';model.manualElapsed=0;model.countdownSpoken=false;
+     if(step.manual){stopTicker();model.remaining=0;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();}
+     else beginTicker(step.seconds||45);
+     renderList();
+   };
+   if(options.fromPrep&&model.voice){
+     // Some Android voices wait before speaking: only the audible GO starts the work clock.
+     model.phase='go';model.remaining=0;renderActive();
+     const token=prepToken;let started=false;
+     const go=()=>{
+       if(started||token!==prepToken||model.finished||model.paused)return;
+       started=true;clearTimeout(fallback);beginClock();
+     };
+     const fallback=setTimeout(go,2200);
+     if(!voiceGuide('GO !',true,undefined,{onStart:go}))go();
+     return;
+   }
+   beginClock();
+   if(step.recovery)voiceGuide('Récupération, '+step.seconds+' secondes',model.voice,undefined,{interrupt:!options.continuous});
+   else if(options.continuous)voiceGuide('GO ! Effort '+(step.seconds||45)+' secondes',model.voice,undefined,{interrupt:false});
  }
  function advance(){
   if(model.loopToTarget&&model.elapsed>=model.targetSeconds){finish();return;}
@@ -1653,7 +1781,12 @@ function guideScreen(title,providedSteps,options={}){
   finish();
  }
  function completeStep(){
-  stopTicker();if(model.finished)return;
+  if(model.finished)return;
+  if(isContinuousTransition()){
+    // The global elapsed clock is continuous; only the phase countdown is reset.
+    model.index++;startWork({continuous:true});return;
+  }
+  stopTicker();
   // The eight-minute objective ends AFTER the current movement, never mid-repetition.
   if(model.loopToTarget&&model.elapsed>=model.targetSeconds){voiceGuide('Stop',model.voice);finish();return;}
   // Round recovery is handled only at round boundaries, never after the final exercise.
@@ -1665,8 +1798,8 @@ function guideScreen(title,providedSteps,options={}){
   stopTicker();model.finished=true;model.paused=false;model.phase='done';localStorage.removeItem(GUIDE_DRAFT_KEY);refreshGuideEntrypoints();renderActive();renderList();voiceGuide('Séance terminée',model.voice);
  }
  function freeze(){
-  if(ticker){const now=Date.now();model.elapsed+=Math.max(0,Math.max(0,(now-lastTick)/1000));if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=Math.max(0,Math.max(0,(now-lastTick)/1000));else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));stopTicker();}
-  if(!model.finished){model.paused=true;stopVoiceGuide();renderActive();persist();}
+  if(ticker){const now=Date.now();if(['work','rest'].includes(model.phase))model.elapsed+=Math.max(0,(now-lastTick)/1000);if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=Math.max(0,Math.max(0,(now-lastTick)/1000));else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));stopTicker();}
+  if(!model.finished){model.paused=true;++prepToken;stopVoiceGuide();renderActive();persist();}
  }
  function readSettings(){
   const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=model.source==='circuit'?1:Number(el('guide-rounds').value);
@@ -1684,7 +1817,7 @@ function guideScreen(title,providedSteps,options={}){
   if(model.finished)return;
   if(!model.started){if(!readSettings())return;model.started=true;model.paused=false;prepare();}
   else if(!model.paused){freeze();}
-  else{model.paused=false;voiceGuide('Reprise. '+model.steps[model.index].name,model.voice);if(model.phase==='ready')prepare();else if(model.phase==='work'&&model.steps[model.index].manual){stopTicker();lastTick=Date.now();ticker=setInterval(tick,200);persist();renderActive();}else beginTicker(model.remaining);}
+  else{model.paused=false;voiceGuide('Reprise. '+model.steps[model.index].name,model.voice);if(['ready','intro','prep','go'].includes(model.phase))prepare();else if(model.phase==='work'&&model.steps[model.index].manual){stopTicker();lastTick=Date.now();ticker=setInterval(tick,200);persist();renderActive();}else beginTicker(model.remaining);}
   renderActive();
  };
  done.onclick=()=>{if(model.paused||model.finished)return;if(model.phase==='rest'){stopTicker();if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();};
