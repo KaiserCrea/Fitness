@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 40;
+const APP_REV = 41;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -142,6 +142,12 @@ function migrate(){
   Object.entries(s.sessionOrder).forEach(([session,ids])=>{
     if(!s.programOverrides[session] && Array.isArray(ids) && ids.length) s.programOverrides[session]=ids.slice();
   });
+  // FM3 previously had two identical Leg Extension IDs. Fix only the known
+  // untouched positions in a saved override; never guess after manual reordering.
+  const fm3=s.programOverrides['FULL MIX 3'];
+  if(Array.isArray(fm3)&&fm3[1]==='ex-leg-extension'&&fm3[4]==='ex-leg-extension'&&!fm3.includes('ex-leg-curl-assis')){
+    fm3[1]='ex-leg-curl-assis';
+  }
   if((raw?.appRev||0)<5 && s.today?.startedAt && !s.today?.manualTimes){
     s.today.start="";s.today.end="";delete s.today.startedAt;
   }
@@ -273,6 +279,10 @@ function thumbnailFor(id,session,no){
 }
 function thumbClass(img){return img?"official-thumb":"fallback-thumb";}
 function groupForId(id){
+  // The original G3A sheet is stored in /ABDOS/, but calf raises belong to Jambes.
+  if(id==='ex-mollets-debout-a-la-machine'||exerciseNameKey(RAW_EXERCISE_BY_ID.get(id)?.name||'')==='mollets debout a la machine')return'Jambes';
+  // "Leg Curl" works the hamstrings, not the biceps of the arms.
+  if(/^leg curl\b/.test(exerciseNameKey(RAW_EXERCISE_BY_ID.get(id)?.name||'')))return'Jambes';
   const occ=Object.entries(OCCURRENCE_SHEETS).find(([k])=>{
     const [s,n]=k.split("|"); return DATA.sessions?.[s]?.[+n-1]?.id===id;
   });
@@ -291,7 +301,36 @@ function groupForId(id){
   return state.customExercises?.[id]?.group||"Autre";
 }
 function paramType(id){return DATA.paramType?.[id]||state.customExercises?.[id]?.paramType||"strength";}
-function repetitionTargetFor(id){
+// Targets validated for the actual workout occurrences. A shared movement can
+// have different programmed rep ranges without splitting its performance history.
+// Resolve using the exercise's ORIGINAL position, not its current drag/drop slot.
+const REP_TARGETS_BY_ORIGINAL_SLOT=Object.freeze({
+  'G1A|1':'8–12','G1A|2':'12–15',
+  'G1B|1':'10–15','G1B|7':'8–12',
+  'G1C|3':'12–15','G1C|6':'10–15',
+  'G2A|5':'10–15',
+  'G2B|1':'8–12','G2B|2':'8–15','G2B|3':'8–12','G2B|5':'8–12',
+  'G2C|4':'8–12','G2C|6':'12–15',
+  'G3A|1':'8–12','G3A|3':'10–15','G3A|4':'10–15',
+  'G3B|3':'15–20','G3C|3':'15–20',
+  'FULL MIX 1|1':'10–15','FULL MIX 1|3':'8–12',
+  'FULL MIX 1|7':'10–12','FULL MIX 1|8':'10–15','FULL MIX 1|9':'12–20',
+  'FULL MIX 2|2':'10–15','FULL MIX 2|4':'10–15','FULL MIX 2|6':'10–15',
+  'FULL MIX 3|2':'10–15','FULL MIX 3|6':'8–12',
+  'FULL MIX 4|5':'10–15','FULL MIX 4|6':'10–15','FULL MIX 4|7':'8–12',
+  'FULL MIX 4|8':'15–20','FULL MIX 4|9':'15–20'
+});
+function repetitionTargetFor(id,session){
+  if(session){
+    const originalIndex=(DATA.sessions?.[session]||[]).findIndex(e=>e.id===id);
+    if(originalIndex>=0){
+      const target=REP_TARGETS_BY_ORIGINAL_SLOT[`${session}|${originalIndex+1}`];
+      if(target)return target;
+    }
+  }
+  // A generic progress card uses a stable reference from the first occurrence.
+  const baseline=RAW_EXERCISE_ENTRIES.find(x=>canonicalId(x.e.id)===canonicalId(id)&&REP_TARGETS_BY_ORIGINAL_SLOT[`${x.session}|${x.i+1}`]);
+  if(baseline)return REP_TARGETS_BY_ORIGINAL_SLOT[`${baseline.session}|${baseline.i+1}`];
   const raw=String(exercise(id)?.name||id||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[’']/g," ");
   const rules=[
     ["developpe couche machine convergente","8–10"],["developpe couche avec halteres","8–10"],["developpe incline smith","8–10"],["developpe incline avec halteres","8–10"],["developpe incline halteres","8–10"],["developpe epaules halteres","8–10"],
@@ -310,7 +349,7 @@ function repetitionTargetFor(id){
   for(const [key,val] of rules)if(raw.includes(key))return val;
   return "";
 }
-function repetitionBounds(id){const t=repetitionTargetFor(id),m=t.match(/(\d+)\s*[–-]\s*(\d+)/);return m?{min:+m[1],max:+m[2]}:null;}
+function repetitionBounds(id,session){const t=repetitionTargetFor(id,session),m=t.match(/(\d+)\s*[–-]\s*(\d+)/);return m?{min:+m[1],max:+m[2]}:null;}
 function repNumber(v){const m=String(v??"").match(/\d+/);return m?+m[0]:NaN;}
 function defaultParams(id){
   const existing=state.params[id]; if(existing&&Object.keys(existing).length)return clone(existing);
@@ -584,7 +623,7 @@ function setExerciseStatus(id,status,no){
   // Remove the legacy canonical status only when this active session has already started using occurrence keys.
   if(Object.prototype.hasOwnProperty.call(cur.status,id))delete cur.status[id];
   if(status==="Réussi"){
-    openNextRefModal(id,current,(next,doneReps,nextReps)=>{cur.nextRefs[key]=next;if(Number.isFinite(doneReps))cur.reps[key]=doneReps;if(Number.isFinite(nextReps))cur.nextReps[key]=nextReps;save();render();openSetResultsModal(id,no,current);});
+    openNextRefModal(id,current,(next,doneReps,nextReps)=>{cur.nextRefs[key]=next;if(Number.isFinite(doneReps))cur.reps[key]=doneReps;if(Number.isFinite(nextReps))cur.nextReps[key]=nextReps;save();render();openSetResultsModal(id,no,current);},cur.session);
   }else{
     delete cur.nextRefs[key];
     save();render();
@@ -595,8 +634,8 @@ function actualSetsFor(id){
  const matches=[];for(const h of state.history||[])for(const e of h.exercises||[])if(canonicalId(e.id)===canonicalId(id)&&String(e.equipment||"")===equipment&&Array.isArray(e.setReps)&&e.setReps.length)matches.push({date:h.date,sets:e.setReps,weight:e.actual,status:e.status});
  return matches.at(-1)||null;
 }
-function targetSuggestion(id,sets,weight){
- const bounds=repetitionBounds(id),p=defaultParams(id),setting=state.progressionSettings[id]||{},inc=Number(setting.increment)||2.5;
+function targetSuggestion(id,sets,weight,session){
+ const bounds=repetitionBounds(id,session),p=defaultParams(id),setting=state.progressionSettings[id]||{},inc=Number(setting.increment)||2.5;
  const expected=Math.min(20,Math.max(1,parseInt(p.series)||4));
  if(!bounds||sets.length!==expected||sets.some(r=>!Number.isInteger(r)||r<0))return null;
  const currentGoal=repNumber(p.repetitions);
@@ -628,7 +667,7 @@ function latestExerciseWeight(id){
   return '';
 }
 function openSetResultsModal(id,no,current,onDone,options={}){
- const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id);
+ const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id,cur.session);
  const loadApplicable=!exerciseWithoutRequiredLoad(id),last=loadApplicable?(isNumericWeight(current)?current:latestExerciseWeight(id)):'';
  const noLoadYet=options.markFailed&&loadApplicable&&!last;
  const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label><input id="failed-weight" inputmode="decimal" autocomplete="off" placeholder="Ex. : 40 ou 2 × 20" required><label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<details class="failure-change-load"><summary>Modifier la charge utilisée (actuellement ${esc(refWithUnit(last))})</summary><div class="field"><label for="failed-weight">Charge utilisée (kg)</label><input id="failed-weight" inputmode="decimal" value="${esc(last)}" placeholder="Ex. : 40"></div></details>`):'';
@@ -648,7 +687,7 @@ function openSetResultsModal(id,no,current,onDone,options={}){
        cur.values=cur.values||{};cur.values[key]=actualWeight;
      }
      cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);
-     const suggestion=targetSuggestion(id,values,actualWeight);cur.nextRefs=cur.nextRefs||{};cur.nextRefs[key]=actualWeight;
+     const suggestion=targetSuggestion(id,values,actualWeight,cur.session);cur.nextRefs=cur.nextRefs||{};cur.nextRefs[key]=actualWeight;
      cur.nextReps=cur.nextReps||{};if(suggestion)cur.nextReps[key]=suggestion.reps;
      save();closeOverlay(true);render();
      if(suggestion)openModal(`<h3>Progression proposée</h3><p>${esc(suggestion.description)}</p><p>Prochaine cible : <b>${esc(refWithUnit(suggestion.weight))} · ${suggestion.reps} répétitions</b></p><div class="modal-actions"><button class="btn ghost" id="suggest-ignore">Conserver ma référence</button><button class="btn gold" id="suggest-accept">Accepter la proposition</button></div>`,()=>{$('#suggest-ignore').onclick=()=>{closeOverlay(true);render();};$('#suggest-accept').onclick=()=>{cur.nextRefs[key]=suggestion.weight;cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();};});
@@ -656,8 +695,8 @@ function openSetResultsModal(id,no,current,onDone,options={}){
    };
  });
 }
-function openNextRefModal(id,current,done){
-  const p=defaultParams(id),target=repetitionTargetFor(id),bounds=repetitionBounds(id); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
+function openNextRefModal(id,current,done,session){
+  const p=defaultParams(id),target=repetitionTargetFor(id,session),bounds=repetitionBounds(id,session); const label=p.type==="strength"?"Charge / référence prévue pour la prochaine occurrence":"Référence prévue pour la prochaine occurrence";
   const currentRep=repNumber(p.repetitions),suggested=Number.isFinite(currentRep)&&bounds?Math.min(bounds.max,currentRep):currentRep;
   openModal(`<h3>Exercice réussi</h3><p>${esc(exercise(id).name)}</p>${target?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(target)}</b></div>`:""}${p.type==="strength"?`<div class="param-grid"><div class="field"><label>Répétitions réalisées</label><input id="done-reps" inputmode="numeric" value="${Number.isFinite(currentRep)?currentRep:""}"></div><div class="field"><label>Prochaine cible répétitions</label><input id="next-reps" inputmode="numeric" value="${Number.isFinite(suggested)?suggested:""}"></div></div>`:""}<div class="field" style="margin-top:6px"><label>${esc(label)}</label><input id="next-ref" value="${esc(p.type==="strength"?(state.refs[id]||p.charge||current):current)}"></div>
     <div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="confirm-next">Valider</button></div>`,()=>{
@@ -1027,7 +1066,7 @@ let perfCache=null;
 const performanceMarkupCache=new Map(),overviewMarkupCache=new Map();
 function allPerf(){
   if(perfCache)return perfCache;
-  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,reps:e.reps,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return perfCache=m;
+  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,reps:e.reps,setReps:Array.isArray(e.setReps)?e.setReps.slice():null,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return perfCache=m;
 }
 function periodStart(period){
   const d=new Date(); if(period==="1m")d.setMonth(d.getMonth()-1);else if(period==="3m")d.setMonth(d.getMonth()-3);else if(period==="6m")d.setMonth(d.getMonth()-6);else if(period==="1y")d.setFullYear(d.getFullYear()-1);else return null;return localISODate(d);
@@ -1037,6 +1076,12 @@ function trendFor(id,arr){
   const a=arr[arr.length-2],b=arr[arr.length-1],wa=parseNumber(a.value),wb=parseNumber(b.value),ra=repNumber(a.reps),rb=repNumber(b.reps),bounds=repetitionBounds(id);
   if(Number.isFinite(wa)&&Number.isFinite(wb)){
     if(wb>wa)return{key:"up",label:"Progression nette"};
+    // +1 repetition on just ONE set also counts, even if the minimum set stays at 10.
+    if(wb===wa&&Array.isArray(a.setReps)&&Array.isArray(b.setReps)&&a.setReps.length===b.setReps.length&&a.setReps.length&&[...a.setReps,...b.setReps].every(Number.isFinite)){
+      const oldTotal=a.setReps.reduce((sum,v)=>sum+v,0),newTotal=b.setReps.reduce((sum,v)=>sum+v,0);
+      if(newTotal>oldTotal)return{key:"up",label:"Progression nette"};
+      if(newTotal<oldTotal)return{key:"down",label:"Régression"};
+    }
     if(wb===wa&&Number.isFinite(ra)&&Number.isFinite(rb)&&rb>ra)return{key:"up",label:"Progression nette"};
     if(wb<wa)return{key:"down",label:"Régression"};
     if(wb===wa&&Number.isFinite(ra)&&Number.isFinite(rb)&&rb<ra)return{key:"down",label:"Régression"};
@@ -1515,7 +1560,7 @@ function openSheet(id,session,no){
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <button class="sheet-close" data-close-sheet>Fermer</button>
     <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
-    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel(circuitKey(id,session,no)))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div>${isAbCircuit(id)?circuitSettingsMarkup(id,session,no):''}<button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
+    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel(circuitKey(id,session,no)))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id,session)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id,session))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div>${isAbCircuit(id)?circuitSettingsMarkup(id,session,no):''}<button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
