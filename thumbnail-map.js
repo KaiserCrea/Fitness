@@ -67,7 +67,7 @@ window.FITNESS_THUMBNAILS = {
   "G2A|1": "miniatures/G2A/01_tirage_horizontal_poulie_double_poignee.jpg",
   "G2A|2": "miniatures/G2A/02_tirage_bras_tendus_poulie_haute_barre.jpg",
   "G2A|3": "miniatures/G2A/03_rowing_unilateral_haltere.jpg",
-  "G2A|4": "miniatures/G2A/04_tirage_vertical_prise_serree_V.jpg",
+  "G2A|4": "miniatures/G2A/04_tirage_vertical_prise_serree_V_v24187.jpg",
   "G2A|5": "miniatures/G2A/05_extension_triceps_corde.jpg",
   "G2A|6": "miniatures/G2A/06_barre_au_front_front_extension.jpg",
   "G2A|7": "miniatures/G2A/07_dips_sur_banc.jpg",
