@@ -727,27 +727,98 @@ function renderActiveAth(cur,date){
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
-    <button class="btn gold block" id="ath-guide">${esc(guideEntryLabel("ath:"+cur.session))}</button><div class="card">${(DATA.ath?.[cur.session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(cur.session,i,x))}</div></div>`).join("")}</div>
+    <button class="btn gold block" id="ath-guide">${esc(guideEntryLabel("ath:"+cur.session))}</button>${athListMarkup(cur.session)}
     <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
-  $("#ath-guide").onclick=()=>openAthGuide(cur.session);$("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
+  $("#ath-guide").onclick=()=>openAthGuide(cur.session);$("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);bindAthList(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
+}
+// V24.19: workout settings have one source of truth for the form, the list and the guide.
+function athDefaultInterval(step){
+  const label=(step.fields||[]).find(f=>/\d+\s*s.*\d+\s*s/i.test(f))||'';
+  const match=label.match(/(\d+)\s*s[^\d]+(\d+)\s*s/i);
+  return match?{effort:+match[1],recovery:+match[2]}:null;
+}
+function athStepConfig(session,index){
+  const step=DATA.ath?.[session]?.[index];if(!step)return null;
+  const saved=state.athParams?.[session]?.[index]||{};
+  const isRemaining=/temps restant/i.test(step.duration||'');
+  // "Temps restant pour atteindre 60 min" is a dynamic remainder, not 60 minutes of extra work.
+  const defaultDuration=isRemaining?null:athDurationSeconds(step.duration);
+  const legacy=String(saved['Durée']||'').trim();
+  const legacyDuration=legacy?(/^\d+(?:[,.]\d+)?$/.test(legacy)?Math.round(Number(legacy.replace(',','.'))*60):athDurationSeconds(legacy)):null;
+  const durationSeconds=Number.isFinite(+saved.durationSeconds)&&+saved.durationSeconds>0?+saved.durationSeconds:(legacyDuration||defaultDuration||null);
+  const interval=athDefaultInterval(step);
+  const legacyIntervalLabel=(step.fields||[]).find(f=>/\d+\s*s.*\d+\s*s/i.test(f));
+  const legacyInterval=legacyIntervalLabel?String(saved[legacyIntervalLabel]||'').match(/(\d+)\s*s?[^\d]+(\d+)\s*s?/i):null;
+  return {step,saved,durationSeconds,isRemaining,interval,
+    effortSeconds:interval?(Number(saved.effortSeconds)>0?Number(saved.effortSeconds):(legacyInterval?+legacyInterval[1]:interval.effort)):null,
+    recoverySeconds:interval?(Number(saved.recoverySeconds)>0?Number(saved.recoverySeconds):(legacyInterval?+legacyInterval[2]:interval.recovery)):null};
+}
+function athStepDurationText(session,index){
+  const c=athStepConfig(session,index);if(!c)return '';
+  if(c.isRemaining&&!c.durationSeconds)return 'Temps restant pour atteindre 60 min';
+  if(!c.durationSeconds)return c.step.duration;
+  const mins=c.durationSeconds/60;
+  return Number.isInteger(mins)?mins+' min':c.durationSeconds+' s';
 }
 function athStepSummary(session,index,step){
-  const values=state.athParams?.[session]?.[index]||{};
-  const parts=(step.fields||[]).map(f=>values[f]?`${f}: ${values[f]}`:f);
-  return parts.join(" · ");
+  const c=athStepConfig(session,index);if(!c)return '';
+  const other=(step.fields||[]).filter(f=>f!=='Durée'&&!/\d+\s*s.*\d+\s*s/i.test(f)).map(f=>c.saved[f]?`${f} : ${c.saved[f]}`:f);
+  if(c.interval)other.push(`Effort ${c.effortSeconds} s / récupération ${c.recoverySeconds} s`);
+  return other.join(' · ');
 }
+function athSettingsMarkup(session,index){
+  const c=athStepConfig(session,index);if(!c)return '';
+  const duration=c.durationSeconds?String(c.durationSeconds/60):'';
+  const optional=c.isRemaining||!athDurationSeconds(c.step.duration);
+  const otherFields=(c.step.fields||[]).filter(f=>f!=='Durée'&&!/\d+\s*s.*\d+\s*s/i.test(f));
+  return `<div class="ath-settings-fields" data-ath-editor="${index}">
+    <div class="field"><label>Durée (minutes)${optional?' · facultatif':''}</label><input data-ath-duration type="number" inputmode="decimal" step="0.5" min="0.5" max="240" value="${esc(duration)}" placeholder="${c.isRemaining?'Automatique : reste à 60 min':optional?'Libre / passages':'Durée'}"></div>
+    ${c.interval?`<div class="field"><label>Effort (secondes)</label><input data-ath-effort type="number" inputmode="numeric" min="5" max="3600" value="${c.effortSeconds}"></div><div class="field"><label>Récupération (secondes)</label><input data-ath-recovery type="number" inputmode="numeric" min="5" max="3600" value="${c.recoverySeconds}"></div>`:''}
+    ${otherFields.map(f=>`<div class="field"><label>${esc(f)}${f==='Récupération'?' (secondes)':''}</label><input data-ath-field="${esc(f)}" ${f==='Passages'||f==='Récupération'?'type="number" inputmode="numeric" min="1" max="600"':'type="text"'} value="${esc(c.saved[f]||'')}" placeholder="${esc(f)}"></div>`).join('')}
+  </div>`;
+}
+function readAthSettings(editor,session,index){
+  const c=athStepConfig(session,index),durationInput=$('[data-ath-duration]',editor);
+  const raw=durationInput.value.trim().replace(',','.');
+  if(raw&&(!Number.isFinite(+raw)||+raw<.5||+raw>240)){alert('Durée : entre 0,5 et 240 minutes.');return null;}
+  if(!raw&&!c.isRemaining&&athDurationSeconds(c.step.duration)){alert('Une durée est nécessaire pour cet exercice.');return null;}
+  const result={...c.saved};delete result['Durée'];
+  if(raw)result.durationSeconds=Math.round(Number(raw)*60);else delete result.durationSeconds;
+  if(c.interval){
+    for(const [field,attr] of [['effortSeconds','data-ath-effort'],['recoverySeconds','data-ath-recovery']]){
+      const v=Number($('['+attr+']',editor).value);
+      if(!Number.isInteger(v)||v<5||v>3600){alert('Effort et récupération : entre 5 et 3600 secondes.');return null;}
+      result[field]=v;
+    }
+  }
+  $$('[data-ath-field]',editor).forEach(field=>{result[field.dataset.athField]=field.value.trim();});
+  const passages=result.Passages,recup=result['Récupération'];
+  if((passages&&(!/^\d+$/.test(passages)||+passages<1||+passages>60))||(recup&&(!/^\d+$/.test(recup)||+recup>600))){alert('Passages : 1–60 ; récupération : 0–600 secondes.');return null;}
+  return result;
+}
+function openAthStepSettings(session,index){
+  if(pendingGuide()?.key==='ath:'+session){alert('Une séance guidée est en pause. Terminez-la avant de modifier ses paramètres.');return;}
+  const step=DATA.ath?.[session]?.[index];if(!step)return;
+  openModal(`<h3>${esc(index+1)}. ${esc(step.name)}</h3><p class="tiny muted">Les réglages seront enregistrés uniquement pour ${esc(niceSession(session))}.</p>${athSettingsMarkup(session,index)}<div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-ath-step">Enregistrer</button></div>`,modal=>{
+    $('#save-ath-step',modal).onclick=()=>{const next=readAthSettings($('[data-ath-editor]',modal),session,index);if(!next)return;state.athParams[session]=state.athParams[session]||{};state.athParams[session][index]=next;save();closeOverlay(true);render();};
+  });
+}
+function athListMarkup(session){
+  return `<div class="card ath-edit-list">${(DATA.ath?.[session]||[]).map((step,i)=>`<button type="button" class="ath-edit-row" data-edit-ath="${i}" aria-label="Régler ${esc(step.name)}"><div class="ath-edit-row-heading"><b class="gold">${i+1}. ${esc(step.name)}</b><span>${esc(athStepDurationText(session,i))} ${icon('pencil')}</span></div><div class="tiny muted">${esc(athStepSummary(session,i,step))}</div></button>`).join('')}</div>`;
+}
+function bindAthList(session){$$('[data-edit-ath]').forEach(b=>b.onclick=()=>openAthStepSettings(session,Number(b.dataset.editAth)));}
 function openAthSheet(session){
   const img=pathUrl(ATH_SHEETS[session]||""),steps=DATA.ath?.[session]||[];
   state.athParams[session]=state.athParams[session]||{};
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <div class="sheet-top"><div><div class="tiny gold">FICHE TECHNIQUE</div><b>${esc(niceSession(session))}</b></div><button class="btn" data-close-sheet>Fermer</button></div>
     <div class="sheet-canvas">${img?`<img data-fallback src="${img}" alt="${esc(niceSession(session))}">`:`<div class="empty" style="min-height:360px">Fiche ATH non associée.</div>`}</div>
-    <div class="sheet-params"><h3>Paramètres de la séance</h3>${steps.map((step,i)=>`<div class="ath-param-block"><div class="row-between"><b>${i+1}. ${esc(step.name)}</b><span class="tiny gold">${esc(step.duration)}</span></div><div class="param-grid">${(step.fields||[]).map(field=>`<div class="field"><label>${esc(field)}</label><input data-ath-step="${i}" data-ath-field="${esc(field)}" value="${esc(state.athParams[session]?.[i]?.[field]||"")}" placeholder="${esc(field)}"></div>`).join("")}</div></div>`).join("")}
+    <div class="sheet-params"><h3>Paramètres de la séance</h3><p class="tiny muted">Les valeurs modifiées seront utilisées par le chronomètre et le coach vocal.</p>${steps.map((step,i)=>`<div class="ath-param-block"><div class="row-between"><b>${i+1}. ${esc(step.name)}</b><span class="tiny gold">${esc(athStepDurationText(session,i))}</span></div>${athSettingsMarkup(session,i)}</div>`).join('')}
       <button class="btn gold block" id="save-ath-params" style="margin-top:8px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"ath-sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
-  $("#save-ath-params",overlay).onclick=()=>{const next={};$$("[data-ath-step]",overlay).forEach(input=>{const i=input.dataset.athStep;(next[i]||(next[i]={}))[input.dataset.athField]=input.value.trim();});state.athParams[session]=next;save();closeOverlay(true);render();};
+  $("#save-ath-params",overlay).onclick=()=>{if(pendingGuide()?.key==='ath:'+session){alert('Terminez la séance guidée en pause avant de modifier les réglages.');return;}const next={...state.athParams[session]};for(const editor of $$('[data-ath-editor]',overlay)){const i=Number(editor.dataset.athEditor),value=readAthSettings(editor,session,i);if(!value)return;next[i]=value;}state.athParams[session]=next;save();closeOverlay(true);render();};
 }
 
 function renderProgram(){
@@ -945,10 +1016,11 @@ function renderAthProgram(session){
   shell(`<header class="session-header" style="--session-image:url('./assets/card-ath-official.jpg')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
     <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-program-official.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
     <button class="btn gold block guide-program-ath" id="program-ath-guide">${esc(guideEntryLabel('ath:'+session))}</button>
-    <div class="card">${(DATA.ath?.[session]||[]).map((x,i)=>`<div class="history-row"><b class="gold">${i+1}. ${esc(x.name)}</b><span style="float:right">${esc(x.duration)}</span><div class="tiny muted">${esc(athStepSummary(session,i,x))}</div></div>`).join("")}</div>`);
+    ${athListMarkup(session)}`);
   $("#back-program").onclick=()=>history.back();
   $("#open-ath-sheet").onclick=()=>openAthSheet(session);
   $("#program-ath-guide").onclick=()=>openAthGuide(session);
+  bindAthList(session);
 }
 
 let perfCache=null;
@@ -1395,12 +1467,55 @@ function renderHistoryDetail(id){
   $("#back-hdetail").onclick=()=>history.back();
 }
 
+// Circuit preferences are indexed by SESSION + OCCURRENCE: changing G2C must not edit G1B.
+function circuitKey(id,session,no){return 'circuit:'+session+':'+no+':'+id;}
+function circuitSettings(id,session,no){
+  const cfg=state.guideConfigs?.[circuitKey(id,session,no)]||{},base=defaultParams(id);
+  return {key:circuitKey(id,session,no),cfg,params:{type:'circuit',duree:cfg.durationLabel||base.duree||'8 min',tours:String(cfg.toursLabel||base.tours||'1')},
+    steps:Array.isArray(cfg.steps)&&cfg.steps.length&&cfg.steps.every(s=>s&&typeof s.name==='string')?clone(cfg.steps):circuitGuideSteps(id,session,no)};
+}
+function circuitSettingsMarkup(id,session,no){
+  const {cfg,steps}=circuitSettings(id,session,no);
+  return `<div class="circuit-tuning"><h3>Réglages par mouvement</h3><p class="tiny muted">Chaque valeur remplace l’objectif du circuit guidé. Les répétitions se valident manuellement.</p>
+    ${steps.map((s,i)=>`<div class="circuit-tune-row"><label for="circuit-step-${i}">${i+1}. ${esc(s.name)} <span>${s.manual?'Répétitions':'Durée (secondes)'}</span></label><input id="circuit-step-${i}" data-circuit-value="${i}" type="number" inputmode="numeric" min="${s.manual?1:5}" max="${s.manual?500:3600}" value="${esc(s.manual?(s.repetitions||repNumber(s.target)||15):(s.seconds||45))}"></div>`).join('')}
+    <div class="param-grid"><div class="field"><label>Repos entre exercices (secondes)</label><input type="number" inputmode="numeric" min="0" max="600" data-circuit-rest value="${esc(cfg.rest??0)}"></div><div class="field"><label>Repos entre tours (secondes)</label><input type="number" inputmode="numeric" min="0" max="600" data-circuit-round-rest value="${esc(cfg.roundRest??(id==='ex-circuit-abdos-intensif-8-min'?30:0))}"></div></div>
+    <p class="tiny muted">Avec 1 tour, le circuit se répète jusqu’à la durée totale. Avec plusieurs tours, il se termine à la fin du nombre choisi.</p>
+  </div>`;
+}
+function readCircuitSettings(overlay,id,session,no){
+  const {key,cfg,steps}=circuitSettings(id,session,no);
+  const rawDuration=$('[data-param="duree"]',overlay)?.value.trim().replace(',','.')||'';
+  const durationMatch=rawDuration.match(/^(\d+(?:\.\d+)?)\s*(min(?:utes?)?|s(?:econdes?)?)?$/i);
+  if(!durationMatch){alert('Durée totale : indiquez par exemple 8 min ou 480 s.');return null;}
+  const targetSeconds=Math.round(Number(durationMatch[1])*(durationMatch[2]?.toLowerCase().startsWith('s')?1:60));
+  const rounds=Number($('[data-param="tours"]',overlay)?.value);
+  const rest=Number($('[data-circuit-rest]',overlay)?.value),roundRest=Number($('[data-circuit-round-rest]',overlay)?.value);
+  if(targetSeconds<30||targetSeconds>14400||!Number.isInteger(rounds)||rounds<1||rounds>30||![rest,roundRest].every(n=>Number.isInteger(n)&&n>=0&&n<=600)){
+    alert('Durée : 30 s à 240 min ; tours : 1 à 30 ; repos : 0 à 600 s.');return null;
+  }
+  for(const input of $$('[data-circuit-value]',overlay)){
+    const step=steps[Number(input.dataset.circuitValue)],value=Number(input.value);
+    if(!Number.isInteger(value)||value<(step.manual?1:5)||value>(step.manual?500:3600)){
+      alert('Vérifiez les répétitions (1–500) et les durées (5–3600 secondes).');return null;
+    }
+    const original=step.manual?(step.repetitions||repNumber(step.target)||15):(step.seconds||45);
+    if(value===original)continue; // Do not replace an untouched range (e.g. 10 à 20) with its lower bound.
+    if(step.manual){
+      const suffix=/au total/i.test(step.target||'')?' au total':/par côté|de chaque côté/i.test(step.target||'')?' par côté':'';
+      step.repetitions=value;step.target=value+' répétitions'+suffix;
+    }else{
+      const suffix=/côté droit/i.test(step.target||'')?' · côté droit':/côté gauche/i.test(step.target||'')?' · côté gauche':'';
+      step.seconds=value;step.target=value+' secondes'+suffix;
+    }
+  }
+  return {key,next:{...cfg,steps,rest,roundRest,rounds,loopToTarget:rounds===1,targetSeconds,durationLabel:rawDuration,toursLabel:String(rounds)}};
+}
 function openSheet(id,session,no){
-  const e=exercise(id),img=sheetFor(id,session,no),p=defaultParams(id);
+  const e=exercise(id),img=sheetFor(id,session,no),p=isAbCircuit(id)?circuitSettings(id,session,no).params:defaultParams(id);
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <button class="sheet-close" data-close-sheet>Fermer</button>
     <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
-    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel('circuit:'+session+':'+no+':'+id))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div><button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
+    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel(circuitKey(id,session,no)))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div>${isAbCircuit(id)?circuitSettingsMarkup(id,session,no):''}<button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
@@ -1408,7 +1523,16 @@ function openSheet(id,session,no){
   const sheetImg=$(".fiche-visual img",overlay);
   if(sheetImg){prepareSheetLayout(sheetImg,sheetCanvas);sheetCanvas.setAttribute("role","button");sheetCanvas.setAttribute("aria-label","Ouvrir l’image en plein écran");sheetCanvas.onclick=()=>openFullscreenSheet(sheetImg.src,e.name);}
   if(isAbCircuit(id))$("#sheet-guide-start",overlay).onclick=()=>openCircuitGuide(id,session,no);
-  $("#save-params",overlay).onclick=()=>{const next={type:p.type};$$("[data-param]",overlay).forEach(i=>next[i.dataset.param]=p.type==="strength"&&i.dataset.param==="charge"?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;save();closeOverlay(true);render();};
+  $("#save-params",overlay).onclick=()=>{
+    if(isAbCircuit(id)){
+      const result=readCircuitSettings(overlay,id,session,no);if(!result)return;
+      if(pendingGuide()?.key===result.key){alert('Terminez le guidage en pause avant de changer les mouvements.');return;}
+      state.guideConfigs=state.guideConfigs||{};state.guideConfigs[result.key]=result.next;
+    }else{
+      const next={type:p.type};$$('[data-param]',overlay).forEach(i=>next[i.dataset.param]=p.type==='strength'&&i.dataset.param==='charge'?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;
+    }
+    save();closeOverlay(true);render();
+  };
 }
 function openFullscreenSheet(src,name){
   const ov=document.createElement("div");ov.className="fullscreen-sheet";
@@ -1608,10 +1732,10 @@ function openCircuitGuide(id,session,no){
  const intensive=id==='ex-circuit-abdos-intensif-8-min';
  const key='circuit:'+session+':'+no+':'+id;
  const cfg=state.guideConfigs?.[key]||{};
- const defaults=circuitGuideSteps(id,session,no);
- const steps=Array.isArray(cfg.steps)&&cfg.steps.length&&cfg.steps.every(x=>x&&typeof x.name==='string')?cfg.steps:defaults;
- const title=intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name;
- guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds:1,loopToTarget:true,targetSeconds:480,voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
+ const steps=circuitSettings(id,session,no).steps;
+ const title=(intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name).replace(/8\s*min/i,cfg.durationLabel||'8 min');
+ const rounds=Number(cfg.rounds)||1;
+ guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds,loopToTarget:rounds===1,targetSeconds:cfg.targetSeconds||athDurationSeconds(cfg.durationLabel)||480,voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
 }
 function athDurationSeconds(value){
  const m=String(value||'').toLowerCase().match(/(\d+)\s*(min|minute|s|sec|seconde)/);
@@ -1620,21 +1744,27 @@ function athDurationSeconds(value){
 function openAthGuide(session){
  const key='ath:'+session,cfg=state.guideConfigs?.[key]||{},steps=[];
  for(const [itemIndex,item] of (DATA.ath?.[session]||[]).entries()){
-   const duration=athDurationSeconds(item.duration);
-   const interval=(item.fields||[]).map(String).find(x=>/\d+\s*s.*\d+\s*s/i.test(x));
-   const match=interval?.match(/(\d+)\s*s[^\d]+(\d+)\s*s/i);
-   if(match&&duration){
+   const c=athStepConfig(session,itemIndex),duration=c.durationSeconds;
+   const properties=(item.fields||[]).filter(f=>f!=='Durée'&&!/\d+\s*s.*\d+\s*s/i.test(f)).filter(f=>c.saved[f]).map(f=>f+' : '+c.saved[f]);
+   const details=properties.length?' · '+properties.join(' · '):'';
+   if(c.interval&&duration){
      let elapsed=0,n=1;
      while(elapsed<duration){
-       const work=Math.min(+match[1],duration-elapsed);
-       steps.push({name:item.name+' · effort '+n,target:work+' secondes',seconds:work,ficheNo:itemIndex+1,intervalBlock:itemIndex+1,recovery:false});elapsed+=work;
-       if(elapsed<duration){const rec=Math.min(+match[2],duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1,intervalBlock:itemIndex+1});elapsed+=rec;}
+       const work=Math.min(c.effortSeconds,duration-elapsed);
+       steps.push({name:item.name+' · effort '+n,target:work+' secondes'+details,seconds:work,ficheNo:itemIndex+1,intervalBlock:itemIndex+1,recovery:false});elapsed+=work;
+       if(elapsed<duration){const rec=Math.min(c.recoverySeconds,duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1,intervalBlock:itemIndex+1});elapsed+=rec;}
        n++;
      }
-   }else if(/temps restant/i.test(item.duration)){
-     steps.push({name:item.name,target:'Temps restant pour atteindre 60 min',remainingTo60:true,ficheNo:itemIndex+1});
-   }else if(duration){steps.push({name:item.name,target:item.duration,seconds:duration,ficheNo:itemIndex+1});}
-   else{steps.push({name:item.name,target:item.duration,manual:true,ficheNo:itemIndex+1});}
+   }else if(c.isRemaining&&!c.durationSeconds){
+     steps.push({name:item.name,target:'Temps restant pour atteindre 60 min'+details,remainingTo60:true,ficheNo:itemIndex+1});
+   }else if(duration){steps.push({name:item.name,target:athStepDurationText(session,itemIndex)+details,seconds:duration,ficheNo:itemIndex+1});}
+   else if(/sled push/i.test(item.name)&&Number.isInteger(Number(c.saved.Passages))&&Number(c.saved.Passages)>0&&Number(c.saved.Passages)<=60){
+     const passages=Number(c.saved.Passages),recovery=Number(c.saved['Récupération'])||0;
+     for(let p=1;p<=passages;p++){
+       steps.push({name:item.name+' · passage '+p+'/'+passages,target:'Validez le passage'+details,manual:true,ficheNo:itemIndex+1});
+       if(p<passages&&recovery>0)steps.push({name:item.name+' · récupération',target:recovery+' secondes',seconds:recovery,recovery:true,ficheNo:itemIndex+1});
+     }
+   }else{steps.push({name:item.name,target:item.duration+details,manual:true,ficheNo:itemIndex+1});}
  }
  if(!steps.length)return;
  guideScreen(niceSession(session),steps,{key,source:'ath',session,editable:false,rest:cfg.rest??0,roundRest:0,rounds:1,voice:cfg.voice!==false});
@@ -1650,8 +1780,8 @@ function guideScreen(title,providedSteps,options={}){
  const isResume=!!draft&&draft.key===key;
  const model=isResume?draft:{key,title,steps:providedSteps.map(x=>({...x})),index:0,round:1,rounds:options.rounds||1,rest:options.rest??0,roundRest:options.roundRest??0,loopToTarget:!!options.loopToTarget,targetSeconds:options.targetSeconds||0,voice:options.voice!==false,source:options.source||'',phase:'ready',remaining:0,elapsed:0,manualElapsed:0,started:false,paused:false,finished:false};
  model.title=title;
- // Existing paused circuits/configurations may have saved loopToTarget=false in V24.18.5.
- if(model.source==='circuit'){model.loopToTarget=true;model.targetSeconds=480;model.rounds=1;}
+ // Never replace an active draft's timing: only fresh guides read newly saved settings.
+ if(model.source==='circuit'&&!isResume){model.rounds=options.rounds||1;model.loopToTarget=model.rounds===1;model.targetSeconds=options.targetSeconds||480;}
  // Preserve paused ATH B sessions created before continuous-interval metadata existed.
  if(isResume&&model.source==='ath'&&model.steps.length===providedSteps.length){model.steps=model.steps.map((step,i)=>({...providedSteps[i],...step,intervalBlock:providedSteps[i].intervalBlock,recovery:providedSteps[i].recovery}));}
  if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
@@ -1661,8 +1791,8 @@ function guideScreen(title,providedSteps,options={}){
    <div class="guide-heading"><div><div class="guide-eyebrow">SÉANCE GUIDÉE</div><h2>${esc(title)}</h2></div><button class="btn guide-close" id="guide-close">Fermer</button></div>
    <div class="guide-active" id="guide-active"><div class="guide-eyebrow" id="guide-step-counter"></div><h3 id="guide-step-name" aria-live="polite"></h3><div class="guide-target" id="guide-step-target"></div><img id="guide-step-visual" class="guide-visual" alt="Aperçu du mouvement indiqué sur la fiche" loading="eager"></div>
    <div class="guide-time"><div class="guide-eyebrow" id="guide-phase"></div><div id="guide-clock" class="v2418-guide-clock">00:00</div><div class="guide-elapsed"><span>Temps écoulé</span><strong id="guide-elapsed-value">00:00</strong><span id="guide-elapsed-goal"></span></div><div class="guide-next" id="guide-next"></div></div>
-   <div class="guide-config" id="guide-config"><div class="param-grid"><div class="field"><label>Repos entre exercices (s)</label><input id="guide-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.rest}"></div><div class="field"><label>Repos entre tours (s)</label><input id="guide-round-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.roundRest}"></div>${model.source==='ath'?'<div class="field"><label>Tours</label><input id="guide-rounds" type="number" inputmode="numeric" min="1" max="30" value="1" disabled></div>':'<div class="guide-auto-rounds">Tours automatiques jusqu’à 8 minutes</div>'}</div>
-   ${model.source==='circuit'?'<p class="guide-loop-label">À la fin du dernier mouvement, un nouveau tour commence tant que les 8 minutes ne sont pas atteintes.</p>':''}
+   <div class="guide-config" id="guide-config"><div class="param-grid"><div class="field"><label>Repos entre exercices (s)</label><input id="guide-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.rest}"></div><div class="field"><label>Repos entre tours (s)</label><input id="guide-round-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.roundRest}"></div>${model.source==='ath'?'<div class="field"><label>Tours</label><input id="guide-rounds" type="number" inputmode="numeric" min="1" max="30" value="1" disabled></div>':`<div class="guide-auto-rounds">${model.loopToTarget?'Tours automatiques · objectif '+Math.round(model.targetSeconds/60)+' min':model.rounds+' tours programmés'}</div>`}</div>
+   ${model.source==='circuit'?`<p class="guide-loop-label">${model.loopToTarget?'Un nouveau tour commence si la durée cible n’est pas atteinte.':'Le guidage s’arrête après les '+model.rounds+' tours définis.'} Les paramètres des mouvements se règlent depuis leur fiche avant le démarrage.</p>`:''}
    <label class="guide-check"><input id="guide-voice" type="checkbox" ${model.voice?'checked':''}> Coach vocal français</label></div>
    <p id="guide-status" class="guide-status" role="status"></p>
    <details id="guide-details" class="guide-details"><summary>Voir le déroulement <span>${model.steps.length} mouvements</span></summary><div class="guide-list-heading"><h3>Déroulement</h3>${options.editable?'<button class="btn guide-edit-btn" id="guide-edit" type="button">Modifier</button>':''}</div><div id="guide-list" class="guide-list"></div></details>
@@ -1675,7 +1805,7 @@ function guideScreen(title,providedSteps,options={}){
  function persist(){if(model.started&&!model.finished)localStorage.setItem(GUIDE_DRAFT_KEY,JSON.stringify({...model,paused:true}));}
  function storeConfig(){
   state.guideConfigs=state.guideConfigs||{};
-  state.guideConfigs[key]={steps:model.steps.map(s=>({...s})),rest:model.rest,roundRest:model.roundRest,rounds:model.rounds,loopToTarget:model.loopToTarget,voice:model.voice};save();
+  state.guideConfigs[key]={...state.guideConfigs[key],steps:model.steps.map(s=>({...s})),rest:model.rest,roundRest:model.roundRest,rounds:model.rounds,loopToTarget:model.loopToTarget,targetSeconds:model.targetSeconds,voice:model.voice};save();
  }
  function stopTicker(){if(ticker)clearInterval(ticker);ticker=null;lastTick=0;}
  function close(goBack=false){
@@ -1702,7 +1832,7 @@ function guideScreen(title,providedSteps,options={}){
  }
  function renderActive(){
   const step=model.steps[model.index];if(!step)return;
-  el('guide-step-counter').textContent=`MOUVEMENT ${model.index+1}/${model.steps.length} · TOUR ${model.round}${model.loopToTarget?' · OBJECTIF 8 MIN':'/'+model.rounds}`;
+  el('guide-step-counter').textContent=`MOUVEMENT ${model.index+1}/${model.steps.length} · TOUR ${model.round}${model.loopToTarget?' · OBJECTIF '+timeText(model.targetSeconds):'/'+model.rounds}`;
   el('guide-step-name').textContent=step.name;
   el('guide-step-target').textContent=step.target|| (step.manual?'Validez à la fin des répétitions':'');
   const preview=el('guide-step-visual');if(step.preview){const src=pathUrl(step.preview);if(preview.dataset.current!==src){preview.src=src;preview.dataset.current=src;}preview.hidden=false;}else{preview.removeAttribute('src');preview.dataset.current='';preview.hidden=true;}
@@ -1854,10 +1984,10 @@ function guideScreen(title,providedSteps,options={}){
   if(!model.finished){model.paused=true;++prepToken;stopVoiceGuide();renderActive();persist();}
  }
  function readSettings(){
-  const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=model.source==='circuit'?1:Number(el('guide-rounds').value);
+  const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=model.source==='circuit'?model.rounds:Number(el('guide-rounds').value);
   if(![rest,roundRest].every(x=>Number.isInteger(x)&&x>=0&&x<=600)||!Number.isInteger(rounds)||rounds<1||rounds>30){alert('Réglages invalides : repos 0–600 secondes et tours 1–30.');return false;}
   model.rest=rest;model.roundRest=model.source==='ath'?0:roundRest;model.rounds=model.source==='ath'?1:rounds;model.voice=el('guide-voice').checked;
-  if(model.source==='circuit')model.loopToTarget=true;
+  if(model.source==='circuit')model.loopToTarget=model.rounds===1;
   if(editing)toggleEdit();storeConfig();return true;
  }
  function toggleEdit(){
