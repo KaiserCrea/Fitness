@@ -1511,3 +1511,9 @@ body.lock-program-home{
 .circuit-tune-row input,.circuit-tuning .field input{width:100%;min-width:0;min-height:44px;background:#1a1a1a;border:1px solid #786240;border-radius:8px;padding:8px;color:#fff;font-size:14px}
 .circuit-tuning .param-grid{margin-top:12px}
 @media(max-width:360px){.ath-settings-fields{grid-template-columns:1fr}.ath-edit-row-heading{flex-wrap:wrap}}
+
+/* V24.21 — load notation with a real multiplication key (Android compatible). */
+.weight-entry{display:flex;align-items:stretch;gap:8px}
+.weight-entry input{flex:1;min-width:0}
+.weight-entry .weight-times{flex:0 0 48px;min-height:46px;border:1px solid #ac884b;border-radius:9px;background:#32291b;color:#f6d78b;font-size:25px;cursor:pointer}
+.weight-entry+.tiny{margin-top:6px;line-height:1.4}

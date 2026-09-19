@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 41;
+const APP_REV = 42;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -95,7 +95,7 @@ function weeksBetween(a,b){
 function defaultState(){
   return {
     installed:false,cycle:"A",nextG:1,weekKey:currentWeekKey(),completedG:[],complementAccessWeek:null,
-    history:[],oldWeeks:[],refs:{},params:{},progressionSettings:{},
+    history:[],oldWeeks:[],refs:{},params:{},progressionSettings:{},sharedProgress:{},
     sessionOrder:{},programOverrides:{},customExercises:{},archivedExercises:[],ephemeralSessions:[],
     today:null,todayDismissed:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},measurements:[],bodySettings:{heightCm:""},appRev:APP_REV
   };
@@ -131,7 +131,7 @@ function migrate(){
   });
   s.completedG=Array.isArray(s.completedG)?s.completedG:[];
   s.oldWeeks=(Array.isArray(s.oldWeeks)?s.oldWeeks:[]).filter(w=>w&&typeof w==="object");
-  s.refs=s.refs||{}; s.params=s.params||{}; s.sessionOrder=s.sessionOrder||{};
+  s.refs=s.refs||{}; s.params=s.params||{}; s.sharedProgress=s.sharedProgress||{}; s.sessionOrder=s.sessionOrder||{};
   s.programOverrides=s.programOverrides||{}; s.customExercises=s.customExercises||{};
   s.archivedExercises=Array.isArray(s.archivedExercises)?s.archivedExercises:[];
   s.ephemeralSessions=Array.isArray(s.ephemeralSessions)?s.ephemeralSessions.filter(x=>x&&Array.isArray(x.exerciseIds)):[];
@@ -238,6 +238,65 @@ function canonicalId(id){
   return id;
 }
 function canonicalDisplayName(id){const raw=RAW_EXERCISE_BY_ID.get(id)||state.customExercises?.[id];const group=aliasGroupForName(raw?.name);return group?.[0]||raw?.name||id;}
+// Only these FIVE equivalences were explicitly authorised for shared progression.
+// Other historical/statistical aliases must not silently merge working loads.
+const APPROVED_PROGRESSION_LINKS=[
+  ['Écarté unilatéral à la poulie basse','Presse unilatérale à la poulie basse, trajectoire ascendante'],
+  ['Tirage vertical prise serrée en V','Tirage vertical prise serrée en V à la poulie haute'],
+  ['Curl biceps à la poulie basse en position bayésienne','Curl biceps à la poulie basse en V'],
+  ['Extension triceps au-dessus de la tête à la corde','Extension triceps poulie arrière'],
+  ['Circuit abdos 8 min','Circuit abdos complet — 8 min']
+];
+function progressionId(id){
+  const name=(RAW_EXERCISE_BY_ID.get(id)||state.customExercises?.[id])?.name;
+  const group=APPROVED_PROGRESSION_LINKS.find(g=>g.some(n=>exerciseNameKey(n)===exerciseNameKey(name)));
+  if(!group)return id;
+  for(const candidate of group){const hit=RAW_EXERCISE_BY_NAME.get(exerciseNameKey(candidate));if(hit)return hit.id;}
+  return id;
+}
+function progressionKey(id){
+  const equipment=String(state.progressionSettings?.[id]?.equipment||'').trim();
+  return progressionId(id)+(equipment?'@@machine:'+equipment:'');
+}
+function sharedProgressFor(id){return state.sharedProgress?.[progressionKey(id)]||null;}
+function setSharedProgress(id,values){
+  state.sharedProgress=state.sharedProgress||{};
+  const key=progressionKey(id),old=state.sharedProgress[key]||{};
+  state.sharedProgress[key]={...old,...values};
+}
+function initializeSharedProgress(){
+  if(state.sharedProgressInitialized)return;
+  const groups=new Map();
+  for(const entry of RAW_EXERCISE_ENTRIES){
+    const id=entry.e.id,key=progressionKey(id);
+    if(!groups.has(key))groups.set(key,new Set());groups.get(key).add(id);
+  }
+  for(const [key,idsSet] of groups){
+    const ids=[...idsSet];if(ids.length<2||state.sharedProgress[key])continue;
+    const last=[...(state.history||[])].reverse().flatMap(h=>[...(h.exercises||[])].reverse())
+      .find(e=>ids.includes(e.id)&&e.status!=='Non réalisé');
+    const ordered=last?[last.id,...ids.filter(id=>id!==last.id)]:ids;
+    const candidate=ordered.map(id=>({id,charge:state.params[id]?.charge||state.refs[id]||'',repetitions:state.params[id]?.repetitions||''}))
+      .find(v=>v.charge)||ordered.map(id=>({id,charge:'',repetitions:state.params[id]?.repetitions||''})).find(v=>v.repetitions);
+    const charge=candidate?.charge||(last?.next&&isNumericWeight(last.next)?last.next:last?.actual&&isNumericWeight(last.actual)?last.actual:'');
+    if(charge||candidate?.repetitions)state.sharedProgress[key]={charge,repetitions:candidate?.repetitions||''};
+  }
+  // Repair the already recorded Wood Chop 15/15/15/10 without rewriting its history:
+  // the working target is 15, but the recorded workout remains an unsuccessful 4×15.
+  const wood='ex-wood-chop-a-la-poulie';
+  const lastWood=[...(state.history||[])].reverse().flatMap(h=>[...(h.exercises||[])].reverse()).find(e=>e.id===wood&&Array.isArray(e.setReps)&&e.setReps.length);
+  if(lastWood){
+    const p=state.params[wood]||{},old=repNumber(p.repetitions||'10'),best=Math.max(...lastWood.setReps);
+    const bounds=repetitionBounds(wood,'FULL MIX 1');
+    if(Number.isFinite(best)&&bounds&&best>old&&best<=bounds.max){
+      state.params[wood]={...p,type:p.type||'strength',repetitions:String(best)};
+      const charge=state.refs[wood]||p.charge||lastWood.next||lastWood.actual||'';
+      if(charge)state.sharedProgress[progressionKey(wood)]={charge,repetitions:String(best)};
+    }
+  }
+  state.sharedProgressInitialized=true;
+  save();
+}
 function buildRegistry(){
   const reg={};
   Object.entries(DATA.sessions||{}).forEach(([session,es])=>es.forEach((e,i)=>{
@@ -352,11 +411,16 @@ function repetitionTargetFor(id,session){
 function repetitionBounds(id,session){const t=repetitionTargetFor(id,session),m=t.match(/(\d+)\s*[–-]\s*(\d+)/);return m?{min:+m[1],max:+m[2]}:null;}
 function repNumber(v){const m=String(v??"").match(/\d+/);return m?+m[0]:NaN;}
 function defaultParams(id){
-  const existing=state.params[id]; if(existing&&Object.keys(existing).length)return clone(existing);
+  const existing=state.params[id],shared=sharedProgressFor(id);
+  if(existing&&Object.keys(existing).length){
+    const p=clone(existing);
+    if(p.type==='strength'&&shared){if(shared.charge!==undefined)p.charge=shared.charge;if(shared.repetitions)p.repetitions=shared.repetitions;}
+    return p;
+  }
   const t=paramType(id);
   if(t==="gainage") return {type:t,tours:"5",normal:"1 min",gauche:"30 s",droite:"30 s",repos:"15–20 s"};
   if(t==="circuit") return {type:t,duree:"8 min",tours:"1"};
-  return {type:t,series:"4",repetitions:"10",charge:state.refs[id]||"",reposSeries:"60 s",reposExercices:"60 s"};
+  return {type:t,series:"4",repetitions:shared?.repetitions||"10",charge:shared?.charge??state.refs[id]??"",reposSeries:"60 s",reposExercices:"60 s"};
 }
 function referenceFor(id){
   const p=defaultParams(id), t=p.type;
@@ -638,8 +702,7 @@ function targetSuggestion(id,sets,weight,session){
  const bounds=repetitionBounds(id,session),p=defaultParams(id),setting=state.progressionSettings[id]||{},inc=Number(setting.increment)||2.5;
  const expected=Math.min(20,Math.max(1,parseInt(p.series)||4));
  if(!bounds||sets.length!==expected||sets.some(r=>!Number.isInteger(r)||r<0))return null;
- const currentGoal=repNumber(p.repetitions);
- const goal=Number.isFinite(currentGoal)?Math.max(bounds.min,Math.min(bounds.max,currentGoal)):bounds.min;
+ const goal=workingGoalFromSets(id,sets,session);
  const n=parseNumber(weight),simpleKg=/^\s*\d+(?:[,.]\d+)?\s*(kg)?\s*$/i.test(String(weight));
  if(sets.every(r=>r>=bounds.max)&&Number.isFinite(n)&&simpleKg){
    return {weight:normalizeWeight(String(Math.round((n+inc)*100)/100)),reps:bounds.min,description:`Toutes les séries ont atteint ${bounds.max} répétitions. Augmentation proposée de ${inc} kg et retour à ${bounds.min} répétitions.`};
@@ -648,6 +711,14 @@ function targetSuggestion(id,sets,weight,session){
  if(sets.some(r=>r<goal))return {weight,reps:goal,description:`Objectif actuel : ${expected} séries de ${goal}. Conserver la charge et compléter les séries inachevées.`};
  const next=Math.min(bounds.max,Math.max(goal,Math.min(...sets))+1);
  return {weight,reps:next,description:`Toutes les séries ont atteint ${goal}. Proposer ${next} répétitions à charge identique.`};
+}
+function workingGoalFromSets(id,sets,session){
+ const bounds=repetitionBounds(id,session),currentGoal=repNumber(defaultParams(id).repetitions);
+ if(!bounds)return Number.isFinite(currentGoal)?currentGoal:NaN;
+ const observed=(Array.isArray(sets)?sets:[]).filter(Number.isFinite);
+ const best=observed.length?Math.max(...observed):bounds.min;
+ // 15/15/15/10 means a 4×15 target still to complete, never a 4×15 success.
+ return Math.max(bounds.min,Math.min(bounds.max,Math.max(Number.isFinite(currentGoal)?currentGoal:bounds.min,best)));
 }
 function exerciseWithoutRequiredLoad(id){
   if(paramType(id)!=='strength')return true;
@@ -670,10 +741,16 @@ function openSetResultsModal(id,no,current,onDone,options={}){
  const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id,cur.session);
  const loadApplicable=!exerciseWithoutRequiredLoad(id),last=loadApplicable?(isNumericWeight(current)?current:latestExerciseWeight(id)):'';
  const noLoadYet=options.markFailed&&loadApplicable&&!last;
- const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label><input id="failed-weight" inputmode="decimal" autocomplete="off" placeholder="Ex. : 40 ou 2 × 20" required><label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<details class="failure-change-load"><summary>Modifier la charge utilisée (actuellement ${esc(refWithUnit(last))})</summary><div class="field"><label for="failed-weight">Charge utilisée (kg)</label><input id="failed-weight" inputmode="decimal" value="${esc(last)}" placeholder="Ex. : 40"></div></details>`):'';
+ const weightEditor=(value='',required=false)=>`<div class="weight-entry"><input id="failed-weight" type="text" inputmode="text" autocomplete="off" autocapitalize="off" value="${esc(value)}" placeholder="Ex. : 40 ou 2×40" ${required?'required':''}><button type="button" class="weight-times" aria-label="Insérer le signe multiplication" title="Insérer ×">×</button></div><div class="tiny muted">Vous pouvez saisir 2×40 pour deux disques de 40 kg, sans compter le poids de la barre.</div>`;
+ const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label>${weightEditor('',true)}<label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<details class="failure-change-load"><summary>Modifier la charge utilisée (actuellement ${esc(refWithUnit(last))})</summary><div class="field"><label for="failed-weight">Charge utilisée (kg)</label>${weightEditor(last)}</div></details>`):'';
  openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(last||current))}</p>${loadMarkup}${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{
    const noLoad=$('#failed-no-load'),weightInput=$('#failed-weight');
    if(noLoad&&weightInput)noLoad.onchange=()=>{weightInput.disabled=noLoad.checked;weightInput.required=!noLoad.checked;};
+   const times=$('.weight-times');if(times&&weightInput)times.onclick=()=>{
+     const a=weightInput.selectionStart??weightInput.value.length,b=weightInput.selectionEnd??a;
+     weightInput.value=weightInput.value.slice(0,a)+'×'+weightInput.value.slice(b);
+     weightInput.focus();weightInput.setSelectionRange(a+1,a+1);
+   };
    $('#save-set-results').onclick=()=>{
      const inputs=$$('[data-set-reps]'),values=inputs.map(x=>Number(x.value));
      if(values.some((v,i)=>!Number.isInteger(v)||v<0||v>200||!inputs[i].value.trim())){alert('Saisissez chaque série (0 à 200).');return;}
@@ -687,8 +764,12 @@ function openSetResultsModal(id,no,current,onDone,options={}){
        cur.values=cur.values||{};cur.values[key]=actualWeight;
      }
      cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);
-     const suggestion=targetSuggestion(id,values,actualWeight,cur.session);cur.nextRefs=cur.nextRefs||{};cur.nextRefs[key]=actualWeight;
-     cur.nextReps=cur.nextReps||{};if(suggestion)cur.nextReps[key]=suggestion.reps;
+     const suggestion=targetSuggestion(id,values,actualWeight,cur.session);
+     cur.nextRefs=cur.nextRefs||{};if(options.markFailed||!cur.nextRefs[key])cur.nextRefs[key]=actualWeight;
+     cur.nextReps=cur.nextReps||{};
+     // Even if the user declines a load increase, a partly achieved higher
+     // target must no longer revert to the stale 4×10 from a technical sheet.
+     if(options.markFailed||!Number.isFinite(repNumber(cur.nextReps[key])))cur.nextReps[key]=workingGoalFromSets(id,values,cur.session);
      save();closeOverlay(true);render();
      if(suggestion)openModal(`<h3>Progression proposée</h3><p>${esc(suggestion.description)}</p><p>Prochaine cible : <b>${esc(refWithUnit(suggestion.weight))} · ${suggestion.reps} répétitions</b></p><div class="modal-actions"><button class="btn ghost" id="suggest-ignore">Conserver ma référence</button><button class="btn gold" id="suggest-accept">Accepter la proposition</button></div>`,()=>{$('#suggest-ignore').onclick=()=>{closeOverlay(true);render();};$('#suggest-accept').onclick=()=>{cur.nextRefs[key]=suggestion.weight;cur.nextReps[key]=suggestion.reps;save();closeOverlay(true);render();};});
      if(onDone)onDone(values);
@@ -750,7 +831,19 @@ function commitCurrentSession(){
   const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:activeSessionIds(cur);
   const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual,reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps,setReps=cur.setReps?.[key]||null,equipment=state.progressionSettings[id]?.equipment||"";return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no,setReps,equipment};}).filter(e=>e.status!=="Non réalisé");
   state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
-  ids.forEach((id,i)=>{const v=occurrenceNext(cur,id,i+1);if(!v)return;state.refs[id]=v;const p=defaultParams(id);if(p.type==="strength"){p.charge=v;state.params[id]=p;}});
+  // Commit ONLY recorded exercises; each occurrence keeps its four actual sets
+  // in history while its next working charge/repetitions are shared by identity.
+  exRecords.forEach(e=>{
+    if(!e.next)return;
+    const id=e.id,p=defaultParams(id);
+    state.refs[id]=e.next;
+    if(p.type==='strength'){
+      p.charge=e.next;
+      if(Number.isFinite(Number(e.nextReps))&&Number(e.nextReps)>0)p.repetitions=String(e.nextReps);
+      state.params[id]=p;
+      setSharedProgress(id,{charge:e.next,repetitions:p.repetitions});
+    }
+  });
   if(/^G[123][ABC]$/.test(cur.session)){
     const n=+cur.session[1]; if(!state.completedG.includes(n))state.completedG.push(n);state.nextG=Math.min(3,n+1);
   }else if(cur.session.startsWith("ATHLÉTIQUE")){
@@ -1073,8 +1166,12 @@ function periodStart(period){
 }
 function trendFor(id,arr){
   if(!arr||arr.length<2)return{key:"none",label:"Données insuffisantes"};
-  const a=arr[arr.length-2],b=arr[arr.length-1],wa=parseNumber(a.value),wb=parseNumber(b.value),ra=repNumber(a.reps),rb=repNumber(b.reps),bounds=repetitionBounds(id);
-  if(Number.isFinite(wa)&&Number.isFinite(wb)){
+  const a=arr[arr.length-2],b=arr[arr.length-1],oldLoad=loadForProgressComparison(a.value),newLoad=loadForProgressComparison(b.value),ra=repNumber(a.reps),rb=repNumber(b.reps);
+  // A plate notation compares plate weight only against the same notation.
+  // Never treat the leading 2 in "2×40" as a 2 kg machine load, or add an
+  // unknown Smith-machine/bar weight to it.
+  if(oldLoad&&newLoad&&oldLoad.kind===newLoad.kind){
+    const wa=oldLoad.weight,wb=newLoad.weight;
     if(wb>wa)return{key:"up",label:"Progression nette"};
     // +1 repetition on just ONE set also counts, even if the minimum set stays at 10.
     if(wb===wa&&Array.isArray(a.setReps)&&Array.isArray(b.setReps)&&a.setReps.length===b.setReps.length&&a.setReps.length&&[...a.setReps,...b.setReps].every(Number.isFinite)){
@@ -1091,6 +1188,20 @@ function trendFor(id,arr){
   return{key:"none",label:"Données insuffisantes"};
 }
 function normalizeRef(v){return String(v??"").trim().toLowerCase();}
+function loadForProgressComparison(raw){
+ const text=String(raw??'').trim().replace(/\s/g,'').replace(/,/g,'.');
+ const pair=text.match(/^(\d+(?:\.\d+)?)[x×](\d+(?:\.\d+)?)(?:kg)?$/i);
+ if(pair)return{kind:'plates',weight:Number(pair[1])*Number(pair[2])};
+ const single=text.match(/^(\d+(?:\.\d+)?)(?:kg)?$/i);
+ return single?{kind:'kg',weight:Number(single[1])}:null;
+}
+function comparableProgressSeries(arr){
+ const rows=(arr||[]).map(record=>({record,load:loadForProgressComparison(record.value)})).filter(x=>x.load);
+ const kind=rows.at(-1)?.load.kind;
+ // A new notation starts a new numeric comparison: a stated load in kilograms
+ // is not directly interchangeable with disks-only weight on a Smith machine.
+ return rows.filter(x=>x.load.kind===kind).map(x=>({record:x.record,weight:x.load.weight,kind}));
+}
 function parseNumber(v){const m=String(v??"").replace(",",".").match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):NaN;}
 function progressHomeTabs(){
   return `<div class="progress-home-tabs">
@@ -1106,7 +1217,7 @@ function weekKeyFromDate(date){
 function progressionGlobalPercent(perf){
   const deltas=[];
   Object.values(perf).forEach(arr=>{
-    const nums=(arr||[]).map(x=>parseNumber(x.value)).filter(Number.isFinite);
+    const nums=comparableProgressSeries(arr).map(x=>x.weight);
     if(nums.length<2||nums[0]===0)return;
     deltas.push((nums.at(-1)-nums[0])/Math.abs(nums[0])*100);
   });
@@ -1327,7 +1438,7 @@ function renderProgress(){
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
 function averageIncrease(perf,ids){
-  const vals=ids.map(id=>{const a=(perf[id]||[]).map(x=>parseNumber(x.value)).filter(Number.isFinite);return a.length>1&&a[0]!==0?(a.at(-1)-a[0])/a[0]*100:NaN;}).filter(Number.isFinite);
+  const vals=ids.map(id=>{const a=comparableProgressSeries(perf[id]).map(x=>x.weight);return a.length>1&&a[0]!==0?(a.at(-1)-a[0])/a[0]*100:NaN;}).filter(Number.isFinite);
   return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
 }
 function progressRow(id,no,arr){
@@ -1338,13 +1449,14 @@ function progressRow(id,no,arr){
 }
 function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
-  const filtered=filterPerf(arr,progressionPeriod);const nums=filtered.map(x=>({x:x.date,y:parseNumber(x.value),raw:x})).filter(x=>Number.isFinite(x.y));
+  const filtered=filterPerf(arr,progressionPeriod),comparison=comparableProgressSeries(filtered);
+  const nums=comparison.map(x=>({x:x.record.date,y:x.weight,raw:x.record}));
   const first=nums[0]?.y,last=nums.at(-1)?.y,delta=(Number.isFinite(first)&&Number.isFinite(last))?last-first:null,pct=(delta!=null&&first)?Math.round(delta/first*100):null,trend=trendFor(id,filtered);
   const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
   shell(`<div class="detail-hero detail-sheet-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
-    ${sub==="evolution"?progressEvolutionContent(nums,delta,pct,trend):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
+    ${sub==="evolution"?progressEvolutionContent(nums,delta,pct,trend,comparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
     <div class="card progress-settings-card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div><div class="card"><div class="section-title">Records personnels</div>${personalRecordsContent(id)}</div>`,"progress-detail-screen");
   $("#back-progress").onclick=()=>history.back();
   $$("[data-detail-tab]").forEach(b=>b.onclick=()=>{view={type:"progressDetail",id,sub:b.dataset.detailTab};history.replaceState(navState(),"");render();});
@@ -1353,16 +1465,16 @@ function renderProgressDetail(id,sub="evolution"){
   $("#edit-prog-settings").onclick=()=>openProgressSettingsModal(id);
 }
 function filterPerf(arr,period){const st=periodStart(period);return st?arr.filter(x=>x.date>=st):arr.slice();}
-function progressEvolutionContent(nums,delta,pct,trend){
-  return `<div class="chart">${lineChart(nums)}</div><div class="metrics"><div class="metric"><b>${delta==null?"—":`${delta>0?"+":""}${round1(delta)}`}</b><span>Évolution sur la période</span></div><div class="metric"><b>${pct==null?"—":`${pct>0?"+":""}${pct}%`}</b><span>Progression</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
+function progressEvolutionContent(nums,delta,pct,trend,kind){
+  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="metrics"><div class="metric"><b>${delta==null?"—":`${delta>0?"+":""}${round1(delta)}`}</b><span>Évolution sur la période${kind==='plates'?' · kg de disques':''}</span></div><div class="metric"><b>${pct==null?"—":`${pct>0?"+":""}${pct}%`}</b><span>Progression</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
 }
 function progressHistoryContent(arr){
   return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b>${esc(refWithUnit(x.value))}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
 }
 function progressStatsContent(arr){
-  const vals=arr.map(x=>parseNumber(x.value)).filter(Number.isFinite);
+  const comparison=comparableProgressSeries(arr),vals=comparison.map(x=>x.weight),suffix=comparison.at(-1)?.kind==='plates'?' kg de disques (hors barre)':'';
   const best=vals.length?Math.max(...vals):null,avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
-  return `<div class="metrics"><div class="metric"><b>${arr.length}</b><span>Occurrences</span></div><div class="metric"><b>${best==null?"—":round1(best)}</b><span>Meilleure référence</span></div><div class="metric"><b>${avg==null?"—":round1(avg)}</b><span>Moyenne</span></div></div>`;
+  return `<div class="metrics"><div class="metric"><b>${arr.length}</b><span>Occurrences</span></div><div class="metric"><b>${best==null?"—":round1(best)}</b><span>Meilleure référence${suffix}</span></div><div class="metric"><b>${avg==null?"—":round1(avg)}</b><span>Moyenne${suffix}</span></div></div>`;
 }
 function lineChart(nums){
   if(nums.length<1)return`<div class="empty">Le graphique apparaîtra après les premières performances chiffrées.</div>`;
@@ -1523,7 +1635,7 @@ function circuitSettingsMarkup(id,session,no){
   const {cfg,steps}=circuitSettings(id,session,no);
   return `<div class="circuit-tuning"><h3>Réglages par mouvement</h3><p class="tiny muted">Chaque valeur remplace l’objectif du circuit guidé. Les répétitions se valident manuellement.</p>
     ${steps.map((s,i)=>`<div class="circuit-tune-row"><label for="circuit-step-${i}">${i+1}. ${esc(s.name)} <span>${s.manual?'Répétitions':'Durée (secondes)'}</span></label><input id="circuit-step-${i}" data-circuit-value="${i}" type="number" inputmode="numeric" min="${s.manual?1:5}" max="${s.manual?500:3600}" value="${esc(s.manual?(s.repetitions||repNumber(s.target)||15):(s.seconds||45))}"></div>`).join('')}
-    <div class="param-grid"><div class="field"><label>Repos entre exercices (secondes)</label><input type="number" inputmode="numeric" min="0" max="600" data-circuit-rest value="${esc(cfg.rest??0)}"></div><div class="field"><label>Repos entre tours (secondes)</label><input type="number" inputmode="numeric" min="0" max="600" data-circuit-round-rest value="${esc(cfg.roundRest??(id==='ex-circuit-abdos-intensif-8-min'?30:0))}"></div></div>
+    <div class="param-grid"><div class="field"><label>Repos entre tours (secondes)</label><input type="number" inputmode="numeric" min="0" max="600" data-circuit-round-rest value="${esc(cfg.roundRest??(id==='ex-circuit-abdos-intensif-8-min'?30:0))}"></div></div>
     <p class="tiny muted">Avec 1 tour, le circuit se répète jusqu’à la durée totale. Avec plusieurs tours, il se termine à la fin du nombre choisi.</p>
   </div>`;
 }
@@ -1534,7 +1646,9 @@ function readCircuitSettings(overlay,id,session,no){
   if(!durationMatch){alert('Durée totale : indiquez par exemple 8 min ou 480 s.');return null;}
   const targetSeconds=Math.round(Number(durationMatch[1])*(durationMatch[2]?.toLowerCase().startsWith('s')?1:60));
   const rounds=Number($('[data-param="tours"]',overlay)?.value);
-  const rest=Number($('[data-circuit-rest]',overlay)?.value),roundRest=Number($('[data-circuit-round-rest]',overlay)?.value);
+  // The technical-sheet field was removed by request. Its existing timing is
+  // retained and remains editable in the dedicated guided-workout controls.
+  const rest=Number(cfg.rest??0),roundRest=Number($('[data-circuit-round-rest]',overlay)?.value);
   if(targetSeconds<30||targetSeconds>14400||!Number.isInteger(rounds)||rounds<1||rounds>30||![rest,roundRest].every(n=>Number.isInteger(n)&&n>=0&&n<=600)){
     alert('Durée : 30 s à 240 min ; tours : 1 à 30 ; repos : 0 à 600 s.');return null;
   }
@@ -1574,7 +1688,13 @@ function openSheet(id,session,no){
       if(pendingGuide()?.key===result.key){alert('Terminez le guidage en pause avant de changer les mouvements.');return;}
       state.guideConfigs=state.guideConfigs||{};state.guideConfigs[result.key]=result.next;
     }else{
-      const next={type:p.type};$$('[data-param]',overlay).forEach(i=>next[i.dataset.param]=p.type==='strength'&&i.dataset.param==='charge'?normalizeWeight(i.value):i.value.trim());state.params[id]=next;if(next.charge)state.refs[id]=next.charge;
+      // Keep hidden legacy settings intact: removing a field from the form
+      // must never delete unrelated saved values or guided-circuit timing.
+      const next=clone(p);$$('[data-param]',overlay).forEach(i=>next[i.dataset.param]=p.type==='strength'&&i.dataset.param==='charge'?normalizeWeight(i.value):i.value.trim());state.params[id]=next;
+      if(p.type==='strength'){
+        if(next.charge)state.refs[id]=next.charge;else delete state.refs[id];
+        setSharedProgress(id,{charge:next.charge,repetitions:next.repetitions});
+      }
     }
     save();closeOverlay(true);render();
   };
@@ -1673,8 +1793,8 @@ function prepareSheetLayout(img,canvas){
   if(img.complete&&img.naturalWidth)apply();else img.addEventListener("load",apply,{once:true});
 }
 function paramInputs(p){
-  const labels={series:"Séries",repetitions:"Répétitions",charge:"Charge / référence",reposSeries:"Repos entre séries",reposExercices:"Repos entre exercices",tours:"Tours",normal:"Gainage normal",gauche:"Latéral gauche",droite:"Latéral droit",repos:"Repos",duree:"Durée totale"};
-  return Object.entries(p).filter(([k])=>k!=="type").map(([k,v])=>`<div class="field"><label>${esc(labels[k]||k)}</label><input data-param="${esc(k)}" value="${esc(v)}"></div>`).join("");
+  const labels={series:"Séries",repetitions:"Répétitions",charge:"Charge / référence",reposSeries:"Repos entre séries",tours:"Tours",normal:"Gainage normal",gauche:"Latéral gauche",droite:"Latéral droit",repos:"Repos",duree:"Durée totale"};
+  return Object.entries(p).filter(([k])=>k!=="type"&&k!=="reposExercices").map(([k,v])=>`<div class="field"><label>${esc(labels[k]||k)}</label><input data-param="${esc(k)}" value="${esc(v)}"></div>`).join("");
 }
 function openCycleModal(){
   openModal(`<h3>Position du cycle G</h3><p>Le cycle hebdomadaire suit A → B → C. Un G manqué n’est pas reporté à la semaine suivante.</p>
@@ -2165,6 +2285,7 @@ document.addEventListener("click",e=>{
 });
 window.addEventListener("pagehide",()=>{rememberTabScroll();persistUI();});
 window.addEventListener("beforeunload",()=>{rememberTabScroll();persistUI();});
+initializeSharedProgress();
 render();
 if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
