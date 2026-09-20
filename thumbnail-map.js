@@ -1,5 +1,5 @@
 window.FITNESS_THUMBNAILS = {
-  "FULL MIX 1|1": "miniatures/FM1/01_developpe_incline_smith_machine.jpg",
+  "FULL MIX 1|1": "miniatures/FM4/01_developpe_incline_halteres.jpg",
   "FULL MIX 1|2": "miniatures/FM1/02_ecarte_poulie_basse_vers_haut_debout.jpg",
   "FULL MIX 1|3": "miniatures/FM1/03_developpe_epaules_assis_halteres.jpg",
   "FULL MIX 1|4": "miniatures/FM1/04_elevations_laterales_halteres.jpg",

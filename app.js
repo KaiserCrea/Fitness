@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 42;
+const APP_REV = 43;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -147,6 +147,15 @@ function migrate(){
   });
   // FM3 previously had two identical Leg Extension IDs. Fix only the known
   // untouched positions in a saved override; never guess after manual reordering.
+  // V24.24: replace the retired FM1 Smith exercise in a saved FM1 order only.
+  // Never touch workout history, other sessions, existing loads or a running session.
+  const fm1=s.programOverrides['FULL MIX 1'];
+  if(Array.isArray(fm1)&&fm1.includes('ex-developpe-incline-a-la-smith-machine')){
+    const dumbbell='ex-developpe-incline-avec-halteres';
+    s.programOverrides['FULL MIX 1']=fm1.includes(dumbbell)
+      ?fm1.filter(id=>id!=='ex-developpe-incline-a-la-smith-machine')
+      :fm1.map(id=>id==='ex-developpe-incline-a-la-smith-machine'?dumbbell:id);
+  }
   const fm3=s.programOverrides['FULL MIX 3'];
   if(Array.isArray(fm3)&&fm3[1]==='ex-leg-extension'&&fm3[4]==='ex-leg-extension'&&!fm3.includes('ex-leg-curl-assis')){
     fm3[1]='ex-leg-curl-assis';
@@ -209,7 +218,21 @@ function sessionIds(session){
   return Array.isArray(ov)?ov.slice():baseIds(session);
 }
 
-function activeSessionIds(cur){return Array.isArray(cur?.exerciseIds)?cur.exerciseIds.slice():sessionIds(cur?.session);}
+function activeSessionIds(cur){
+  if(Array.isArray(cur?.exerciseIds))return cur.exerciseIds.slice();
+  const ids=sessionIds(cur?.session);
+  // A workout opened before the update retains its original Smith identity and
+  // recorded values until it is saved. Future FM1 sessions use dumbbells.
+  if(cur?.session==='FULL MIX 1'){
+    const oldId='ex-developpe-incline-a-la-smith-machine';
+    const keys=[...Object.keys(cur.values||{}),...Object.keys(cur.status||{}),...Object.keys(cur.setReps||{})];
+    keys.forEach(key=>{
+      const match=key.match(/^ex-developpe-incline-a-la-smith-machine@@(\d+)$/);
+      if(match){const pos=Number(match[1])-1;if(pos>=0&&pos<ids.length&&ids[pos]==='ex-developpe-incline-avec-halteres')ids[pos]=oldId;}
+    });
+  }
+  return ids;
+}
 function ephemeralById(id){return state.ephemeralSessions.find(x=>x.id===id);}
 function ephemeralDisplayName(cur){return cur?.ephemeralName||ephemeralById(cur?.ephemeralId)?.name||"Séance éphémère";}
 const EXERCISE_ALIAS_GROUPS=[
@@ -311,7 +334,15 @@ function buildRegistry(){
 let registryCache=null,occurrenceCache=new Map();
 function invalidateDerivedCaches(){registryCache=null;occurrenceCache.clear();perfCache=null;performanceMarkupCache.clear();overviewMarkupCache.clear();}
 function registry(){return registryCache||(registryCache=buildRegistry());}
-function exercise(id){const cid=canonicalId(id);return registry()[cid]||{id:cid,name:canonicalDisplayName(id),remark:""};}
+const RETIRED_EXERCISES=Object.freeze({
+  'ex-developpe-incline-a-la-smith-machine':{
+    id:'ex-developpe-incline-a-la-smith-machine',name:'Développé incliné à la Smith Machine',
+    firstSession:'FULL MIX 1',firstNo:1,
+    sheet:'fiches/FM1/FM1_EX01_Developpe incline a la Smith Machine.png',
+    thumbnail:'miniatures/FM1/01_developpe_incline_smith_machine.jpg'
+  }
+});
+function exercise(id){const cid=canonicalId(id);return registry()[cid]||RETIRED_EXERCISES[cid]||{id:cid,name:canonicalDisplayName(id),remark:""};}
 function occurrenceList(id){
   const cid=canonicalId(id);if(occurrenceCache.has(cid))return occurrenceCache.get(cid);
   const out=[];
@@ -324,6 +355,7 @@ function canonicalSheetOccurrence(id){
   return Object.entries(DATA.sessions||{}).flatMap(([s,es])=>es.map((e,i)=>({s,e,n:i+1}))).find(x=>x.e.id===id && sheetPathForOccurrence(x.s,x.n));
 }
 function sheetFor(id,session,no){
+  if(RETIRED_EXERCISES[id])return pathUrl(RETIRED_EXERCISES[id].sheet);
   // A position-specific file is valid only while the same canonical exercise still occupies its original position.
   // After drag/drop or transfer, fall back to the exercise's canonical sheet so identity never follows a slot number.
   const originalId=DATA.sessions?.[session]?.[Math.max(0,(+no||1)-1)]?.id;
@@ -334,6 +366,7 @@ function sheetFor(id,session,no){
   const custom=state.customExercises?.[id]?.sheetPath;return custom?pathUrl(custom):"";
 }
 function thumbnailFor(id,session,no){
+  if(RETIRED_EXERCISES[id])return pathUrl(RETIRED_EXERCISES[id].thumbnail);
   const direct=THUMBNAILS[`${session}|${no}`];
   if(direct&&DATA.sessions?.[session]?.[Math.max(0,(+no||1)-1)]?.id===id)return pathUrl(direct);
   const occurrence=occurrenceList(id).find(x=>THUMBNAILS[`${x.s}|${x.n}`]);
@@ -375,7 +408,7 @@ const REP_TARGETS_BY_ORIGINAL_SLOT=Object.freeze({
   'G2C|4':'8–12','G2C|6':'12–15',
   'G3A|1':'8–12','G3A|3':'10–15','G3A|4':'10–15',
   'G3B|3':'15–20','G3C|3':'15–20',
-  'FULL MIX 1|1':'10–15','FULL MIX 1|3':'8–12',
+  'FULL MIX 1|1':'8–12','FULL MIX 1|3':'8–12',
   'FULL MIX 1|7':'10–12','FULL MIX 1|8':'10–15','FULL MIX 1|9':'12–20',
   'FULL MIX 2|2':'10–15','FULL MIX 2|4':'10–15','FULL MIX 2|6':'10–15',
   'FULL MIX 3|2':'10–15','FULL MIX 3|6':'8–12',
@@ -383,6 +416,8 @@ const REP_TARGETS_BY_ORIGINAL_SLOT=Object.freeze({
   'FULL MIX 4|8':'15–20','FULL MIX 4|9':'15–20'
 });
 function repetitionTargetFor(id,session){
+  // Historical Smith workout already open during the update keeps its FM1 target.
+  if(id==='ex-developpe-incline-a-la-smith-machine'&&session==='FULL MIX 1')return '10–15';
   if(session){
     const originalIndex=(DATA.sessions?.[session]||[]).findIndex(e=>e.id===id);
     if(originalIndex>=0){
@@ -1219,14 +1254,48 @@ function weekKeyFromDate(date){
   const d=new Date(`${date||localISODate()}T12:00:00`);const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day);
   return localISODate(d);
 }
+// Charge + répétitions, sans assimiler la reprise au bas de la plage après
+// augmentation de charge à une régression. Cette métrique est un indice de suivi,
+// pas un volume d'entraînement ni une mesure physiologique.
+function comparisonReps(record){
+  const sets=record?.setReps;
+  if(Array.isArray(sets)&&sets.length&&sets.every(n=>Number.isInteger(n)&&n>=0&&n<=200))
+    return {value:sets.reduce((sum,n)=>sum+n,0),sets:sets.length,source:'actual'};
+  const reps=repNumber(record?.reps);
+  return Number.isFinite(reps)&&reps>0?{value:reps,sets:0,source:'minimum'}:null;
+}
+function progressionChange(arr){
+  const rows=comparableProgressSeries(arr);
+  if(rows.length<2)return null;
+  let multiplier=1,repDelta=0,comparisons=0;
+  for(let i=1;i<rows.length;i++){
+    const a=rows[i-1],b=rows[i],oldLoad=a.weight,newLoad=b.weight;
+    if(oldLoad>0&&newLoad>0&&oldLoad!==newLoad){
+      multiplier*=newLoad/oldLoad;comparisons++;
+      // Rep targets reset on a load change: never count them as a rep loss.
+      continue;
+    }
+    if(oldLoad!==newLoad)continue;
+    const ra=comparisonReps(a.record),rb=comparisonReps(b.record);
+    if(!ra||!rb)continue;
+    // Actual sets are compared as totals only when the same number of sets was done.
+    // If one result lacks set details, compare the per-set minimum instead.
+    let previous=ra.value,current=rb.value;
+    if(ra.sets!==rb.sets){
+      previous=ra.sets?Math.min(...a.record.setReps):ra.value;
+      current=rb.sets?Math.min(...b.record.setReps):rb.value;
+    }
+    if(previous<=0)continue;
+    multiplier*=current/previous;repDelta+=current-previous;comparisons++;
+  }
+  if(!comparisons)return null;
+  const delta=rows.at(-1).weight-rows[0].weight;
+  return {percent:Math.round((multiplier-1)*100),loadDelta:round1(delta),repDelta,
+    kind:rows.at(-1).kind,comparisons};
+}
 function progressionGlobalPercent(perf){
-  const deltas=[];
-  Object.values(perf).forEach(arr=>{
-    const nums=comparableProgressSeries(arr).map(x=>x.weight);
-    if(nums.length<2||nums[0]===0)return;
-    deltas.push((nums.at(-1)-nums[0])/Math.abs(nums[0])*100);
-  });
-  return deltas.length?Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length):0;
+  const deltas=Object.values(perf).map(progressionChange).filter(Boolean).map(x=>x.percent);
+  return deltas.length?Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length):null;
 }
 function selectedRange(period,anchor=periodAnchor){
   const d=new Date(`${anchor}T12:00:00`);let start,end;
@@ -1376,8 +1445,9 @@ function renderProgressOverview(){
       <div class="overview-metric"><span class="overview-metric-icon">${icon("dumbbell")}</span><b>${d.sessions}</b><span>Séances<br>réalisées</span></div>
       <div class="overview-metric"><span class="overview-metric-icon">${icon("chart")}</span><b>${d.exercises}</b><span>Exercices<br>effectués</span></div>
       <div class="overview-metric"><span class="overview-metric-icon">${icon("clock")}</span><b>${hours}h ${String(mins).padStart(2,"0")}</b><span>Temps total</span></div>
-      <div class="overview-metric"><span class="overview-metric-icon">${icon("trend")}</span><b>${d.global>0?"+":""}${d.global}%</b><span>Progression<br>globale</span></div>
+      <div class="overview-metric"><span class="overview-metric-icon">${icon("trend")}</span><b>${d.global==null?'—':`${d.global>0?'+':''}${d.global}%`}</b><span>Progression<br>globale*</span></div>
     </div>
+    <p class="tiny muted overview-progress-method">* Indice moyen : charge et répétitions comparables sur la période. Aucune valeur sans deux relevés exploitables.</p>
     <div class="overview-section-head duration-heading"><h2>Évolution du temps d’entraînement</h2><span>${overviewPeriod==="week"?(()=>{const w=isoWeekInfo(periodAnchor);return 'Semaine '+w.week+' / '+isoWeekCount(w.year);})():overviewPeriod==="month"?"Par semaine · mois sélectionné":"Par mois · année sélectionnée"}</span></div>
     <div class="overview-panel duration-panel">${overviewDurationBars(trainingDurationSeries())}</div>
     <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
@@ -1387,7 +1457,11 @@ function renderProgressOverview(){
 function renderProgressPerformance(){
   const cacheKey=progressionPeriod+"|"+progressionGroup+"|"+localISODate();
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
-  const perf=allPerf(),reg=registry();let ids=Object.keys(reg).filter(id=>!state.archivedExercises.includes(id));
+  const perf=allPerf(),reg=registry();
+  // Show historical Smith performances under their own retired name, without
+  // reintroducing the old exercise to the active program or merging its loads.
+  let ids=[...new Set([...Object.keys(reg),...Object.keys(perf).filter(id=>RETIRED_EXERCISES[id])])]
+    .filter(id=>!state.archivedExercises.includes(id));
   if(progressionGroup!=="Tous")ids=ids.filter(id=>groupForId(id)===progressionGroup);
   const start=periodStart(progressionPeriod);if(start)ids=ids.filter(id=>(perf[id]||[]).some(x=>x.date>=start));
   const active=ids.filter(id=>(perf[id]||[]).length),progressing=active.filter(id=>["up","slow"].includes(trendFor(id,perf[id]).key)).length;
@@ -1476,7 +1550,7 @@ function renderProgress(){
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
 function averageIncrease(perf,ids){
-  const vals=ids.map(id=>{const a=comparableProgressSeries(perf[id]).map(x=>x.weight);return a.length>1&&a[0]!==0?(a.at(-1)-a[0])/a[0]*100:NaN;}).filter(Number.isFinite);
+  const vals=ids.map(id=>progressionChange(perf[id])?.percent).filter(Number.isFinite);
   return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
 }
 function progressRow(id,no,arr){
@@ -1489,12 +1563,12 @@ function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
   const filtered=filterPerf(arr,progressionPeriod),comparison=comparableProgressSeries(filtered);
   const nums=comparison.map(x=>({x:x.record.date,y:x.weight,raw:x.record}));
-  const first=nums[0]?.y,last=nums.at(-1)?.y,delta=(Number.isFinite(first)&&Number.isFinite(last))?last-first:null,pct=(delta!=null&&first)?Math.round(delta/first*100):null,trend=trendFor(id,filtered);
+  const change=progressionChange(filtered),trend=trendFor(id,filtered);
   const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
   shell(`<div class="detail-hero detail-sheet-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
-    ${sub==="evolution"?progressEvolutionContent(nums,delta,pct,trend,comparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
+    ${sub==="evolution"?progressEvolutionContent(nums,change,trend,comparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
     <div class="card progress-settings-card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div><div class="card"><div class="section-title">Records personnels</div>${personalRecordsContent(id)}</div>`,"progress-detail-screen");
   $("#back-progress").onclick=()=>history.back();
   $$("[data-detail-tab]").forEach(b=>b.onclick=()=>{view={type:"progressDetail",id,sub:b.dataset.detailTab};history.replaceState(navState(),"");render();});
@@ -1503,8 +1577,10 @@ function renderProgressDetail(id,sub="evolution"){
   $("#edit-prog-settings").onclick=()=>openProgressSettingsModal(id);
 }
 function filterPerf(arr,period){const st=periodStart(period);return st?arr.filter(x=>x.date>=st):arr.slice();}
-function progressEvolutionContent(nums,delta,pct,trend,kind){
-  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="metrics"><div class="metric"><b>${delta==null?"—":`${delta>0?"+":""}${round1(delta)}`}</b><span>Évolution sur la période${kind==='plates'?' · kg de disques':''}</span></div><div class="metric"><b>${pct==null?"—":`${pct>0?"+":""}${pct}%`}</b><span>Progression</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
+function progressEvolutionContent(nums,change,trend,kind){
+  const signed=n=>`${n>0?'+':''}${String(round1(n)).replace('.',',')}`;
+  const summary=change?[...(change.loadDelta?[signed(change.loadDelta)+(kind==='plates'?' kg de disques':' kg')]:[]),...(change.repDelta?[signed(change.repDelta)+' rép.']:[])].join(' · ')||'Stable':'—';
+  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe reste basée sur la charge ; les indicateurs d’évolution incluent les répétitions à charge égale, sans pénaliser leur remise à zéro après hausse de charge.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(summary)}</b><span>Évolution sur la période · charge et répétitions</span></div><div class="metric"><b>${change?`${change.percent>0?'+':''}${change.percent}%`:'—'}</b><span>Indice de progression · charge + répétitions</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
 }
 function progressHistoryContent(arr){
   return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b>${esc(refWithUnit(x.value))}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
@@ -1870,8 +1946,33 @@ function periodLabel(period,anchor){
   if(period==="month")return d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
   return String(d.getFullYear());
 }
+function openOverviewMonthPicker(){
+  let year=Number(periodAnchor.slice(0,4))||new Date().getFullYear();
+  const monthNames=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  openModal('<h3>Choisir un mois</h3><div id="overview-month-picker-body"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button></div>',modal=>{
+    const body=$('#overview-month-picker-body',modal);
+    function draw(){
+      body.innerHTML=`<div class="overview-month-year"><button type="button" data-overview-year="-1" aria-label="Année précédente">‹</button><b>${year}</b><button type="button" data-overview-year="1" aria-label="Année suivante">›</button></div><div class="overview-month-grid">${monthNames.map((name,i)=>{
+        const key=year+'-'+String(i+1).padStart(2,'0');
+        const count=(state.history||[]).filter(h=>String(h.date||'').startsWith(key)).length;
+        const selected=periodAnchor.slice(0,7)===key;
+        return `<button type="button" data-overview-month="${i+1}" class="overview-month-tile ${selected?'selected':''}" aria-label="Afficher ${name} ${year}"><b>${name}</b><span>${count?count+' séance'+(count>1?'s':''):'Aucune séance'}</span></button>`;
+      }).join('')}</div>`;
+      $$('[data-overview-year]',body).forEach(button=>button.onclick=()=>{year+=Number(button.dataset.overviewYear);draw();});
+      $$('[data-overview-month]',body).forEach(button=>button.onclick=()=>{
+        periodAnchor=year+'-'+String(button.dataset.overviewMonth).padStart(2,'0')+'-01';
+        overviewPeriod='month';persistUI();closeOverlay(false);
+        // Replace the modal history entry with this selected month. Android Back
+        // can still return to the prior overview without reverting this selection.
+        history.replaceState(navState(),'');render();
+      });
+    }
+    draw();
+  });
+}
 function openPeriodPicker(target){
   const period=target==="history"?historyPeriod:overviewPeriod;
+  if(target==='overview'&&period==='month'){openOverviewMonthPicker();return;}
   const anchor=target==="history"?historyAnchor:periodAnchor;
   if(period==="all"){historyPeriod="year";historyYear=new Date().getFullYear();historyAnchor=localISODate();persistUI();render();return;}
   const d=new Date(`${anchor}T12:00:00`),type=period==="month"?"month":period==="year"?"number":"date";
@@ -1962,27 +2063,49 @@ function openAthGuide(session){
    const c=athStepConfig(session,itemIndex),duration=c.durationSeconds;
    const properties=(item.fields||[]).filter(f=>f!=='Durée'&&!/\d+\s*s.*\d+\s*s/i.test(f)).filter(f=>c.saved[f]).map(f=>f+' : '+c.saved[f]);
    const details=properties.length?' · '+properties.join(' · '):'';
+   const timeCue=session==='ATHLÉTIQUE A'?itemIndex<4:session==='ATHLÉTIQUE B'&&itemIndex<2;
+   const cueProps=timeCue?{athTimeCue:true,athTimeBlock:itemIndex+1}:{};
    if(c.interval&&duration){
      let elapsed=0,n=1;
      while(elapsed<duration){
        const work=Math.min(c.effortSeconds,duration-elapsed);
-       steps.push({name:item.name+' · effort '+n,target:work+' secondes'+details,seconds:work,ficheNo:itemIndex+1,intervalBlock:itemIndex+1,recovery:false});elapsed+=work;
-       if(elapsed<duration){const rec=Math.min(c.recoverySeconds,duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1,intervalBlock:itemIndex+1});elapsed+=rec;}
+       steps.push({name:item.name+' · effort '+n,target:work+' secondes'+details,seconds:work,ficheNo:itemIndex+1,intervalBlock:itemIndex+1,recovery:false,...cueProps});elapsed+=work;
+       if(elapsed<duration){const rec=Math.min(c.recoverySeconds,duration-elapsed);steps.push({name:item.name+' · récupération '+n,target:rec+' secondes',seconds:rec,recovery:true,ficheNo:itemIndex+1,intervalBlock:itemIndex+1,...cueProps});elapsed+=rec;}
        n++;
      }
    }else if(c.isRemaining&&!c.durationSeconds){
-     steps.push({name:item.name,target:'Temps restant pour atteindre 60 min'+details,remainingTo60:true,ficheNo:itemIndex+1});
-   }else if(duration){steps.push({name:item.name,target:athStepDurationText(session,itemIndex)+details,seconds:duration,ficheNo:itemIndex+1});}
+     steps.push({name:item.name,target:'Temps restant pour atteindre 60 min'+details,remainingTo60:true,ficheNo:itemIndex+1,...cueProps});
+   }else if(duration){steps.push({name:item.name,target:athStepDurationText(session,itemIndex)+details,seconds:duration,ficheNo:itemIndex+1,...cueProps});}
    else if(/sled push/i.test(item.name)&&Number.isInteger(Number(c.saved.Passages))&&Number(c.saved.Passages)>0&&Number(c.saved.Passages)<=60){
      const passages=Number(c.saved.Passages),recovery=Number(c.saved['Récupération'])||0;
      for(let p=1;p<=passages;p++){
-       steps.push({name:item.name+' · passage '+p+'/'+passages,target:'Validez le passage'+details,manual:true,ficheNo:itemIndex+1});
-       if(p<passages&&recovery>0)steps.push({name:item.name+' · récupération',target:recovery+' secondes',seconds:recovery,recovery:true,ficheNo:itemIndex+1});
+       steps.push({name:item.name+' · passage '+p+'/'+passages,target:'Validez le passage'+details,manual:true,ficheNo:itemIndex+1,...cueProps});
+       if(p<passages&&recovery>0)steps.push({name:item.name+' · récupération',target:recovery+' secondes',seconds:recovery,recovery:true,ficheNo:itemIndex+1,...cueProps});
      }
-   }else{steps.push({name:item.name,target:item.duration+details,manual:true,ficheNo:itemIndex+1});}
+   }else{steps.push({name:item.name,target:item.duration+details,manual:true,ficheNo:itemIndex+1,...cueProps});}
  }
  if(!steps.length)return;
  guideScreen(niceSession(session),steps,{key,source:'ath',session,editable:false,rest:cfg.rest??0,roundRest:0,rounds:1,voice:cfg.voice!==false});
+}
+// Pure milestone decision: testable without Android speech or a live timer.
+function athMinuteCue(step,model,phase,elapsedPrev,elapsedNow,previousRemaining,remaining,spoken){
+  if(!step?.athTimeCue||model.source!=='ath'||
+     !(phase==='work'||phase==='rest'&&step.recovery)||
+     model.athCueBlock!==step.athTimeBlock)return '';
+  const secs=Number(step.seconds);
+  const timed=phase==='work'&&!step.manual&&Number.isFinite(secs)&&secs>0;
+  let key='',text='';
+  if(timed&&previousRemaining>60&&remaining<=60&&remaining>0){key='ath-rem-60';text="Plus qu'une minute";}
+  else if(timed&&previousRemaining>300&&remaining<=300&&remaining>0){key='ath-rem-300';text='Plus que 5 minutes';}
+  else{
+    const milestone=Math.floor(elapsedNow/300);
+    if(milestone>0&&elapsedPrev<milestone*300&&elapsedNow>=milestone*300&&
+       (!timed||remaining>0)){
+      key='ath-elapsed-'+milestone;text=milestone*5+' minutes écoulées';
+    }
+  }
+  if(!key||spoken.has(key))return '';
+  spoken.add(key);return text;
 }
 function guideScreen(title,providedSteps,options={}){
  if(activeGuideClose)activeGuideClose();
@@ -1998,8 +2121,14 @@ function guideScreen(title,providedSteps,options={}){
  // Never replace an active draft's timing: only fresh guides read newly saved settings.
  if(model.source==='circuit'&&!isResume){model.rounds=options.rounds||1;model.loopToTarget=model.rounds===1;model.targetSeconds=options.targetSeconds||480;}
  // Preserve paused ATH B sessions created before continuous-interval metadata existed.
- if(isResume&&model.source==='ath'&&model.steps.length===providedSteps.length){model.steps=model.steps.map((step,i)=>({...providedSteps[i],...step,intervalBlock:providedSteps[i].intervalBlock,recovery:providedSteps[i].recovery}));}
+ if(isResume&&model.source==='ath'&&model.steps.length===providedSteps.length){model.steps=model.steps.map((step,i)=>({...providedSteps[i],...step,intervalBlock:providedSteps[i].intervalBlock,recovery:providedSteps[i].recovery,athTimeCue:providedSteps[i].athTimeCue,athTimeBlock:providedSteps[i].athTimeBlock}));}
  if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
+ if(isResume&&model.source==='ath'&&model.steps[model.index]?.athTimeCue&&model.athCueBlock==null){
+   const active=model.steps[model.index];
+   model.athCueBlock=active.athTimeBlock;
+   const inStep=active.manual?model.manualElapsed:Math.max(0,(Number(active.seconds)||0)-model.remaining);
+   model.athCueStartElapsed=Math.max(0,model.elapsed-inStep);
+ }
  let ticker=null,lastTick=0,deadline=0,editing=false,savingTick=-1,prepToken=0,prepStarted=false,prepLength=3,previousCountdown=0,announcedCues=new Set();
  const ov=document.createElement('div');ov.className='v2418-guide';
  ov.innerHTML=`<div class="v2418-guide-card" role="dialog" aria-modal="true" aria-label="${esc(title)}">
@@ -2069,7 +2198,7 @@ function guideScreen(title,providedSteps,options={}){
  }
  function tick(){
    if(model.paused||model.finished)return;
-   const now=Date.now(),delta=Math.max(0,(now-lastTick)/1000);lastTick=now;
+   const now=Date.now(),delta=Math.max(0,(now-lastTick)/1000),elapsedBefore=model.elapsed;lastTick=now;
    // Presentation and countdown must NOT consume training time.
    if(['work','rest'].includes(model.phase))model.elapsed+=delta;
    if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=delta;
@@ -2095,6 +2224,15 @@ function guideScreen(title,providedSteps,options={}){
          voiceGuide(text,true,undefined,{interrupt:false});
        }
      }
+   }
+   // Only ATH A exercises 1–4 and ATH B exercises 1–2 receive these cues.
+   const cueStep=model.steps[model.index];
+   if(model.voice&&cueStep?.athTimeCue){
+     const start=model.athCueStartElapsed??model.elapsed;
+     const text=athMinuteCue(cueStep,model,model.phase,
+       Math.max(0,elapsedBefore-start),Math.max(0,model.elapsed-start),
+       previousRemaining,model.remaining,announcedCues);
+     if(text)voiceGuide(text,true,undefined,{interrupt:false});
    }
    if(Math.floor(model.elapsed)!==savingTick){savingTick=Math.floor(model.elapsed);persist();}
    renderActive();
@@ -2145,10 +2283,15 @@ function guideScreen(title,providedSteps,options={}){
  function startWork(options={}){
    if(model.finished||model.paused)return;
    const step=model.steps[model.index];
+   if(model.source==='ath'&&step.athTimeCue&&model.athCueBlock!==step.athTimeBlock){
+     model.athCueBlock=step.athTimeBlock;
+     model.athCueStartElapsed=model.elapsed;
+   }
    if(step.remainingTo60){step.seconds=Math.max(1,Math.round(3600-model.elapsed));step.target='Temps restant : '+timeText(step.seconds)+' pour atteindre 60 min';}
    const beginClock=()=>{
      if(model.finished||model.paused)return;
-     model.phase='work';model.manualElapsed=0;model.countdownSpoken=false;announcedCues=new Set();
+     model.phase='work';model.manualElapsed=0;model.countdownSpoken=false;
+     if(model.source!=='ath'||!step.athTimeCue||model.athCueBlock!==step.athTimeBlock)announcedCues=new Set();
      if(step.manual){stopTicker();model.remaining=0;lastTick=Date.now();model.paused=false;ticker=setInterval(tick,200);persist();renderActive();}
      else beginTicker(step.seconds||45);
      renderList();

@@ -1554,3 +1554,29 @@ body.lock-program-home{
 /* Bouton explicite de sortie du calendrier annuel, sans toucher aux 12 mois. */
 .calendar-back-to-month{display:inline-flex;align-items:center;justify-content:center;min-height:34px;margin:10px 0 3px;padding:6px 11px;border:1px solid #806539;border-radius:8px;background:#191714;color:#efd083;font-size:11px;font-weight:650;cursor:pointer}
 .calendar-back-to-month:focus-visible{outline:2px solid #efca68;outline-offset:2px}
+
+/* V24.24 — cadrage et relief final VALIDÉS : cartes G1/G2 uniquement.
+   Aucun changement de G3, des images originales ou des proportions. */
+.program-card-g1::before,.program-card-g2::before{
+  background-size:cover!important;
+  background-position:81% center!important;
+  filter:brightness(.79) contrast(1.21) saturate(.97)!important;
+}
+.program-card-g1::after,.program-card-g2::after{
+  background:
+    radial-gradient(ellipse 55% 63% at 80% 34%,#ffdc7952 0%,#dfab4530 24%,#a66a1810 48%,transparent 76%),
+    linear-gradient(90deg,#010101f8 0%,#020202e8 24%,#030303a3 46%,#03030330 75%,#02020235 100%),
+    linear-gradient(0deg,#020202f7 0%,#040404d5 22%,#0303036e 49%,transparent 74%)!important;
+}
+
+/* V24.24 — sélection directe des 12 mois dans Vue d'ensemble. */
+.overview-month-year{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 16px;color:#f3d388;font-family:Georgia,serif;font-size:22px}
+.overview-month-year button{width:50px;min-height:44px;border-radius:9px;border:1px solid #806539;background:#1d1c19;color:#f0d28d;font-size:27px}
+.overview-month-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.overview-month-tile{display:flex;flex-direction:column;justify-content:center;gap:5px;min-height:58px;padding:8px 5px;border:1px solid #675333;border-radius:10px;background:#20201e;color:#f5d282;text-align:center;cursor:pointer}
+.overview-month-tile b{font:700 clamp(13px,3.5vw,16px) Georgia,serif}
+.overview-month-tile span{font-size:10px;color:#bdb7ac}
+.overview-month-tile.selected{background:linear-gradient(180deg,#ffdc84,#dfaa40);color:#1d170e;border-color:#ffdf93}
+.overview-month-tile.selected span{color:#3d3020}
+.overview-month-year button:focus-visible,.overview-month-tile:focus-visible{outline:2px solid #f7db92;outline-offset:2px}
+.overview-progress-method{margin:9px 3px 3px;font-size:10px;line-height:1.35}
