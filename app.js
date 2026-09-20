@@ -15,6 +15,8 @@ const BACKUP_SNOOZE_KEY="fitness-backup-snooze-v2418";
 let calendarAnchor=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0");
 let calendarSelectedDay=null;
 let calendarView="month";
+let annualReturnAnchor=null;
+let activeFullscreenSheetClose=null;
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -469,6 +471,8 @@ function pushNav(v=null,newTab=null){
 history.replaceState(navState(),"");
 persistUI();
 window.addEventListener("popstate",e=>{
+  // Fullscreen fiches/measurement guide own one history entry: Android Back closes them first.
+  if(activeFullscreenSheetClose){activeFullscreenSheetClose();return;}
   if(activeGuideClose){activeGuideClose();return;}
   const activeOverlay=overlayRoot.firstElementChild;
   if(activeOverlay){overlayRoot.innerHTML=""; return;}
@@ -1313,7 +1317,7 @@ function annualTrainingCalendar(year){
     );
     return `<button type="button" class="annual-month" data-calendar-month="${m+1}" aria-label="Afficher ${esc(label)} ${year}"><span class="annual-month-name">${esc(label)}</span><span class="annual-month-grid">${['L','M','M','J','V','S','D'].map(d=>`<span class="annual-weekday">${d}</span>`).join('')}${cells.join('')}</span></button>`;
   });
-  return `<div class="calendar-month-bar calendar-year-bar"><button type="button" data-calendar-year-shift="-1" aria-label="Année précédente">‹</button><h3>${year}</h3><button type="button" data-calendar-year-shift="1" aria-label="Année suivante">›</button></div><div class="training-annual-grid">${months.join('')}</div>`;
+  return `<button type="button" class="calendar-back-to-month" data-calendar-return-month aria-label="Revenir au calendrier mensuel">‹ Retour au mois</button><div class="calendar-month-bar calendar-year-bar"><button type="button" data-calendar-year-shift="-1" aria-label="Année précédente">‹</button><h3>${year}</h3><button type="button" data-calendar-year-shift="1" aria-label="Année suivante">›</button></div><div class="training-annual-grid">${months.join('')}</div>`;
 }
 function trainingCalendar(){
   const [year,month]=calendarAnchor.split('-').map(Number),first=new Date(year,month-1,1),count=new Date(year,month,0).getDate(),offset=(first.getDay()+6)%7,byDay={};
@@ -1336,14 +1340,16 @@ function bindTrainingCalendar(){
   const root=$('#history-training-calendar');if(!root)return;
   const refresh=()=>{root.outerHTML=trainingCalendar();bindTrainingCalendar();};
   const yearButton=$('[data-calendar-open-year]',root);
-  if(yearButton)yearButton.onclick=()=>{calendarView='year';refresh();};
+  if(yearButton)yearButton.onclick=()=>{annualReturnAnchor=calendarAnchor;calendarView='year';refresh();};
+  const returnMonth=$('[data-calendar-return-month]',root);
+  if(returnMonth)returnMonth.onclick=()=>{calendarAnchor=annualReturnAnchor||calendarAnchor;annualReturnAnchor=null;calendarSelectedDay=null;calendarView='month';refresh();};
   $$('[data-calendar-year-shift]',root).forEach(b=>b.onclick=()=>{
     const d=new Date(calendarAnchor+'-01T12:00:00');d.setFullYear(d.getFullYear()+Number(b.dataset.calendarYearShift));
     calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;refresh();
   });
   $$('[data-calendar-month]',root).forEach(b=>b.onclick=()=>{
     calendarAnchor=calendarAnchor.slice(0,4)+'-'+String(b.dataset.calendarMonth).padStart(2,'0');
-    calendarSelectedDay=null;calendarView='month';refresh();
+    calendarSelectedDay=null;calendarView='month';annualReturnAnchor=null;refresh();
   });
   $$('[data-calendar-shift]',root).forEach(b=>b.onclick=()=>{
     const d=new Date(calendarAnchor+'-01T12:00:00');d.setMonth(d.getMonth()+Number(b.dataset.calendarShift));
@@ -1743,10 +1749,14 @@ function openFullscreenSheet(src,name){
   const ov=document.createElement("div");ov.className="fullscreen-sheet";
   ov.innerHTML=`<div class="fullscreen-toolbar"><span>${esc(name)}</span><button data-zoom-out aria-label="Réduire">−</button><button data-zoom-in aria-label="Agrandir">+</button><button data-zoom-close aria-label="Fermer">Fermer</button></div><div class="fullscreen-stage"><img src="${esc(src)}" alt="${esc(name)}" draggable="false"></div>`;
   document.body.appendChild(ov);
+  // A dedicated history entry keeps Android Back inside Progression/Mensurations.
+  history.pushState(Object.assign(navState(),{overlay:"fullscreen-sheet"}),"");
   const stage=$(".fullscreen-stage",ov),img=$("img",stage),points=new Map();
   let scale=1,tx=0,ty=0,gesture=null,lastTap=0,hadPinch=false;
-  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);};
-  const onKey=e=>{if(e.key==='Escape')close();};document.addEventListener('keydown',onKey);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);if(activeFullscreenSheetClose===close)activeFullscreenSheetClose=null;};
+  activeFullscreenSheetClose=close;
+  const requestClose=()=>{if(history.state?.overlay==='fullscreen-sheet')history.back();else close();};
+  const onKey=e=>{if(e.key==='Escape'){e.preventDefault();requestClose();}};document.addEventListener('keydown',onKey);
   function apply(){
     const r=stage.getBoundingClientRect();
     const maxX=Math.max(0,(img.clientWidth*scale-r.width)/2),maxY=Math.max(0,(img.clientHeight*scale-r.height)/2);
@@ -1761,7 +1771,7 @@ function openFullscreenSheet(src,name){
   }
   $("[data-zoom-in]",ov).onclick=()=>{const r=stage.getBoundingClientRect();zoom(scale+.5,r.left+r.width/2,r.top+r.height/2);};
   $("[data-zoom-out]",ov).onclick=()=>{const r=stage.getBoundingClientRect();zoom(scale-.5,r.left+r.width/2,r.top+r.height/2);};
-  $("[data-zoom-close]",ov).onclick=close;
+  $("[data-zoom-close]",ov).onclick=requestClose;
   stage.addEventListener('pointerdown',e=>{
     e.preventDefault();stage.setPointerCapture(e.pointerId);points.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(points.size===1){gesture={type:'pan',x:e.clientX,y:e.clientY,tx,ty};hadPinch=false;}
