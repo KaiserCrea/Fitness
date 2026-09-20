@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-21-build-20260919-1";
+const CACHE = "fitness-v24-22-build-20260920-1";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
@@ -14,6 +14,7 @@ const ROOT = [
   "./app.css",
   "./data.js",
   "./app.js",
+  "./assets/guide/mensurations.jpg",
   "./manifest.webmanifest",
   "./icon-192-v241.png",
   "./icon-512-v241.png",
@@ -36,7 +37,7 @@ self.addEventListener("activate", event => {
   event.waitUntil((async () => {
     const keys=await caches.keys(),imageCache=await caches.open(IMAGE_CACHE);
     // Migrate only the previously cached JPEG thumbnails/guide assets, never entire old releases.
-    for(const key of keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19)-/.test(k))){
+    for(const key of keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21)-/.test(k))){
       const cache=await caches.open(key);
       for(const request of await cache.keys()){
         const url=new URL(request.url);
@@ -46,7 +47,7 @@ self.addEventListener("activate", event => {
         }
       }
     }
-    await Promise.all(keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19)-/.test(k)).map(k=>caches.delete(k)));
+    await Promise.all(keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21)-/.test(k)).map(k=>caches.delete(k)));
     await self.clients.claim();
   })());
 });

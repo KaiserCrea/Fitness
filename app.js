@@ -14,6 +14,7 @@ const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
 const BACKUP_SNOOZE_KEY="fitness-backup-snooze-v2418";
 let calendarAnchor=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0");
 let calendarSelectedDay=null;
+let calendarView="month";
 const cycles = ["A","B","C"];
 const tabs = ["today","program","progress","history"];
 const $=(q,r=document)=>r.querySelector(q);
@@ -54,7 +55,7 @@ const SCROLL_KEY="fitness-tab-scroll-v9";
 const needsCleanReset=false;
 let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
 let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
-let tab="today";
+let tab=tabs.includes(savedUI?.tab)?savedUI.tab:"today";
 let view={type:"root"};
 let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(!needsCleanReset&&savedUI?.programMode==="exercises"?"groups":"sessions");
 let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
@@ -1296,27 +1297,57 @@ function calendarDayDetails(day){
   const sessions=(state.history||[]).filter(h=>h.date===day).slice().sort((a,b)=>String(a.start||'').localeCompare(String(b.start||'')));
   return `<div class="calendar-detail-heading">Séances du ${esc(formatDate(day))}</div>${sessions.length?sessions.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||'Séance'))}</b><span>${esc(h.start||'')}${h.end?' → '+esc(h.end):''}</span></div><div><b>${Number(h.duration)>0?formatMinutes(h.duration):'Durée non renseignée'}</b><span>${(h.exercises||[]).filter(e=>e.status!=='Non réalisé').length} exercices</span></div><i>›</i></button>`).join(''):'<div class="calendar-hint">Aucune séance enregistrée ce jour.</div>'}`;
 }
+// The annual calendar is a read-only visualization of dated history, independent
+// of the main Historique period filters and of the saved training records.
+function annualTrainingCalendar(year){
+  const recorded=new Set((state.history||[]).map(h=>String(h.date||"")));
+  const months=Array.from({length:12},(_,m)=>{
+    const first=new Date(year,m,1),days=new Date(year,m+1,0).getDate(),offset=(first.getDay()+6)%7;
+    const label=first.toLocaleDateString("fr-FR",{month:"long"});
+    const cells=Array.from({length:offset},()=>'<span class="annual-blank" aria-hidden="true"></span>').concat(
+      Array.from({length:days},(_,i)=>{
+        const date=`${year}-${String(m+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`;
+        const trained=recorded.has(date);
+        return `<span class="annual-day ${trained?"trained":""}" aria-label="${i+1}${trained?", séance réalisée":""}"><b>${i+1}</b>${trained?'<small aria-hidden="true">✓</small>':""}</span>`;
+      })
+    );
+    return `<button type="button" class="annual-month" data-calendar-month="${m+1}" aria-label="Afficher ${esc(label)} ${year}"><span class="annual-month-name">${esc(label)}</span><span class="annual-month-grid">${['L','M','M','J','V','S','D'].map(d=>`<span class="annual-weekday">${d}</span>`).join('')}${cells.join('')}</span></button>`;
+  });
+  return `<div class="calendar-month-bar calendar-year-bar"><button type="button" data-calendar-year-shift="-1" aria-label="Année précédente">‹</button><h3>${year}</h3><button type="button" data-calendar-year-shift="1" aria-label="Année suivante">›</button></div><div class="training-annual-grid">${months.join('')}</div>`;
+}
 function trainingCalendar(){
   const [year,month]=calendarAnchor.split('-').map(Number),first=new Date(year,month-1,1),count=new Date(year,month,0).getDate(),offset=(first.getDay()+6)%7,byDay={};
   (state.history||[]).forEach(h=>{if(h.date?.startsWith(calendarAnchor))byDay[h.date]=(byDay[h.date]||0)+1;});
   const monthCount=Object.values(byDay).reduce((n,v)=>n+v,0);
   const legacyCount=(state.oldWeeks||[]).reduce((n,w)=>n+(Number(w.count)||0),0);
   const totalCount=(state.history||[]).length+legacyCount;
+  const isYear=calendarView==="year";
+  const displayedCount=isYear?historyForYear(year).length:monthCount;
   const cells=Array.from({length:offset},(_,i)=>`<span class="calendar-blank" aria-hidden="true" data-blank="${i}"></span>`).concat(Array.from({length:count},(_,i)=>{
     const day=calendarAnchor+'-'+String(i+1).padStart(2,'0'),n=byDay[day]||0;
     return `<button type="button" data-calendar-day="${day}" class="training-day ${n?'trained':''} ${calendarSelectedDay===day?'selected':''}" aria-pressed="${calendarSelectedDay===day}" aria-label="${i+1} : ${n} séance${n>1?'s':''}"><b>${i+1}</b>${n?`<small aria-hidden="true">${n===1?'✓':n}</small>`:''}</button>`;
   }));
-  return `<section class="card training-calendar" id="history-training-calendar"><h2>Calendrier d'entraînement</h2><div class="calendar-stats"><div><span>Ce mois-ci</span><b>${monthCount}</b><small>Séances réalisées</small></div><div><span>Total</span><b>${totalCount}</b><small>Séances enregistrées</small></div></div>
-    <div class="calendar-month-bar"><button type="button" data-calendar-shift="-1" aria-label="Mois précédent">‹</button><h3>${esc(first.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))}</h3><button type="button" data-calendar-shift="1" aria-label="Mois suivant">›</button></div>
-    <div class="training-calendar-grid">${['L','M','M','J','V','S','D'].map(x=>`<span class="calendar-weekday">${x}</span>`).join('')}${cells.join('')}</div><div id="calendar-day-details" class="calendar-day-details" aria-live="polite">${calendarDayDetails(calendarSelectedDay)}</div>
+  return `<section class="card training-calendar" id="history-training-calendar"><h2>Calendrier d'entraînement</h2><div class="calendar-stats"><div><span>${isYear?'Cette année':'Ce mois-ci'}</span><b>${displayedCount}</b><small>Séances réalisées</small></div><div><span>Total</span><b>${totalCount}</b><small>Séances enregistrées</small></div></div>
+    ${isYear?annualTrainingCalendar(year):`<div class="calendar-month-bar"><button type="button" data-calendar-shift="-1" aria-label="Mois précédent">‹</button><button type="button" class="calendar-month-title" data-calendar-open-year aria-label="Afficher le calendrier annuel ${year}">${esc(first.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))}</button><button type="button" data-calendar-shift="1" aria-label="Mois suivant">›</button></div>
+    <div class="training-calendar-grid">${['L','M','M','J','V','S','D'].map(x=>`<span class="calendar-weekday">${x}</span>`).join('')}${cells.join('')}</div><div id="calendar-day-details" class="calendar-day-details" aria-live="polite">${calendarDayDetails(calendarSelectedDay)}</div>`}
     ${legacyCount?'<p class="calendar-archive-hint">Les anciennes séances archivées sans date précise sont incluses dans le total, mais ne peuvent pas être positionnées sur un jour.</p>':''}</section>`;
 }
 function bindTrainingCalendar(){
   const root=$('#history-training-calendar');if(!root)return;
+  const refresh=()=>{root.outerHTML=trainingCalendar();bindTrainingCalendar();};
+  const yearButton=$('[data-calendar-open-year]',root);
+  if(yearButton)yearButton.onclick=()=>{calendarView='year';refresh();};
+  $$('[data-calendar-year-shift]',root).forEach(b=>b.onclick=()=>{
+    const d=new Date(calendarAnchor+'-01T12:00:00');d.setFullYear(d.getFullYear()+Number(b.dataset.calendarYearShift));
+    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;refresh();
+  });
+  $$('[data-calendar-month]',root).forEach(b=>b.onclick=()=>{
+    calendarAnchor=calendarAnchor.slice(0,4)+'-'+String(b.dataset.calendarMonth).padStart(2,'0');
+    calendarSelectedDay=null;calendarView='month';refresh();
+  });
   $$('[data-calendar-shift]',root).forEach(b=>b.onclick=()=>{
     const d=new Date(calendarAnchor+'-01T12:00:00');d.setMonth(d.getMonth()+Number(b.dataset.calendarShift));
-    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;
-    root.outerHTML=trainingCalendar();bindTrainingCalendar();
+    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;refresh();
   });
   $$('[data-calendar-day]',root).forEach(b=>b.onclick=()=>{
     calendarSelectedDay=b.dataset.calendarDay;
@@ -1403,7 +1434,7 @@ function renderMeasurements(){
     <div class="overview-section-head"><h2>Évolution du poids</h2><span>${measurementPeriod==="month"?"Ce mois":measurementPeriod==="year"?"Cette année":"Depuis la première mesure"}</span></div>
     <div class="overview-panel measure-chart">${smoothMeasureChart(rows,"weight")}</div>
     <div class="measure-calculated"><div><span>IMC</span><b>${c?fmt(c.bmi):"—"}</b></div><div><span>Masse grasse</span><b>${c?fmt(c.fatMass," kg"):"—"}</b></div><div><span>Masse maigre</span><b>${c?fmt(c.leanMass," kg"):"—"}</b></div></div>
-    <details class="card body-measurements"><summary><span><b class="serif gold">Mensurations</b><small>Bras, cuisses, mollets, poitrine, épaules, hanches</small></span><span>Afficher</span></summary>${c?`<div class="body-measure-grid"><button data-body-chart="arm"><span>Bras</span><b>G ${fmt(c.armL," cm")} · D ${fmt(c.armR," cm")}</b></button><button data-body-chart="thigh"><span>Cuisses</span><b>G ${fmt(c.thighL," cm")} · D ${fmt(c.thighR," cm")}</b></button><button data-body-chart="calf"><span>Mollets</span><b>G ${fmt(c.calfL," cm")} · D ${fmt(c.calfR," cm")}</b></button><button data-body-chart="chest"><span>Poitrine</span><b>${fmt(c.chest," cm")}</b></button><button data-body-chart="shoulders"><span>Épaules</span><b>${fmt(c.shoulders," cm")}</b></button><button data-body-chart="hips"><span>Hanches</span><b>${fmt(c.hips," cm")}</b></button></div>`:`<div class="empty">Ajoutez une mesure pour renseigner vos mensurations.</div>`}</details>
+    <details class="card body-measurements"><summary><span><b class="serif gold">Mensurations</b><small>Bras, cuisses, mollets, poitrine, épaules, taille, hanches</small></span><span class="body-measure-actions"><button type="button" class="body-measure-guide" id="body-measure-guide" aria-label="Ouvrir le guide des mensurations">Guide</button><span>Afficher</span></span></summary>${c?`<div class="body-measure-grid"><button data-body-chart="arm"><span>Bras</span><b>G ${fmt(c.armL," cm")} · D ${fmt(c.armR," cm")}</b></button><button data-body-chart="thigh"><span>Cuisses</span><b>G ${fmt(c.thighL," cm")} · D ${fmt(c.thighR," cm")}</b></button><button data-body-chart="calf"><span>Mollets</span><b>G ${fmt(c.calfL," cm")} · D ${fmt(c.calfR," cm")}</b></button><button data-body-chart="chest"><span>Poitrine</span><b>${fmt(c.chest," cm")}</b></button><button data-body-chart="shoulders"><span>Épaules</span><b>${fmt(c.shoulders," cm")}</b></button><button data-body-chart="hips"><span>Hanches</span><b>${fmt(c.hips," cm")}</b></button></div>`:`<div class="empty">Ajoutez une mesure pour renseigner vos mensurations.</div>`}</details>
     <div class="card measure-history"><div class="row-between"><b class="serif gold">Historique des mesures</b><button class="backlink" id="measure-height">Taille : ${esc(state.bodySettings?.heightCm||"—")} cm</button></div>${all.length?all.slice(-8).reverse().map(m=>`<button class="measure-row" data-edit-measure="${esc(m.id)}"><span>${formatDate(m.date)}</span><b>${esc(m.weight||"—")} kg</b><span>${esc(m.bodyFatPct||"—")} % MG</span><span>${esc(m.waistCm||"—")} cm</span></button>`).join(""):`<div class="empty">Aucune mesure enregistrée.</div>`}</div>`;
 }
 function openBodyMeasurementChart(kind){
@@ -1432,6 +1463,7 @@ function renderProgress(){
   if($("#add-measure"))$("#add-measure").onclick=()=>openMeasurementModal();
   $$('[data-edit-measure]').forEach(b=>b.onclick=()=>openMeasurementModal(b.dataset.editMeasure));
   if($("#measure-height"))$("#measure-height").onclick=openHeightModal;
+  if($("#body-measure-guide"))$("#body-measure-guide").onclick=e=>{e.preventDefault();e.stopPropagation();openFullscreenSheet("./assets/guide/mensurations.jpg","Guide des mensurations");};
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
@@ -1525,13 +1557,21 @@ function openAllSessionHistory(){
   const html=rows.map(h=>{const key=String(h.date).slice(0,7),d=new Date(`${key}-01T12:00:00`),head=key!==lastMonth?`<h4 class="session-month-title">${d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}</h4>`:"";lastMonth=key;return `${head}<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div><i>›</i></button>`;}).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
   openModal(`<h3>Toutes les séances</h3><div class="all-session-history">${html}</div><div class="modal-actions"><button class="btn gold" data-close-modal>Fermer</button></div>`,()=>{$$("[data-history-session]").forEach(b=>b.onclick=()=>{const id=b.dataset.historySession;closeOverlay(true);pushNav({type:"historyDetail",id});});});
 }
+function historyIsCurrentPeriod(){
+  if(historyPeriod==="all")return false;
+  const today=new Date(),anchor=new Date(`${historyAnchor}T12:00:00`);
+  if(!Number.isFinite(anchor.getTime()))return false;
+  if(historyPeriod==="year")return historyYear===today.getFullYear();
+  if(historyPeriod==="month")return anchor.getFullYear()===today.getFullYear()&&anchor.getMonth()===today.getMonth();
+  return localISODate(mondayOf(anchor))===currentWeekKey();
+}
 function renderHistory(){
   const scoped=historyScope(historyPeriod,historyYear),hs=scoped.history,old=scoped.old;
   const total=hs.reduce((a,h)=>a+(+h.duration||0),0),count=hs.length+old.reduce((a,w)=>a+(+w.count||0),0);
   const weekDur=weeklyDurations(hs),weekCounts=weeklySessionCounts(hs,old),best=Math.max(...Object.values(weekDur),0),knownDurations=hs.map(h=>Number(h.duration)).filter(n=>Number.isFinite(n)&&n>0),avgSession=knownDurations.length?formatAverageSession(knownDurations):"—",attendance=attendancePct(historyYear,hs,old);
   shell(`${header("Historique","Suivi du parcours","","compact")}
     <div class="progress-home-tabs history-home-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"],["all","Toutes"]].map(([p,l])=>`<button data-hperiod="${p}" class="${historyPeriod===p?"on":""}">${l}</button>`).join("")}</div>
-    <div class="history-year"><button id="prev-year">‹</button><button class="history-period-title" id="history-period-picker">${esc(scoped.label)}</button><button id="next-year">›</button></div><button class="today-period-btn" id="history-today">Aujourd’hui</button>
+    <div class="history-year"><button id="prev-year">‹</button><button class="history-period-title" id="history-period-picker">${esc(scoped.label)}</button><button id="next-year">›</button></div>${historyIsCurrentPeriod()?"":'<button class="today-period-btn" id="history-today">Aujourd’hui</button>'}
     <div class="history-grid">
       <div><b>${count}</b><span>Séances</span></div><div><b>${formatMinutes(total)}</b><span>Durée totale connue</span></div><div><b>${avgSession}</b><span>Durée moyenne / séance</span></div>
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
@@ -1542,7 +1582,7 @@ function renderHistory(){
   $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
   $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
   $("#history-period-picker").onclick=()=>openPeriodPicker("history");
-  $("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
+  if($("#history-today"))$("#history-today").onclick=()=>{historyAnchor=localISODate();historyYear=new Date().getFullYear();persistUI();history.replaceState(navState(),"");render();};
   bindTrainingCalendar();
 }
 function historyScope(period,year){

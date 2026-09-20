@@ -1517,3 +1517,25 @@ body.lock-program-home{
 .weight-entry input{flex:1;min-width:0}
 .weight-entry .weight-times{flex:0 0 48px;min-height:46px;border:1px solid #ac884b;border-radius:9px;background:#32291b;color:#f6d78b;font-size:25px;cursor:pointer}
 .weight-entry+.tiny{margin-top:6px;line-height:1.4}
+
+/* V24.22 — calendrier annuel et accès discret au guide des mensurations. */
+.calendar-month-bar .calendar-month-title{
+  flex:1;min-width:0;width:auto;height:auto;min-height:42px;padding:8px 3px;
+  background:transparent;border:0;color:#f4f0e8;font-size:clamp(15px,4vw,20px);
+  font-weight:700;line-height:1.2;text-align:center;text-transform:capitalize;
+}
+.calendar-month-bar .calendar-month-title:focus-visible,
+.annual-month:focus-visible,.body-measure-guide:focus-visible{outline:2px solid #efca68;outline-offset:2px}
+.calendar-year-bar h3{flex:1;margin:0;text-align:center;color:#f4f0e8;font-size:clamp(16px,4vw,20px)}
+.training-annual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+.annual-month{display:block;min-width:0;padding:9px 6px 10px;background:#20201f;border:1px solid #695432;border-radius:11px;color:#e8e3d9;text-align:left}
+.annual-month-name{display:block;margin:0 0 8px;text-align:center;color:#f0cc79;text-transform:capitalize;font-family:Georgia,serif;font-size:clamp(12px,3.5vw,16px);font-weight:700}
+.annual-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;text-align:center}
+.annual-weekday{font-size:8px;color:#a9a49b;line-height:16px}
+.annual-blank,.annual-day{min-width:0;height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:3px;font-size:9px;line-height:10px;font-weight:400}
+.annual-day b{font-weight:500}
+.annual-day.trained{background:#42341d;color:#ffdf91;outline:1px solid #97713a}
+.annual-day small{color:#efc86e;font-size:9px;line-height:9px;font-weight:700}
+.body-measurements summary .body-measure-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-shrink:0;color:#e8c86e;font-size:8px}
+.body-measure-guide{appearance:none;background:#1a1710;border:1px solid #b18b44;border-radius:7px;color:#f1d083;font-size:10px;font-weight:700;padding:7px 9px;cursor:pointer}
+@media(max-width:360px){.training-annual-grid{gap:6px}.annual-month{padding:8px 4px}.annual-month-grid{gap:1px}.annual-day{height:20px}.body-measurements summary .body-measure-actions{gap:5px}.body-measure-guide{padding:6px}}
