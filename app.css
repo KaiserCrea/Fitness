@@ -1581,30 +1581,90 @@ body.lock-program-home{
 .overview-month-year button:focus-visible,.overview-month-tile:focus-visible{outline:2px solid #f7db92;outline-offset:2px}
 .overview-progress-method{margin:9px 3px 3px;font-size:10px;line-height:1.35}
 
-/* V24.24.2 — Programme : rendu uniforme de TOUTES les miniatures de séances.
-   Référence : maquette validée (G1/G2/G3 + ATHLÉTIQUE + FULL MIX).
-   Aucun fichier image n'est modifié : cadrage/lumière/ombres uniquement en CSS. */
-.program-home .program-card::before{
-  background-size:cover!important;
-  background-position:right center!important;
-  background-repeat:no-repeat!important;
+
+/* =====================================================================
+   V24.24.3 — CARTES PROGRAMME, réglages individuels, AUCUNE image générée.
+   Repart du CSS V24.24 : annule la règle 24.24.2 qui forçait "cover"
+   sur les cartes larges et grossissait FULL MIX.
+   Les 5 images source, les cartes, les textes et les autres écrans restent intacts.
+   ===================================================================== */
+/* Images carrées G : déplacement réel du calque photo vers la droite.
+   Deux calques avec tailles/positions explicites empêchent de zoomer la photo
+   ou de déplacer le dégradé en même temps que le personnage. */
+.program-home .program-card-g1::before,
+.program-home .program-card-g2::before {
+  background-image:
+    linear-gradient(0deg,rgba(0,0,0,.51) 0%,rgba(0,0,0,.11) 35%,transparent 67%),
+    var(--card-image)!important;
+  background-size:100% 100%,auto 100%!important;
+  background-position:center center,calc(100% + 32px) center!important;
+  background-repeat:no-repeat,no-repeat!important;
+  background-color:#070707!important;
+  filter:brightness(1.20) contrast(1.07) saturate(1.06)!important;
   opacity:1!important;
-  filter:brightness(1.03) contrast(1.12) saturate(1.05)!important;
 }
-.program-home .program-card::after{
+.program-home .program-card-g1::after,
+.program-home .program-card-g2::after {
   background:
-    radial-gradient(ellipse 52% 72% at 82% 35%,rgba(255,203,91,.25) 0%,rgba(208,143,29,.11) 34%,transparent 67%),
-    linear-gradient(90deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,.72) 28%,rgba(0,0,0,.28) 53%,rgba(0,0,0,.04) 76%),
-    linear-gradient(0deg,rgba(0,0,0,.84) 0%,rgba(0,0,0,.34) 31%,transparent 66%)!important;
+    radial-gradient(ellipse 48% 72% at 83% 31%,rgba(255,194,76,.16) 0%,rgba(212,142,35,.06) 37%,transparent 73%),
+    linear-gradient(90deg,rgba(0,0,0,.81) 0%,rgba(0,0,0,.49) 22%,rgba(0,0,0,.10) 50%,transparent 73%),
+    linear-gradient(0deg,rgba(0,0,0,.80) 0%,rgba(0,0,0,.43) 22%,transparent 59%)!important;
 }
-/* G3 est inclus dans la même finition d'affichage, mais son image source reste strictement intacte. */
-.program-home .program-card-g3::before{
-  background-position:right center!important;
+/* G3 : source inchangée, cadrage propre sans le zoom global du correctif .2.
+   La lumière est légèrement remontée sur le visage, pas d'overlay uniforme. */
+.program-home .program-card-g3::before {
+  background-image:
+    linear-gradient(0deg,rgba(0,0,0,.46) 0%,rgba(0,0,0,.07) 36%,transparent 67%),
+    var(--card-image)!important;
+  background-size:100% 100%,auto 100%!important;
+  background-position:center center,right center!important;
+  background-repeat:no-repeat,no-repeat!important;
+  background-color:#070707!important;
+  filter:brightness(1.09) contrast(1.10) saturate(1.04)!important;
+  opacity:1!important;
 }
-/* Les cartes larges complémentaires reprennent le même relief, avec davantage d'espace photo à droite. */
-.program-home .comp-card::after{
+.program-home .program-card-g3::after {
   background:
-    radial-gradient(ellipse 48% 82% at 83% 40%,rgba(255,203,91,.24) 0%,rgba(208,143,29,.10) 36%,transparent 69%),
-    linear-gradient(90deg,rgba(0,0,0,.94) 0%,rgba(0,0,0,.77) 31%,rgba(0,0,0,.30) 57%,rgba(0,0,0,.03) 80%),
-    linear-gradient(0deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,.25) 32%,transparent 68%)!important;
+    radial-gradient(ellipse 48% 67% at 83% 34%,rgba(255,191,67,.16) 0%,rgba(208,145,29,.06) 33%,transparent 75%),
+    linear-gradient(90deg,rgba(0,0,0,.79) 0%,rgba(0,0,0,.43) 24%,rgba(0,0,0,.08) 52%,transparent 76%),
+    linear-gradient(0deg,rgba(0,0,0,.81) 0%,rgba(0,0,0,.43) 24%,transparent 60%)!important;
+}
+/* ATHLÉTIQUE et FULL MIX : photographies carrées affichées EN ENTIER
+   sur la hauteur à droite, sans background-size:cover, qui les grossissait.
+   Chaque image reste sa propre image; le texte à gauche reste lisible. */
+.program-home .complement-grid>.comp-card::before {
+  background-image:
+    linear-gradient(0deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.09) 38%,transparent 69%),
+    var(--card-image)!important;
+  background-size:100% 100%,auto 100%!important;
+  background-position:center center,right center!important;
+  background-repeat:no-repeat,no-repeat!important;
+  background-color:#070707!important;
+  opacity:1!important;
+}
+.program-home .complement-grid>.comp-card::after {
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.90) 0%,rgba(0,0,0,.65) 29%,rgba(0,0,0,.19) 56%,transparent 77%),
+    linear-gradient(0deg,rgba(0,0,0,.80) 0%,rgba(0,0,0,.35) 25%,transparent 63%)!important;
+}
+/* ATHLÉTIQUE : coureur bien visible, lueur localisée derrière la tête. */
+.program-home .complement-grid>.comp-card:first-child::before {
+  filter:brightness(1.23) contrast(1.07) saturate(1.05)!important;
+}
+.program-home .complement-grid>.comp-card:first-child::after {
+  background:
+    radial-gradient(ellipse 45% 79% at 83% 37%,rgba(255,191,59,.16) 0%,rgba(213,142,24,.06) 40%,transparent 77%),
+    linear-gradient(90deg,rgba(0,0,0,.90) 0%,rgba(0,0,0,.61) 29%,rgba(0,0,0,.13) 57%,transparent 77%),
+    linear-gradient(0deg,rgba(0,0,0,.80) 0%,rgba(0,0,0,.37) 25%,transparent 63%)!important;
+}
+/* FULL MIX : retour à la petite silhouette cadrée à droite, comme AVANT .2.
+   Pas de zoom, pas de halo opaque devant le personnage. */
+.program-home .complement-grid>.comp-card:last-child::before {
+  filter:brightness(1.12) contrast(1.06) saturate(1.03)!important;
+}
+.program-home .complement-grid>.comp-card:last-child::after {
+  background:
+    radial-gradient(ellipse 47% 71% at 84% 32%,rgba(255,194,77,.11) 0%,rgba(211,145,30,.04) 42%,transparent 78%),
+    linear-gradient(90deg,rgba(0,0,0,.90) 0%,rgba(0,0,0,.59) 28%,rgba(0,0,0,.10) 59%,transparent 78%),
+    linear-gradient(0deg,rgba(0,0,0,.80) 0%,rgba(0,0,0,.34) 26%,transparent 64%)!important;
 }
