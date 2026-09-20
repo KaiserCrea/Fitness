@@ -1580,3 +1580,31 @@ body.lock-program-home{
 .overview-month-tile.selected span{color:#3d3020}
 .overview-month-year button:focus-visible,.overview-month-tile:focus-visible{outline:2px solid #f7db92;outline-offset:2px}
 .overview-progress-method{margin:9px 3px 3px;font-size:10px;line-height:1.35}
+
+/* V24.24.2 — Programme : rendu uniforme de TOUTES les miniatures de séances.
+   Référence : maquette validée (G1/G2/G3 + ATHLÉTIQUE + FULL MIX).
+   Aucun fichier image n'est modifié : cadrage/lumière/ombres uniquement en CSS. */
+.program-home .program-card::before{
+  background-size:cover!important;
+  background-position:right center!important;
+  background-repeat:no-repeat!important;
+  opacity:1!important;
+  filter:brightness(1.03) contrast(1.12) saturate(1.05)!important;
+}
+.program-home .program-card::after{
+  background:
+    radial-gradient(ellipse 52% 72% at 82% 35%,rgba(255,203,91,.25) 0%,rgba(208,143,29,.11) 34%,transparent 67%),
+    linear-gradient(90deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,.72) 28%,rgba(0,0,0,.28) 53%,rgba(0,0,0,.04) 76%),
+    linear-gradient(0deg,rgba(0,0,0,.84) 0%,rgba(0,0,0,.34) 31%,transparent 66%)!important;
+}
+/* G3 est inclus dans la même finition d'affichage, mais son image source reste strictement intacte. */
+.program-home .program-card-g3::before{
+  background-position:right center!important;
+}
+/* Les cartes larges complémentaires reprennent le même relief, avec davantage d'espace photo à droite. */
+.program-home .comp-card::after{
+  background:
+    radial-gradient(ellipse 48% 82% at 83% 40%,rgba(255,203,91,.24) 0%,rgba(208,143,29,.10) 36%,transparent 69%),
+    linear-gradient(90deg,rgba(0,0,0,.94) 0%,rgba(0,0,0,.77) 31%,rgba(0,0,0,.30) 57%,rgba(0,0,0,.03) 80%),
+    linear-gradient(0deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,.25) 32%,transparent 68%)!important;
+}
