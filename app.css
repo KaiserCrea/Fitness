@@ -1686,3 +1686,33 @@ body.lock-program-home{
   object-fit:cover!important;
   object-position:center center!important;
 }
+
+
+/* V24.25.3 — MAQUETTE VALIDÉE : exclusif G1 et G2.
+   Visuels extraits de la maquette validée, avec labels/boutons intégrés masqués.
+   Les vrais titres, libellés et boutons A/B/C de l'application restent au-dessus.
+   Aucun sélecteur sur G3, ATHLÉTIQUE ou FULL MIX. */
+.program-home .program-card-g1::before,
+.program-home .program-card-g2::before {
+  background-image:var(--card-image)!important;
+  background-size:100% 100%!important;
+  background-position:center center!important;
+  background-repeat:no-repeat!important;
+  background-color:#050403!important;
+  filter:none!important;
+  opacity:1!important;
+}
+.program-home .program-card-g1::after,
+.program-home .program-card-g2::after {
+  background:linear-gradient(0deg,rgba(0,0,0,.17),transparent 35%)!important;
+}
+/* Image verticale native validée : ne pas re-zoomer ni forcer un recadrage 3:4. */
+.thumb-preview-card img.thumb-preview-ez-portrait {
+  width:auto!important;
+  height:auto!important;
+  aspect-ratio:auto!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  object-fit:contain!important;
+  object-position:center!important;
+}

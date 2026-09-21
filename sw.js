@@ -1,9 +1,12 @@
-const CACHE = "fitness-v24-25-2-thumb-portrait-20260921-1";
+const CACHE = "fitness-v24-25-3-g1g2-ez-20260922-1";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
   "./miniatures/G1A/05_curl_biceps_barre_EZ_debout_v24251.png",
+  "./miniatures/G1A/05_curl_biceps_barre_EZ_debout_vertical_v24253.png",
+  "./assets/card-g1-maquette-validee-v24253.jpg",
+  "./assets/card-g2-maquette-validee-v24253.jpg",
   "./assets/card-g1-v22.jpg",
   "./assets/card-g1-v22.png",
   "./assets/card-g2-v22.jpg",

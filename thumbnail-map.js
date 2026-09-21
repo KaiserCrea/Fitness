@@ -43,7 +43,7 @@ window.FITNESS_THUMBNAILS = {
   "G1A|2": "miniatures/G1A/02_ecarte_unilateral_poulie_basse.jpg",
   "G1A|3": "miniatures/G1A/03_pec_deck_butterfly.jpg",
   "G1A|4": "miniatures/G1A/04_dips_lestes.jpg",
-  "G1A|5": "miniatures/G1A/05_curl_biceps_barre_EZ_debout_v24251.png",
+  "G1A|5": "miniatures/G1A/05_curl_biceps_barre_EZ_debout_vertical_v24253.png",
   "G1A|6": "miniatures/G1A/06_curl_biceps_halteres.jpg",
   "G1A|7": "miniatures/G1A/07_curl_unilateral_pupitre_vertical.jpg",
   "G1A|8": "miniatures/G1A/08_crunch_abdominal.jpg",
