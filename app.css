@@ -1669,46 +1669,5 @@ body.lock-program-home{
     linear-gradient(0deg,rgba(0,0,0,.80) 0%,rgba(0,0,0,.34) 26%,transparent 64%)!important;
 }
 
-
-/* V24.25 — G1 / G2 : deux cartes approuvées par l’utilisateur, pixels non retouchés.
-   G3, ATHLÉTIQUE, FULL MIX et les autres écrans sont strictement inchangés. */
-.program-home .program-card-g1::before,
-.program-home .program-card-g2::before {
-  background-image:var(--card-image)!important;
-  background-size:100% 100%!important;
-  background-position:center center!important;
-  background-repeat:no-repeat!important;
-  background-color:#050505!important;
-  filter:none!important;
-  opacity:1!important;
-}
-.program-home .program-card-g1::after,
-.program-home .program-card-g2::after { background:none!important; }
-/* Titles and button faces are already present in the validated artwork.
-   Keep semantic, keyboard-accessible HTML and real touch targets above it. */
-.program-home .program-card-g1 .code,
-.program-home .program-card-g2 .code,
-.program-home .program-card-g1 .groups,
-.program-home .program-card-g2 .groups { color:transparent!important; text-shadow:none!important; }
-.program-home .program-card-g1 .variant-row,
-.program-home .program-card-g2 .variant-row {
-  left:7.3%!important;right:7.4%!important;bottom:3.1%!important;
-  height:24%!important;gap:6.3%!important;align-items:stretch!important;
-}
-.program-home .program-card-g1 .variant-row button,
-.program-home .program-card-g2 .variant-row button {
-  flex:1 1 0!important;width:0!important;height:100%!important;min-width:0!important;
-  background:transparent!important;border-color:transparent!important;box-shadow:none!important;
-  color:transparent!important;text-shadow:none!important;
-}
-.program-home .program-card-g1 .variant-row button:focus-visible,
-.program-home .program-card-g2 .variant-row button:focus-visible {
-  outline:2px solid #ffe18d!important;outline-offset:1px!important;
-}
-/* Conserve le retour visuel lors d’un appui long puis glissement sur A/B/C. */
-.program-home .program-card-g1 .variant-row button.preview,
-.program-home .program-card-g2 .variant-row button.preview {
-  background:rgba(255,213,120,.19)!important;
-  outline:2px solid rgba(255,217,139,.90)!important;
-  outline-offset:-2px!important;
-}
+/* V24.25.1 — sécurité cartes Programme : retour strict au rendu V24.24.3.
+   Aucun sélecteur supplémentaire pour FULL MIX, ATHLÉTIQUE ou G3. */
