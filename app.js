@@ -57,7 +57,7 @@ const SCROLL_KEY="fitness-tab-scroll-v9";
 const needsCleanReset=false;
 let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
 let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
-let tab=tabs.includes(savedUI?.tab)?savedUI.tab:"today";
+let tab="today"; // V24.25: every full app launch starts on Aujourd’hui.
 let view={type:"root"};
 let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(!needsCleanReset&&savedUI?.programMode==="exercises"?"groups":"sessions");
 let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
@@ -66,11 +66,12 @@ let progressionGroup=savedUI?.progressionGroup||"Tous";
 let progressionView="overview";
 let measurementPeriod=!needsCleanReset&&savedUI?.measurementPeriod||"month";
 let overviewPeriod=!needsCleanReset&&savedUI?.overviewPeriod||"week";
-let periodAnchor=!needsCleanReset&&savedUI?.periodAnchor||localISODate();
+let periodAnchor=localISODate(); // V24.25: overview opens at the actual current period.
 let historyPeriod=!needsCleanReset&&savedUI?.historyPeriod||"week";
-let historyYear=!needsCleanReset&&Number.isFinite(+savedUI?.historyYear)?+savedUI.historyYear:new Date().getFullYear();
-let historyAnchor=!needsCleanReset&&savedUI?.historyAnchor||localISODate();
+let historyYear=new Date().getFullYear(); // V24.25: current year on full launch.
+let historyAnchor=localISODate(); // V24.25: history opens at current period.
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
+tabScroll.today=0; // Never reopen Aujourd’hui halfway down after an app restart.
 let navTransitionClass="";
 function rememberTabScroll(){
   if(view?.type==="root"&&tabs.includes(tab)){
@@ -782,7 +783,7 @@ function openSetResultsModal(id,no,current,onDone,options={}){
  const loadApplicable=!exerciseWithoutRequiredLoad(id),last=loadApplicable?(isNumericWeight(current)?current:latestExerciseWeight(id)):'';
  const noLoadYet=options.markFailed&&loadApplicable&&!last;
  const weightEditor=(value='',required=false)=>`<div class="weight-entry"><input id="failed-weight" type="text" inputmode="text" autocomplete="off" autocapitalize="off" value="${esc(value)}" placeholder="Ex. : 40 ou 2×40" ${required?'required':''}><button type="button" class="weight-times" aria-label="Insérer le signe multiplication" title="Insérer ×">×</button></div><div class="tiny muted">Vous pouvez saisir 2×40 pour deux disques de 40 kg, sans compter le poids de la barre.</div>`;
- const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label>${weightEditor('',true)}<label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<details class="failure-change-load"><summary>Modifier la charge utilisée (actuellement ${esc(refWithUnit(last))})</summary><div class="field"><label for="failed-weight">Charge utilisée (kg)</label>${weightEditor(last)}</div></details>`):'';
+ const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label>${weightEditor('',true)}<label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<div class="field initial-failure-load"><label for="failed-weight">Charge réellement utilisée (kg) — modifiable</label>${weightEditor(last)}</div>`):'';
  openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(last||current))}</p>${loadMarkup}${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{
    const noLoad=$('#failed-no-load'),weightInput=$('#failed-weight');
    if(noLoad&&weightInput)noLoad.onchange=()=>{weightInput.disabled=noLoad.checked;weightInput.required=!noLoad.checked;};
@@ -1011,7 +1012,7 @@ function programSessions(){
     <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
 }
 function programGCard(n){
-  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=`./assets/card-g${n}-${n<3?"v22":"official"}.png`;
+  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=n<3?`./assets/card-g${n}-approved-v2425.png`:`./assets/card-g3-official.png`;
   const positionMap={1:'right center',2:'right center',3:'right center'};return `<div class="program-card program-card-g${n}" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
@@ -1978,7 +1979,7 @@ function openPeriodPicker(target){
   const d=new Date(`${anchor}T12:00:00`),type=period==="month"?"month":period==="year"?"number":"date";
   const value=period==="month"?anchor.slice(0,7):period==="year"?String(d.getFullYear()):anchor;
   openModal(`<h3>Choisir ${period==="week"?"une semaine":period==="month"?"un mois":"une année"}</h3><div class="field"><label>Période</label><input id="period-choice" type="${type}" ${type==="number"?'min="2000" max="2100"':''} value="${esc(value)}"></div><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="period-confirm">Afficher</button></div>`,()=>{
-    $("#period-confirm").onclick=()=>{const raw=$("#period-choice").value;if(!raw)return;let next=raw;if(type==="month")next=`${raw}-01`;if(type==="number")next=`${raw}-01-01`;if(target==="history"){historyAnchor=next;historyYear=+next.slice(0,4);}else periodAnchor=next;persistUI();closeOverlay(true);render();};
+    $("#period-confirm").onclick=()=>{const raw=$("#period-choice").value;if(!raw)return;let next=raw;if(type==="month")next=`${raw}-01`;if(type==="number")next=`${raw}-01-01`;if(target==="history"){historyAnchor=next;historyYear=+next.slice(0,4);}else periodAnchor=next;persistUI();closeOverlay(false);history.replaceState(navState(),"");render();};
   });
 }
 function formatDate(iso){if(!iso)return"—";const d=new Date(iso+"T12:00:00");return d.toLocaleDateString("fr-FR");}

@@ -1,8 +1,10 @@
-const CACHE = "fitness-v24-24-3-cards-20260920-1";
+const CACHE = "fitness-v24-25-fixes-20260921-1";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
+  "./assets/card-g1-approved-v2425.png",
+  "./assets/card-g2-approved-v2425.png",
   "./assets/card-g1-v22.jpg",
   "./assets/card-g1-v22.png",
   "./assets/card-g2-v22.jpg",
