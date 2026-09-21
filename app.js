@@ -553,7 +553,9 @@ function openThumbnailPreview(src){
   if(!src)return;
   const ov=document.createElement("div");
   ov.className="thumb-preview-overlay";
-  ov.innerHTML=`<div class="thumb-preview-card" role="dialog" aria-modal="true" aria-label="Agrandissement de la miniature"><button class="thumb-preview-close" aria-label="Fermer">×</button><img src="${esc(src)}" alt=""></div>`;
+  // V24.25.2: cadrage vertical réservé au curl EZ debout (image source inchangée).
+  const ezPortrait = /(?:^|\/)05_curl_biceps_barre_EZ_debout_v24251\.png(?:[?#]|$)/.test(src);
+  ov.innerHTML=`<div class="thumb-preview-card" role="dialog" aria-modal="true" aria-label="Agrandissement de la miniature"><button class="thumb-preview-close" aria-label="Fermer">×</button><img class="${ezPortrait?"thumb-preview-ez-portrait":""}" src="${esc(src)}" alt=""></div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(ov);
   history.pushState(Object.assign(navState(),{overlay:"thumb-preview"}),"");
   ov.querySelector(".thumb-preview-close").onclick=()=>closeOverlay(true);

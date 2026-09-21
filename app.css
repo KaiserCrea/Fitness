@@ -1671,3 +1671,18 @@ body.lock-program-home{
 
 /* V24.25.1 — sécurité cartes Programme : retour strict au rendu V24.24.3.
    Aucun sélecteur supplémentaire pour FULL MIX, ATHLÉTIQUE ou G3. */
+
+/* V24.25.2 — CORRECTIF CIBLÉ : aperçu vertical du curl barre EZ debout.
+   La miniature originale et les autres images ne sont ni modifiées ni recadrées.
+   Même proportion 3:4 que les miniatures verticales déjà validées ; zoom limité à
+   la prévisualisation de ce seul exercice, et non aux listes ou aux cartes Programme. */
+.thumb-preview-card img.thumb-preview-ez-portrait{
+  display:block!important;
+  width:100%!important;
+  height:auto!important;
+  aspect-ratio:3 / 4!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+}

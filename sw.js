@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-25-1-card-safety-20260921-1";
+const CACHE = "fitness-v24-25-2-thumb-portrait-20260921-1";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
@@ -43,7 +43,7 @@ self.addEventListener("activate", event => {
   event.waitUntil((async () => {
     const keys=await caches.keys(),imageCache=await caches.open(IMAGE_CACHE);
     // Migrate only the previously cached JPEG thumbnails/guide assets, never entire old releases.
-    for(const key of keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21|22|23|24)-/.test(k))){
+    for(const key of keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21|22|23|24|25)-/.test(k))){
       const cache=await caches.open(key);
       for(const request of await cache.keys()){
         const url=new URL(request.url);
@@ -53,7 +53,7 @@ self.addEventListener("activate", event => {
         }
       }
     }
-    await Promise.all(keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21|22|23|24)-/.test(k)).map(k=>caches.delete(k)));
+    await Promise.all(keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21|22|23|24|25)-/.test(k)).map(k=>caches.delete(k)));
     await self.clients.claim();
   })());
 });
