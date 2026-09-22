@@ -1716,3 +1716,52 @@ body.lock-program-home{
   object-fit:contain!important;
   object-position:center!important;
 }
+
+
+/* V24.25.4 — CORRECTION FINALE G1/G2
+   G1 et G2 utilisent la maquette validée directement dans la carte.
+   G3, ATHLÉTIQUE, FULL MIX et le reste de l'application restent inchangés. */
+.program-home .program-card-g1::before,
+.program-home .program-card-g2::before{
+  background-image:var(--card-image)!important;
+  background-size:100% 100%!important;
+  background-position:center center!important;
+  background-repeat:no-repeat!important;
+  background-color:#050403!important;
+  filter:none!important;
+  opacity:1!important;
+}
+.program-home .program-card-g1::after,
+.program-home .program-card-g2::after{
+  background:none!important;
+}
+.program-home .program-card-g1 .code,
+.program-home .program-card-g1 .groups,
+.program-home .program-card-g2 .code,
+.program-home .program-card-g2 .groups{
+  opacity:0!important;
+  pointer-events:none!important;
+}
+.program-home .program-card-g1 .variant-row,
+.program-home .program-card-g2 .variant-row{
+  left:9px!important;
+  right:9px!important;
+  bottom:8px!important;
+  gap:6px!important;
+}
+.program-home .program-card-g1 .variant-row button,
+.program-home .program-card-g2 .variant-row button{
+  background:transparent!important;
+  border-color:transparent!important;
+  color:transparent!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+}
+.program-home .program-card-g1 .variant-row button.preview,
+.program-home .program-card-g2 .variant-row button.preview,
+.program-home .program-card-g1 .variant-row button:focus-visible,
+.program-home .program-card-g2 .variant-row button:focus-visible{
+  outline:2px solid rgba(247,219,146,.72)!important;
+  outline-offset:0!important;
+  border-color:rgba(247,219,146,.72)!important;
+}

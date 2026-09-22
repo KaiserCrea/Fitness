@@ -1014,7 +1014,7 @@ function programSessions(){
     <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
 }
 function programGCard(n){
-  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=n<3?`./assets/card-g${n}-maquette-validee-v24253.jpg`:`./assets/card-g3-official.png`;
+  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=n===1?'./assets/card-g1-maquette-finale-v24254.png':n===2?'./assets/card-g2-maquette-finale-v24254.png':'./assets/card-g3-official.png';
   const positionMap={1:'right center',2:'right center',3:'right center'};return `<div class="program-card program-card-g${n}" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
