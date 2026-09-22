@@ -1014,7 +1014,7 @@ function programSessions(){
     <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
 }
 function programGCard(n){
-  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=n===1?'./assets/card-g1-maquette-finale-v24254.png':n===2?'./assets/card-g2-maquette-finale-v24254.png':'./assets/card-g3-official.png';
+  const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=n===1?'./assets/card-g1-maquette-finale-v24254.png':n===2?'./assets/card-g2-maquette-finale-v24254.png':'./assets/card-g3-portrait-valide-v24255.png';
   const positionMap={1:'right center',2:'right center',3:'right center'};return `<div class="program-card program-card-g${n}" data-session-card="${s}" style="--card-image:url('${asset}');--card-position:${positionMap[n]}"><span class="code">G${n}</span><span class="groups">${groups}</span>
     <span class="variant-row">${cycles.map(c=>`<button data-open-g="${`G${n}${c}`}" class="">${c}</button>`).join("")}</span></div>`;
 }
@@ -1662,7 +1662,7 @@ function renderHistory(){
       <div><b>${attendance}%</b><span>Assiduité</span></div><div><b>${Object.values(weekCounts).filter(v=>v>=5).length}</b><span>Semaines ≥ 5 séances</span></div><div><b>${formatMinutes(best)}</b><span>Meilleure semaine</span></div>
     </div>
     ${trainingCalendar()}
-    <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults(hs,old)}</div>
+    <div class="card"><div class="section-title" style="margin:0 0 4px">Résultats hebdomadaires</div>${weeklyResults()}</div>
     `,"history-screen");
   $$("[data-hperiod]").forEach(b=>b.onclick=()=>{historyPeriod=b.dataset.hperiod;persistUI();history.pushState(navState(),"");render();});
   $("#prev-year").onclick=()=>shiftHistory(-1);$("#next-year").onclick=()=>shiftHistory(1);
@@ -1685,14 +1685,36 @@ function shiftHistory(delta){
   if(historyPeriod==="week")d.setDate(d.getDate()+delta*7);else if(historyPeriod==="month")d.setMonth(d.getMonth()+delta);else d.setFullYear(d.getFullYear()+delta);
   historyAnchor=localISODate(d);historyYear=d.getFullYear();persistUI();history.replaceState(navState(),"");render();
 }
-function weeklyResults(hs,old){
-  const counts={};hs.forEach(h=>{const k=weekKeyFromDate(h.date);counts[k]=(counts[k]||0)+1;});old.forEach(w=>{const k=String(w.week||w.date||"").slice(0,10);counts[k]=(counts[k]||0)+(+w.count||0);});
-  if(historyPeriod!=="all"){
-    const anchor=new Date(`${historyAnchor}T12:00:00`),start=historyPeriod==="week"?mondayOf(anchor):historyPeriod==="month"?mondayOf(new Date(anchor.getFullYear(),anchor.getMonth(),1)):mondayOf(new Date(historyYear,0,1));
-    const end=historyPeriod==="week"?new Date(start.getFullYear(),start.getMonth(),start.getDate()+7):historyPeriod==="month"?new Date(anchor.getFullYear(),anchor.getMonth()+1,1):new Date(historyYear+1,0,1);
-    for(const d=new Date(start);d<end;d.setDate(d.getDate()+7)){const k=localISODate(d);if(counts[k]===undefined)counts[k]=0;}
+// Synthèse ANNUELLE indépendante du filtre Semaine/Mois/Année/Toutes.
+// Les semaines écoulées sans séance comptent dans 0/5 ; les semaines futures
+// ne sont pas encore classées. La semaine du 1er janvier reste incluse, même
+// lorsque son lundi appartient à l'année précédente.
+function weeklyResultsYear(){
+  if(historyPeriod==="all")return new Date().getFullYear();
+  if(historyPeriod==="year")return historyYear;
+  const anchor=new Date(`${historyAnchor}T12:00:00`);
+  return Number.isFinite(anchor.getTime())?anchor.getFullYear():new Date().getFullYear();
+}
+function weeklyResults(){
+  const year=weeklyResultsYear(),today=new Date(),thisYear=today.getFullYear();
+  const counts=new Map();
+  if(year<=thisYear){
+    const start=mondayOf(new Date(year,0,1));
+    const end=mondayOf(year===thisYear?today:new Date(year,11,31));
+    for(const day=new Date(start);day<=end;day.setDate(day.getDate()+7))counts.set(localISODate(day),0);
   }
-  const buckets=Array(8).fill(0);Object.values(counts).forEach(n=>buckets[Math.min(7,Math.max(0,n))]++);
+  historyForYear(year).forEach(h=>{
+    const k=weekKeyFromDate(h.date);
+    if(counts.has(k))counts.set(k,counts.get(k)+1);
+  });
+  oldWeekEntries(year).forEach(w=>{
+    const raw=String(w.week||w.date||"").slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(raw))return;
+    const k=weekKeyFromDate(raw);
+    if(counts.has(k))counts.set(k,counts.get(k)+(+w.count||0));
+  });
+  const buckets=Array(8).fill(0);
+  counts.forEach(n=>{buckets[Math.min(7,Math.max(0,n))]++;});
   return `<div class="weekly-results">${buckets.map((n,i)=>`<div class="weekly-result ${i>=6?"over-goal":""}"><b>${i}/5</b><span>${n} semaine${n>1?"s":""}</span>${i===5?`<em>Objectif atteint</em>`:i===6?`<em>Objectif dépassé !</em>`:i===7?`<em>Exceptionnel !</em>`:""}</div>`).join("")}</div>`;
 }
 function historyForYear(y){return (state.history||[]).filter(h=>Number(String(h.date).slice(0,4))===+y);}

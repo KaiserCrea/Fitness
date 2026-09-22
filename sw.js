@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-25-4-final-g1g2-20260922-1";
+const CACHE = "fitness-v24-25-5-annual-g3-20260922-1";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
@@ -7,6 +7,7 @@ const ROOT = [
   "./miniatures/G1A/05_curl_biceps_barre_EZ_debout_vertical_v24253.png",
   "./assets/card-g1-maquette-finale-v24254.png",
   "./assets/card-g2-maquette-finale-v24254.png",
+  "./assets/card-g3-portrait-valide-v24255.png",
   "./assets/card-g1-v22.jpg",
   "./assets/card-g1-v22.png",
   "./assets/card-g2-v22.jpg",
@@ -35,7 +36,6 @@ const ROOT = [
   "./assets/card-g1-official.jpg",
   "./assets/card-g2-official.jpg",
   "./assets/card-g3-official.jpg",
-  "./assets/card-g3-official.png",
   "./assets/card-ath-official.jpg",
   "./assets/card-fm-official.jpg"
 ];
