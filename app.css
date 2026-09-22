@@ -1765,3 +1765,73 @@ body.lock-program-home{
   outline-offset:0!important;
   border-color:rgba(247,219,146,.72)!important;
 }
+
+
+/* V24.25.7 — Harmonisation typographique des 5 cartes, CSS UNIQUEMENT.
+   Aucun fichier image ni cadrage, filtre, lumière, dimensions de carte ou programmation modifié.
+   G1/G2 contiennent d'anciennes légendes dans le visuel : masquer EXCLUSIVEMENT
+   cette petite bande de typographie pour utiliser les vrais textes HTML, comme G3. */
+.program-home .program-grid .program-card-g1::after,
+.program-home .program-grid .program-card-g2::after {
+  /* Le cache reste limité à la bande des anciens mots, sans filtre sur la photo. */
+  inset:33% 0 31% 0!important;
+  background:linear-gradient(90deg,
+    #070604 0%, #070604 30%, rgba(7,6,4,.985) 37%,
+    rgba(7,6,4,.68) 43%,transparent 53%)!important;
+  pointer-events:none!important;
+}
+/* Même blanc, graisse, famille, interligne et ombre sur G1/G2/G3/ATH/FM. */
+.program-home .program-grid .program-card .groups,
+.program-home .complement-grid .comp-card .groups {
+  opacity:1!important;
+  color:#f5f5f4!important;
+  font-family:Arial,Helvetica,sans-serif!important;
+  font-size:11px!important;
+  font-weight:400!important;
+  font-style:normal!important;
+  line-height:1.25!important;
+  letter-spacing:0!important;
+  text-shadow:0 1px 4px #000,0 0 6px #000!important;
+  pointer-events:none!important;
+}
+/* Couverture de l'ancienne typo incrustée des deux premières cartes.
+   Les vrais libellés gardent les positions/règles des cartes de l'application. */
+.program-home .program-grid .program-card-g1 .groups,
+.program-home .program-grid .program-card-g2 .groups {
+  z-index:2!important;
+}
+/* Vrais boutons interactifs à la place des lettres A/B/C incrustées : mêmes
+   caractères, blanc, forme et dimensions que les boutons de la carte G3. */
+.program-home .program-grid .program-card-g1 .variant-row button,
+.program-home .program-grid .program-card-g2 .variant-row button {
+  flex:1 1 0!important;
+  min-width:0!important;
+  width:auto!important;
+  background:#242526!important;
+  border:1px solid #4b4b49!important;
+  border-radius:9px!important;
+  color:#f5f5f4!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+}
+.program-home .program-grid .program-card .variant-row button,
+.program-home .complement-grid .comp-card .variant-row button {
+  color:#f5f5f4!important;
+  font-family:Arial,Helvetica,sans-serif!important;
+  font-weight:400!important;
+  font-style:normal!important;
+  letter-spacing:0!important;
+}
+/* Survol/appui long : préserver le retour de sélection existant. */
+.program-home .program-grid .program-card-g1 .variant-row button.preview,
+.program-home .program-grid .program-card-g2 .variant-row button.preview {
+  color:#fff2ca!important;
+  background:#393226!important;
+  border-color:#e8bd5d!important;
+  box-shadow:0 0 0 1px #d4a747 inset,0 0 14px #e6b9502c!important;
+}
+.program-home .program-grid .program-card-g1 .variant-row button:focus-visible,
+.program-home .program-grid .program-card-g2 .variant-row button:focus-visible {
+  outline:2px solid #f7db92!important;
+  outline-offset:0!important;
+}
