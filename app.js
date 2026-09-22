@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 43;
+const APP_REV = 44;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -57,13 +57,13 @@ const SCROLL_KEY="fitness-tab-scroll-v9";
 const needsCleanReset=false;
 let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
 let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
-let tab="today"; // V24.25: every full app launch starts on Aujourd’hui.
+let tab=!needsCleanReset&&["today","program","progress","history"].includes(savedUI?.tab)?savedUI.tab:"today"; // V24.25.8: restore the last validated main tab after reload.
 let view={type:"root"};
 let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(!needsCleanReset&&savedUI?.programMode==="exercises"?"groups":"sessions");
 let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
 let progressionPeriod=savedUI?.progressionPeriod||"1m";
 let progressionGroup=savedUI?.progressionGroup||"Tous";
-let progressionView="overview";
+let progressionView=!needsCleanReset&&["overview","performance","measurements"].includes(savedUI?.progressionView)?savedUI.progressionView:"overview";
 let measurementPeriod=!needsCleanReset&&savedUI?.measurementPeriod||"month";
 let overviewPeriod=!needsCleanReset&&savedUI?.overviewPeriod||"week";
 let periodAnchor=localISODate(); // V24.25: overview opens at the actual current period.
@@ -101,7 +101,7 @@ function defaultState(){
     installed:false,cycle:"A",nextG:1,weekKey:currentWeekKey(),completedG:[],complementAccessWeek:null,
     history:[],oldWeeks:[],refs:{},params:{},progressionSettings:{},sharedProgress:{},
     sessionOrder:{},programOverrides:{},customExercises:{},archivedExercises:[],ephemeralSessions:[],
-    today:null,todayDismissed:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},measurements:[],bodySettings:{heightCm:""},appRev:APP_REV
+    today:null,todayDismissed:null,lastComplement:{},nextAth:"A",nextFm:1,athParams:{},athPerformance:[],measurements:[],bodySettings:{heightCm:""},appRev:APP_REV
   };
 }
 function inferRotations(s){
@@ -139,7 +139,7 @@ function migrate(){
   s.programOverrides=s.programOverrides||{}; s.customExercises=s.customExercises||{};
   s.archivedExercises=Array.isArray(s.archivedExercises)?s.archivedExercises:[];
   s.ephemeralSessions=Array.isArray(s.ephemeralSessions)?s.ephemeralSessions.filter(x=>x&&Array.isArray(x.exerciseIds)):[];
-  s.progressionSettings=s.progressionSettings||{}; s.lastComplement=s.lastComplement||{}; s.athParams=s.athParams||{}; s.guideConfigs=s.guideConfigs||{};
+  s.progressionSettings=s.progressionSettings||{}; s.lastComplement=s.lastComplement||{}; s.athParams=s.athParams||{}; s.athPerformance=Array.isArray(s.athPerformance)?s.athPerformance.filter(x=>x&&typeof x==="object"):[]; s.guideConfigs=s.guideConfigs||{};
   s.measurements=Array.isArray(s.measurements)?s.measurements.filter(x=>x&&typeof x==="object"):[]; s.bodySettings=s.bodySettings||{heightCm:""};
   if(!raw?.nextAth || !raw?.nextFm) inferRotations(s);
   // Preserve the previous reordering model by converting sessionOrder into complete overrides only when safe.
@@ -850,6 +850,30 @@ function editSessionTimes(focus="start"){
       $("#save-times").onclick=()=>{const a=$("#start-edit").value.trim(),b=$("#end-edit").value.trim(),start=a?normalizeTimeInput(a):"",end=b?normalizeTimeInput(b):"";if(a&&!start||b&&!end){$("#time-error").textContent="Utilisez le format 11h25 ou 11:25.";return;}cur.start=start;cur.end=end;cur.manualTimes=true;save();closeOverlay(true);render();};
     });
 }
+function athMetricDefinition(step){
+  const name=String(step?.name||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(/sled/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"loadKg",label:"Charge (kg)",step:"0.5"},{key:"passages",label:"Passages",step:"1"},{key:"distanceM",label:"Distance totale (m)",step:"1"}];
+  if(/rameur/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceM",label:"Distance (m)",step:"1"},{key:"pace",label:"Allure moyenne / 500 m",type:"text",placeholder:"ex. 2:08"}];
+  if(/velo/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceKm",label:"Distance (km)",step:"0.1"},{key:"resistance",label:"Résistance / niveau",step:"1"}];
+  if(/tapis/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceKm",label:"Distance (km)",step:"0.1"},{key:"speedKmh",label:"Vitesse moyenne (km/h)",step:"0.1"},{key:"inclinePct",label:"Inclinaison (%)",step:"0.5"}];
+  if(/mobilite|etirement/.test(name))return [];
+  return [];
+}
+function athPreviousMetric(session,index,key){
+  const rows=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===Number(index));
+  return rows.at(-1)?.metrics?.[key]??"";
+}
+function athPerformanceForm(session){
+  const steps=DATA.ath?.[session]||[];
+  return `<div class="ath-performance-form">${steps.map((step,i)=>{const fields=athMetricDefinition(step);if(!fields.length)return `<div class="ath-performance-block ath-completed-only"><b>${i+1}. ${esc(step.name)}</b><span>Réalisé</span></div>`;return `<div class="ath-performance-block" data-ath-performance="${i}"><b>${i+1}. ${esc(step.name)}</b><div class="ath-performance-fields">${fields.map(f=>{const previous=athPreviousMetric(session,i,f.key),cfg=athStepConfig(session,i),prev=previous!==""?previous:(f.key==="durationMin"&&cfg?.durationSeconds?String(Math.round(cfg.durationSeconds/6)/10):"");return `<label>${esc(f.label)}<input data-ath-metric="${esc(f.key)}" type="${f.type||'number'}" ${f.type?'':`inputmode="decimal" step="${f.step||'0.1'}" min="0"`} value="${esc(prev)}" placeholder="${esc(f.placeholder||'')}"></label>`}).join("")}</div></div>`}).join("")}</div>`;
+}
+function requestAthPerformance(cur){
+  openModal(`<h3>Résultats athlétiques</h3><p class="tiny muted">Renseignez les données disponibles. Les dernières valeurs sont proposées pour accélérer la saisie. Aucun effort ressenti n’est demandé.</p>${athPerformanceForm(cur.session)}<div class="modal-actions"><button class="btn ghost" id="ath-perf-skip">Enregistrer sans valeurs</button><button class="btn gold" id="ath-perf-save">Enregistrer les résultats</button></div>`,modal=>{
+    const finish=()=>{cur.athPerformanceRecorded=true;save();closeOverlay(true);setTimeout(saveCurrentSession,0);};
+    $('#ath-perf-skip',modal).onclick=finish;
+    $('#ath-perf-save',modal).onclick=()=>{cur.athPerformance=cur.athPerformance||{};$$('[data-ath-performance]',modal).forEach(block=>{const metrics={};$$('[data-ath-metric]',block).forEach(input=>{const raw=input.value.trim();if(raw!=="")metrics[input.dataset.athMetric]=raw;});if(Object.keys(metrics).length)cur.athPerformance[block.dataset.athPerformance]=metrics;});finish();};
+  });
+}
 function saveCurrentSession(){
   const cur=state.today;if(!cur)return;
   if(minutesBetweenTimes(cur.start,cur.end)==null){
@@ -860,6 +884,7 @@ function saveCurrentSession(){
       });
     return;
   }
+  if(cur.session.startsWith("ATHLÉTIQUE")&&!cur.athPerformanceRecorded){requestAthPerformance(cur);return;}
   if(!cur.session.startsWith("ATHLÉTIQUE")){
     const ids=activeSessionIds(cur);
     const missing=ids.map((id,i)=>({id,no:i+1,key:occKey(id,i+1)})).filter(o=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,o.id,o.no)));
@@ -878,7 +903,10 @@ function commitCurrentSession(){
   const mins=minutesBetweenTimes(cur.start,cur.end);if(mins==null)return;
   const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:activeSessionIds(cur);
   const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||(status==='Échoué'?'':actual),reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps,setReps=cur.setReps?.[key]||null,equipment=state.progressionSettings[id]?.equipment||"";return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no,setReps,equipment};}).filter(e=>e.status!=="Non réalisé");
-  state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
+  const historyId="h"+Date.now();
+  const athRecords=cur.session.startsWith("ATHLÉTIQUE")?Object.entries(cur.athPerformance||{}).map(([index,metrics])=>{const step=DATA.ath?.[cur.session]?.[Number(index)];return {session:cur.session,index:Number(index),name:step?.name||`Exercice ${Number(index)+1}`,date:localISODate(),historyId,metrics:Object.assign({},metrics)};}):[];
+  state.history.push({id:historyId,date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords,athPerformance:athRecords});
+  if(athRecords.length)state.athPerformance.push(...athRecords);
   // Commit ONLY recorded exercises; each occurrence keeps its four actual sets
   // in history while its next working charge/repetitions are shared by identity.
   exRecords.forEach(e=>{
@@ -1148,11 +1176,19 @@ function renderProgramDetail(session){
   enableSort($("#session-list"),session);
   $("#add-exercise").onclick=()=>openAddExerciseModal(session);
 }
+function programPrescription(id,session){
+  const p=defaultParams(id),target=repetitionTargetFor(id,session);
+  if(p.type==="gainage")return referenceFor(id);
+  if(p.type==="circuit")return referenceFor(id);
+  const load=refWithUnit(p.charge||state.refs[id]||"—"),series=parseInt(p.series)||4,reps=String(p.repetitions||target||"").trim();
+  const repText=reps?`${series} × ${reps}`:`${series} séries`;
+  return `${load} · ${repText}`;
+}
 function sessionRow(id,session,no){
-  const e=exercise(id),img=thumbnailFor(id,session,no);
+  const e=exercise(id),img=thumbnailFor(id,session,no),prescription=programPrescription(id,session);
   return `<div class="session-row" data-session-row data-id="${esc(id)}" data-no="${no}">
     <div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-program-official.jpg"}"></div>
-    <div class="session-copy"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div>
+    <div class="session-copy"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="program-prescription">${esc(prescription)}</div></div><div class="chev">${icon("chevron")}</div><div><button class="row-menu">${icon("more")}</button><span class="handle">${icon("grip")}</span></div>
     ${isAbCircuit(id)?`<button class="btn guide-program-btn" data-program-circuit="${esc(id)}" data-no="${no}">${esc(guideEntryLabel('circuit:'+session+':'+no+':'+id))}</button>`:''}</div>`;
 }
 function enableSort(list,session){
@@ -1463,6 +1499,17 @@ function renderProgressOverview(){
     <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
   overviewMarkupCache.set(cacheKey,html);return html;
 }
+function athMetricNumber(v){const n=Number(String(v??"").replace(",","."));return Number.isFinite(n)?n:null;}
+function athMetricLabel(key){return ({durationMin:"Durée",loadKg:"Charge",passages:"Passages",distanceM:"Distance",distanceKm:"Distance",speedKmh:"Vitesse",inclinePct:"Inclinaison",resistance:"Résistance",pace:"Allure"})[key]||key;}
+function athMetricDisplay(key,v){if(v==null||v==="")return "—";const unit=({durationMin:" min",loadKg:" kg",distanceM:" m",distanceKm:" km",speedKmh:" km/h",inclinePct:" %"})[key]||"";return `${String(v).replace('.',',')}${unit}`;}
+function athleticProgressMarkup(){
+  const rows=state.athPerformance||[];
+  const groups=new Map();rows.forEach(r=>{const key=`${r.session}|${r.index}`;(groups.get(key)||groups.set(key,[]).get(key)).push(r);});
+  const cards=[...groups.values()].map(arr=>{arr.sort((a,b)=>String(a.date).localeCompare(String(b.date)));const last=arr.at(-1),keys=Object.keys(last.metrics||{}),primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],numeric=primary?arr.map(x=>({date:x.date,value:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.value!=null):[],best=numeric.length?Math.max(...numeric.map(x=>x.value)):null;return `<button class="ath-progress-card" data-ath-progress="${esc(last.session)}|${last.index}"><div><b>${esc(niceSession(last.session))} · ${esc(last.name)}</b><span>Dernière · ${formatDate(last.date)}</span></div><div class="ath-progress-values">${keys.slice(0,3).map(k=>`<span><small>${esc(athMetricLabel(k))}</small><b>${esc(athMetricDisplay(k,last.metrics[k]))}</b></span>`).join("")}</div>${best!=null?`<div class="tiny gold">Meilleure ${esc(athMetricLabel(primary).toLowerCase())} : ${esc(athMetricDisplay(primary,best))}</div>`:""}</button>`;});
+  return `<section class="ath-progress-section"><div class="overview-section-head"><h2>Performances athlétiques</h2><span>${groups.size} exercice${groups.size>1?'s':''} suivi${groups.size>1?'s':''}</span></div><div class="ath-progress-list">${cards.join("")||'<div class="card empty">Les performances Athlétique A/B apparaîtront ici après leur prochain enregistrement.</div>'}</div></section>`;
+}
+function openAthProgressDetail(key){
+  const [session,indexRaw]=key.split('|'),index=Number(indexRaw),arr=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===index).sort((a,b)=>String(a.date).localeCompare(String(b.date)));if(!arr.length)return;const last=arr.at(-1),keys=[...new Set(arr.flatMap(x=>Object.keys(x.metrics||{})))],primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],nums=arr.map(x=>({x:x.date,y:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.y!=null);openModal(`<h3>${esc(last.name)}</h3><p class="tiny muted">${esc(niceSession(session))} · évolution objective enregistrée</p>${primary?`<div class="chart ath-mini-chart">${lineChart(nums)}</div><div class="tiny muted">Courbe : ${esc(athMetricLabel(primary))}</div>`:''}<div class="ath-detail-history">${arr.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${formatDate(x.date)}</b><span>${keys.map(k=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,x.metrics?.[k]))}`).join(' · ')}</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);}
 function renderProgressPerformance(){
   const cacheKey=progressionPeriod+"|"+progressionGroup+"|"+localISODate();
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
@@ -1475,6 +1522,7 @@ function renderProgressPerformance(){
   const start=periodStart(progressionPeriod);if(start)ids=ids.filter(id=>(perf[id]||[]).some(x=>x.date>=start));
   const active=ids.filter(id=>(perf[id]||[]).length),progressing=active.filter(id=>["up","slow"].includes(trendFor(id,perf[id]).key)).length;
   const html=`${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
+    ${athleticProgressMarkup()}
     <div class="metrics"><div class="metric"><b>${active.length}</b><span>Exercices suivis</span></div><div class="metric"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></div><div class="metric"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></div></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
     <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`;
@@ -1554,6 +1602,7 @@ function renderProgress(){
   if($("#measure-height"))$("#measure-height").onclick=openHeightModal;
   if($("#body-measure-guide"))$("#body-measure-guide").onclick=e=>{e.preventDefault();e.stopPropagation();openFullscreenSheet("./assets/guide/mensurations.jpg","Guide des mensurations");};
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
+  $$('[data-ath-progress]').forEach(b=>b.onclick=()=>openAthProgressDetail(b.dataset.athProgress));
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));

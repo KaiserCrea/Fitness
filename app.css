@@ -1835,3 +1835,19 @@ body.lock-program-home{
   outline:2px solid #f7db92!important;
   outline-offset:0!important;
 }
+
+/* V24.25.8 — informations de travail dans Programme + suivi Athlétique. */
+.program-prescription{margin-top:5px;color:#e8c66c;font-size:11px;font-weight:650;line-height:1.25;letter-spacing:.01em}
+.ath-performance-form{display:grid;gap:9px;max-height:58vh;overflow:auto;padding-right:2px}
+.ath-performance-block{border:1px solid #34312a;border-radius:10px;background:#121313;padding:9px}
+.ath-performance-block>b{display:block;color:#efd075;font-size:13px;margin-bottom:7px}
+.ath-performance-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.ath-performance-fields label{font-size:10px;color:#aaa59c;display:grid;gap:4px}
+.ath-performance-fields input{width:100%;box-sizing:border-box;background:#090a0a;border:1px solid #3a3832;border-radius:8px;color:#f4f1e9;padding:8px;font-size:13px}
+.ath-completed-only{display:flex;align-items:center;justify-content:space-between}.ath-completed-only>b{margin:0}.ath-completed-only span{font-size:11px;color:#aaa59c}
+.ath-progress-section{margin:10px 0 14px}.ath-progress-list{display:grid;gap:8px}
+.ath-progress-card{width:100%;border:1px solid #37342d;border-radius:11px;background:#141515;color:#eee8dc;padding:10px;text-align:left}
+.ath-progress-card>div:first-child{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.ath-progress-card>div:first-child b{font-size:12px;color:#f0d277}.ath-progress-card>div:first-child span{font-size:9px;color:#99958e;white-space:nowrap}
+.ath-progress-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:9px 0 6px}.ath-progress-values span{background:#0b0c0c;border-radius:8px;padding:6px}.ath-progress-values small{display:block;color:#99958e;font-size:8px}.ath-progress-values b{display:block;color:#f4f1e9;font-size:11px;margin-top:2px}
+.ath-detail-history{max-height:34vh;overflow:auto;margin:8px 0}.ath-detail-row{padding:8px 1px;border-bottom:1px solid #302e28}.ath-detail-row b{display:block;color:#e8c66c;font-size:11px}.ath-detail-row span{display:block;color:#b0aca4;font-size:10px;margin-top:3px;line-height:1.4}.ath-mini-chart{margin-top:8px}
+@media(max-width:380px){.ath-performance-fields{grid-template-columns:1fr}.ath-progress-values{grid-template-columns:repeat(2,minmax(0,1fr))}.program-prescription{font-size:10px}}
