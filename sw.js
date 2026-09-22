@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-25-5-annual-g3-20260922-1";
+const CACHE = "fitness-v24-25-6-annual-fail-20260922-1";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
@@ -40,7 +40,13 @@ const ROOT = [
   "./assets/card-fm-official.jpg"
 ];
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ROOT)).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache=await caches.open(CACHE);
+    // A missing optional older image must never block the updated app from installing.
+    await cache.addAll(["./", "./index.html", "./app.js?v=24256", "./app.css?v=24253", "./data.js?v=24240", "./sheet-layouts.js", "./thumbnail-map.js?v=24253"]);
+    await Promise.allSettled(ROOT.map(path=>cache.add(path)));
+    await self.skipWaiting();
+  })());
 });
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {

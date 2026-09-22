@@ -782,13 +782,14 @@ function latestExerciseWeight(id){
 }
 function openSetResultsModal(id,no,current,onDone,options={}){
  const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id,cur.session);
- const loadApplicable=!exerciseWithoutRequiredLoad(id),last=loadApplicable?(isNumericWeight(current)?current:latestExerciseWeight(id)):'';
- const noLoadYet=options.markFailed&&loadApplicable&&!last;
- const weightEditor=(value='',required=false)=>`<div class="weight-entry"><input id="failed-weight" type="text" inputmode="text" autocomplete="off" autocapitalize="off" value="${esc(value)}" placeholder="Ex. : 40 ou 2×40" ${required?'required':''}><button type="button" class="weight-times" aria-label="Insérer le signe multiplication" title="Insérer ×">×</button></div><div class="tiny muted">Vous pouvez saisir 2×40 pour deux disques de 40 kg, sans compter le poids de la barre.</div>`;
- const loadMarkup=options.markFailed&&loadApplicable?(noLoadYet?`<div class="field initial-failure-load"><label for="failed-weight">Charge utilisée (kg) — première référence</label>${weightEditor('',true)}<label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Exercice effectué sans charge / au poids du corps</label></div>`:`<div class="field initial-failure-load"><label for="failed-weight">Charge réellement utilisée (kg) — modifiable</label>${weightEditor(last)}</div>`):'';
+ // AUCUNE exclusion par type d'exercice : toujours proposer le poids en échec.
+ // La référence planifiée reste distincte de la charge de cette tentative.
+ const last=isNumericWeight(current)?current:latestExerciseWeight(id);
+ const weightEditor=(value='')=>`<div class="weight-entry"><input id="failed-weight" type="text" inputmode="text" autocomplete="off" autocapitalize="off" value="${esc(value)}" placeholder="Ex. : 40 ou 2×40"><button type="button" class="weight-times" aria-label="Insérer le signe multiplication" title="Insérer ×">×</button></div><div class="tiny muted">2×40 représente deux disques de 40 kg, sans supposer le poids de la barre.</div>`;
+ const loadMarkup=options.markFailed?`<div class="field initial-failure-load"><label for="failed-weight">Charge réellement utilisée (kg) — modifiable</label>${weightEditor(last)}<label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Sans charge / poids du corps</label><div class="tiny muted">Laissez le champ vide si aucune charge n'est connue ; la référence prévue ne sera pas modifiée automatiquement.</div></div>`:'';
  openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(last||current))}</p>${loadMarkup}${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{
    const noLoad=$('#failed-no-load'),weightInput=$('#failed-weight');
-   if(noLoad&&weightInput)noLoad.onchange=()=>{weightInput.disabled=noLoad.checked;weightInput.required=!noLoad.checked;};
+   if(noLoad&&weightInput)noLoad.onchange=()=>{weightInput.disabled=noLoad.checked;};
    const times=$('.weight-times');if(times&&weightInput)times.onclick=()=>{
      const a=weightInput.selectionStart??weightInput.value.length,b=weightInput.selectionEnd??a;
      weightInput.value=weightInput.value.slice(0,a)+'×'+weightInput.value.slice(b);
@@ -797,10 +798,14 @@ function openSetResultsModal(id,no,current,onDone,options={}){
    $('#save-set-results').onclick=()=>{
      const inputs=$$('[data-set-reps]'),values=inputs.map(x=>Number(x.value));
      if(values.some((v,i)=>!Number.isInteger(v)||v<0||v>200||!inputs[i].value.trim())){alert('Saisissez chaque série (0 à 200).');return;}
-     let actualWeight=last||current;
-     if(options.markFailed&&loadApplicable){
+     let actualWeight=current;
+     if(options.markFailed){
        if(noLoad?.checked)actualWeight='Poids du corps';
-       else if(weightInput){const entered=weightInput.value.trim();if(!isNumericWeight(entered)){alert('Indiquez la charge utilisée (ex. 40 ou 2 × 20), ou cochez « sans charge ».');weightInput.focus();return;}actualWeight=normalizeWeight(entered);}
+       else if(weightInput){
+         const entered=weightInput.value.trim();
+         if(entered&&!isNumericWeight(entered)){alert('Charge invalide. Utilisez par exemple 40 ou 2×20, ou cochez « poids du corps ».');weightInput.focus();return;}
+         actualWeight=entered?normalizeWeight(entered):current;
+       }
      }
      if(options.markFailed){
        cur.status=cur.status||{};cur.status[key]='Échoué';delete cur.status[id];
@@ -808,7 +813,7 @@ function openSetResultsModal(id,no,current,onDone,options={}){
      }
      cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);
      const suggestion=targetSuggestion(id,values,actualWeight,cur.session);
-     cur.nextRefs=cur.nextRefs||{};if(options.markFailed||!cur.nextRefs[key])cur.nextRefs[key]=actualWeight;
+     cur.nextRefs=cur.nextRefs||{};if(options.markFailed){cur.nextRefs[key]=current;}else if(!cur.nextRefs[key])cur.nextRefs[key]=actualWeight;
      cur.nextReps=cur.nextReps||{};
      // Even if the user declines a load increase, a partly achieved higher
      // target must no longer revert to the stale 4×10 from a technical sheet.
@@ -872,12 +877,13 @@ function commitCurrentSession(){
   const cur=state.today;if(!cur)return;
   const mins=minutesBetweenTimes(cur.start,cur.end);if(mins==null)return;
   const ids=cur.session.startsWith("ATHLÉTIQUE")?[]:activeSessionIds(cur);
-  const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||actual,reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps,setReps=cur.setReps?.[key]||null,equipment=state.progressionSettings[id]?.equipment||"";return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no,setReps,equipment};}).filter(e=>e.status!=="Non réalisé");
+  const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||(status==='Échoué'?'':actual),reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps,setReps=cur.setReps?.[key]||null,equipment=state.progressionSettings[id]?.equipment||"";return{id,name:exercise(id).name,status,actual,next,reps,nextReps,no,setReps,equipment};}).filter(e=>e.status!=="Non réalisé");
   state.history.push({id:"h"+Date.now(),date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords});
   // Commit ONLY recorded exercises; each occurrence keeps its four actual sets
   // in history while its next working charge/repetitions are shared by identity.
   exRecords.forEach(e=>{
-    if(!e.next)return;
+    // A failed attempt with no planned charge must not create a phantom reference.
+    if(!e.next||e.next==='—')return;
     const id=e.id,p=defaultParams(id);
     state.refs[id]=e.next;
     if(p.type==='strength'){
@@ -1685,37 +1691,40 @@ function shiftHistory(delta){
   if(historyPeriod==="week")d.setDate(d.getDate()+delta*7);else if(historyPeriod==="month")d.setMonth(d.getMonth()+delta);else d.setFullYear(d.getFullYear()+delta);
   historyAnchor=localISODate(d);historyYear=d.getFullYear();persistUI();history.replaceState(navState(),"");render();
 }
-// Synthèse ANNUELLE indépendante du filtre Semaine/Mois/Année/Toutes.
-// Les semaines écoulées sans séance comptent dans 0/5 ; les semaines futures
-// ne sont pas encore classées. La semaine du 1er janvier reste incluse, même
-// lorsque son lundi appartient à l'année précédente.
+// V24.25.6 : source ANNUELLE non filtrée. Les statistiques de l'en-tête
+// et du calendrier continuent d'utiliser historyScope ; PAS ce bilan.
 function weeklyResultsYear(){
   if(historyPeriod==="all")return new Date().getFullYear();
   if(historyPeriod==="year")return historyYear;
   const anchor=new Date(`${historyAnchor}T12:00:00`);
   return Number.isFinite(anchor.getTime())?anchor.getFullYear():new Date().getFullYear();
 }
+function annualWeeklyBuckets(year,now,historyEntries,legacyWeeks){
+  const result=Array(8).fill(0),today=new Date(now);
+  if(!Number.isInteger(year)||!Number.isFinite(today.getTime())||year>today.getFullYear())return result;
+  const counts=new Map(),first=mondayOf(new Date(year,0,1)),last=mondayOf(year===today.getFullYear()?today:new Date(year,11,31));
+  // Crée toutes les semaines écoulées de cette année, sans compter les futures.
+  for(const day=new Date(first);day<=last;day.setDate(day.getDate()+7))counts.set(localISODate(day),0);
+  // Part de TOUT l'historique et non des seules séances de la vue Semaine/Mois.
+  (historyEntries||[]).forEach(h=>{
+    const date=String(h?.date||"").slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number(date.slice(0,4))!==year)return;
+    const week=weekKeyFromDate(date);
+    if(counts.has(week))counts.set(week,counts.get(week)+1);
+  });
+  (legacyWeeks||[]).forEach(w=>{
+    const date=String(w?.week||w?.date||"").slice(0,10),count=Number(w?.count);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number(date.slice(0,4))!==year||!Number.isFinite(count)||count<0)return;
+    const week=weekKeyFromDate(date);
+    if(counts.has(week))counts.set(week,counts.get(week)+count);
+  });
+  counts.forEach(count=>result[Math.min(7,Math.max(0,Math.floor(count)))]++);
+  return result;
+}
 function weeklyResults(){
-  const year=weeklyResultsYear(),today=new Date(),thisYear=today.getFullYear();
-  const counts=new Map();
-  if(year<=thisYear){
-    const start=mondayOf(new Date(year,0,1));
-    const end=mondayOf(year===thisYear?today:new Date(year,11,31));
-    for(const day=new Date(start);day<=end;day.setDate(day.getDate()+7))counts.set(localISODate(day),0);
-  }
-  historyForYear(year).forEach(h=>{
-    const k=weekKeyFromDate(h.date);
-    if(counts.has(k))counts.set(k,counts.get(k)+1);
-  });
-  oldWeekEntries(year).forEach(w=>{
-    const raw=String(w.week||w.date||"").slice(0,10);
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(raw))return;
-    const k=weekKeyFromDate(raw);
-    if(counts.has(k))counts.set(k,counts.get(k)+(+w.count||0));
-  });
-  const buckets=Array(8).fill(0);
-  counts.forEach(n=>{buckets[Math.min(7,Math.max(0,n))]++;});
-  return `<div class="weekly-results">${buckets.map((n,i)=>`<div class="weekly-result ${i>=6?"over-goal":""}"><b>${i}/5</b><span>${n} semaine${n>1?"s":""}</span>${i===5?`<em>Objectif atteint</em>`:i===6?`<em>Objectif dépassé !</em>`:i===7?`<em>Exceptionnel !</em>`:""}</div>`).join("")}</div>`;
+  const year=weeklyResultsYear();
+  const buckets=annualWeeklyBuckets(year,new Date(),state.history,state.oldWeeks);
+  return `<div class="tiny muted" style="margin:0 0 12px">Bilan annuel ${year} · indépendant de Semaine / Mois · V24.25.6</div><div class="weekly-results">${buckets.map((n,i)=>`<div class="weekly-result ${i>=6?"over-goal":""}"><b>${i}/5</b><span>${n} semaine${n>1?"s":""}</span>${i===5?`<em>Objectif atteint</em>`:i===6?`<em>Objectif dépassé !</em>`:i===7?`<em>Exceptionnel !</em>`:""}</div>`).join("")}</div>`;
 }
 function historyForYear(y){return (state.history||[]).filter(h=>Number(String(h.date).slice(0,4))===+y);}
 function oldWeekEntries(y){return (state.oldWeeks||[]).filter(w=>Number(String(w.week||w.date||"").slice(0,4))===+y);}
@@ -2507,5 +2516,5 @@ initializeSharedProgress();
 render();
 if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=24256",{updateViaCache:"none"}).catch(()=>{});
 })();
