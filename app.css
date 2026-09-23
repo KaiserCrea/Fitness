@@ -1933,3 +1933,163 @@ body.lock-program-home{
 .ath-progress-section .ath-progress-list{display:none}
 .ath-progress-section.is-open .ath-progress-list{display:grid}
 .ath-progress-section.is-open .ath-progress-toggle>.icon{transform:rotate(-90deg)}
+
+/* =====================================================================
+   V24.25.11 — corrections validées après contrôle de V24.25.10
+   - Programme G1/G2 : un seul cadre continu, contenus alignés sur G3.
+   - Vue d'ensemble : fenêtre comparative hebdomadaire fixe + semaine choisie.
+   - Performance : un seul visuel dézoomé dans le bandeau, sans modifier l'image.
+   ===================================================================== */
+
+/* Programme : le symbole de rotation appartient visuellement à l'ordre du cycle. */
+.program-home .cycle-order{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:5px;
+  white-space:nowrap;
+}
+.program-home .cycle-order .icon{
+  width:13px;
+  height:13px;
+  flex:0 0 auto;
+  color:#b7aa8f;
+}
+
+/* G1/G2 : les maquettes contiennent d'anciens textes, boutons et cadres.
+   On conserve strictement les fichiers images, mais on masque ces éléments
+   intégrés à l'intérieur de la carte puis on utilise le cadre/textes/boutons
+   HTML de l'application, comme G3. Le cadre CSS reste au premier plan et
+   continu sur les quatre côtés. */
+.program-home .program-grid .program-card-g1,
+.program-home .program-grid .program-card-g2{
+  border:1px solid #a07934!important;
+  overflow:hidden!important;
+}
+.program-home .program-grid .program-card-g1::before,
+.program-home .program-grid .program-card-g2::before{
+  inset:0!important;
+  background-image:var(--card-image)!important;
+  background-size:100% 100%!important;
+  background-position:center center!important;
+  background-repeat:no-repeat!important;
+  background-color:#070604!important;
+  filter:none!important;
+  opacity:1!important;
+}
+.program-home .program-grid .program-card-g1::after,
+.program-home .program-grid .program-card-g2::after{
+  content:""!important;
+  position:absolute!important;
+  inset:1px!important;
+  border-radius:11px!important;
+  background:
+    linear-gradient(90deg,rgba(7,6,4,.995) 0%,rgba(7,6,4,.985) 34%,rgba(7,6,4,.78) 44%,rgba(7,6,4,.18) 56%,transparent 66%),
+    linear-gradient(0deg,rgba(7,6,4,.995) 0%,rgba(7,6,4,.985) 28%,rgba(7,6,4,.80) 37%,rgba(7,6,4,.18) 49%,transparent 59%)!important;
+  box-shadow:inset 0 0 0 2px #070604!important;
+  pointer-events:none!important;
+}
+.program-home .program-grid .program-card-g1 .code,
+.program-home .program-grid .program-card-g2 .code{
+  opacity:1!important;
+  pointer-events:none!important;
+  z-index:2!important;
+}
+.program-home .program-grid .program-card-g1 .groups,
+.program-home .program-grid .program-card-g2 .groups{
+  opacity:1!important;
+  pointer-events:none!important;
+  z-index:2!important;
+}
+/* Même ligne de base et même géométrie que G3. */
+.program-home .program-grid .program-card-g1 .variant-row,
+.program-home .program-grid .program-card-g2 .variant-row{
+  left:8px!important;
+  right:8px!important;
+  bottom:9px!important;
+  gap:7px!important;
+}
+.program-home .program-grid .program-card-g1 .variant-row button,
+.program-home .program-grid .program-card-g2 .variant-row button{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  width:35px!important;
+  height:35px!important;
+  background:#242526!important;
+  border:1px solid #4b4b49!important;
+  border-radius:9px!important;
+  color:#f5f5f4!important;
+  box-shadow:none!important;
+  text-shadow:none!important;
+}
+@media(max-width:365px){
+  .program-home .program-grid .program-card-g1 .variant-row button,
+  .program-home .program-grid .program-card-g2 .variant-row button{width:30px!important;height:30px!important;font-size:11px!important}
+}
+@media(max-height:800px){
+  .program-home .program-grid .program-card-g1 .variant-row,
+  .program-home .program-grid .program-card-g2 .variant-row{bottom:6px!important}
+  .program-home .program-grid .program-card-g1 .variant-row button,
+  .program-home .program-grid .program-card-g2 .variant-row button{width:29px!important;height:29px!important;font-size:10px!important}
+}
+
+/* Vue d'ensemble : la semaine sélectionnée est visible sans déplacer les six
+   semaines comparatives les plus récentes. */
+.duration-bar-col.is-selected .duration-bar-space>i{
+  box-shadow:0 0 0 1px #f5dea1,0 0 16px #e1b25055;
+  filter:brightness(1.12);
+}
+.duration-bar-col.is-selected>span,
+.duration-bar-col.is-selected>b{
+  color:#f3d37f;
+  font-weight:750;
+}
+
+/* Performance : le fichier technique reste inchangé. Le bandeau n'affiche
+   qu'une seule zone de l'image source (la position Contraction, à droite de la
+   fiche), fortement dézoomée. Le reste du bandeau est un fond sombre/doré qui
+   absorbe l'espace au lieu de répéter ou d'étirer l'image. */
+.progress-detail-screen .detail-sheet-hero{
+  isolation:isolate;
+  background:
+    radial-gradient(ellipse 58% 120% at 82% 48%,rgba(198,142,48,.17) 0%,rgba(126,83,27,.08) 43%,transparent 73%),
+    linear-gradient(90deg,#050505 0%,#070706 48%,#100d08 72%,#171108 100%)!important;
+  background-image:
+    radial-gradient(ellipse 58% 120% at 82% 48%,rgba(198,142,48,.17) 0%,rgba(126,83,27,.08) 43%,transparent 73%),
+    linear-gradient(90deg,#050505 0%,#070706 48%,#100d08 72%,#171108 100%)!important;
+  background-size:100% 100%,100% 100%!important;
+  background-position:center,center!important;
+  background-repeat:no-repeat!important;
+}
+.progress-detail-screen .detail-sheet-hero::before{
+  content:"";
+  position:absolute;
+  z-index:0;
+  top:0;
+  bottom:0;
+  right:14px;
+  width:clamp(96px,24vw,108px);
+  background-image:var(--detail-image);
+  background-size:300% auto;
+  background-position:right 0 top -20px;
+  background-repeat:no-repeat;
+  filter:brightness(.98) contrast(1.06) saturate(.94);
+  opacity:.96;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 16%,#000 100%);
+  mask-image:linear-gradient(90deg,transparent 0%,#000 16%,#000 100%);
+  pointer-events:none;
+}
+.progress-detail-screen .detail-sheet-hero::after{
+  content:"";
+  position:absolute;
+  z-index:1;
+  inset:0;
+  background:linear-gradient(90deg,#050505 0%,#050505f5 42%,#050505c9 60%,rgba(5,5,5,.38) 74%,transparent 88%);
+  pointer-events:none;
+}
+.progress-detail-screen .detail-sheet-hero>*{
+  position:relative;
+  z-index:2;
+}
+.progress-detail-screen .chart-label{font-size:7.5px}
+.progress-detail-screen .chart-rep-label{font-size:7.5px}

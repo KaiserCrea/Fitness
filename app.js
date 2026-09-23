@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 44;
+const APP_REV = 45;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -1066,11 +1066,12 @@ function renderProgram(){
   bindProgramContent();
 }
 function programSessions(){
-  return `<div class="program-home"><div class="row-between"><h2 class="section-title">Cycle principal G ${icon("rotate")}</h2><span class="tiny muted">Ordre du cycle : A → B → C</span></div>
+  const cycleDone=state.completedG.length>=3;
+  return `<div class="program-home"><div class="row-between"><h2 class="section-title">Cycle principal G</h2><span class="tiny muted cycle-order">Ordre du cycle : A → B → C ${icon("rotate")}</span></div>
     <div class="program-grid">${[1,2,3].map(n=>programGCard(n)).join("")}</div>
     <h2 class="section-title">Séances complémentaires</h2>
     <div class="complement-grid">${programCompCard("ATHLÉTIQUE",["A","B"],state.nextAth)}${programCompCard("FULL MIX",["1","2","3","4"],String(state.nextFm))}</div>
-    <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>Prochaine séance G</span><b>${state.completedG.includes(3)?"Terminée":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
+    <div class="card cycle-info"><div><span>Semaine actuelle</span><b>Semaine ${state.cycle}</b></div><div><span>${cycleDone?"Cycle G":"Prochaine séance G"}</span><b>${cycleDone?"Terminé":sessionCode()}</b></div><div><span>Progression du cycle</span><div class="progress-track"><i style="width:${Math.min(100,(state.completedG.length/3)*100)}%"></i></div><b>${state.completedG.length} / 3</b></div></div></div>`;
 }
 function programGCard(n){
   const s=`G${n}${state.cycle}`,groups=groupLabel(s).split(" / ").map(esc).join("<br>"),asset=n===1?'./assets/card-g1-maquette-finale-v24254.png':n===2?'./assets/card-g2-maquette-finale-v24254.png':'./assets/card-g3-portrait-valide-v24255.png';
@@ -1274,7 +1275,7 @@ let perfCache=null;
 const performanceMarkupCache=new Map(),overviewMarkupCache=new Map();
 function allPerf(){
   if(perfCache)return perfCache;
-  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({date:h.date,value:e.actual,next:e.next,reps:e.reps,setReps:Array.isArray(e.setReps)?e.setReps.slice():null,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return perfCache=m;
+  const m={};(state.history||[]).forEach(h=>(h.exercises||[]).forEach(e=>{if(e.status==="Non réalisé")return;{const cid=canonicalId(e.id);(m[cid]||(m[cid]=[])).push({id:cid,date:h.date,value:e.actual,next:e.next,reps:e.reps,setReps:Array.isArray(e.setReps)?e.setReps.slice():null,nextReps:e.nextReps,status:e.status,session:h.session,duration:h.duration});}}));return perfCache=m;
 }
 function periodStart(period){
   const d=new Date(); if(period==="1m")d.setMonth(d.getMonth()-1);else if(period==="3m")d.setMonth(d.getMonth()-3);else if(period==="6m")d.setMonth(d.getMonth()-6);else if(period==="1y")d.setFullYear(d.getFullYear()-1);else return null;return localISODate(d);
@@ -1363,7 +1364,8 @@ function progressionCurvePoints(rows){
         }
       }
     }
-    return {x:row.record.date,y:round1(index),load:row.weight,raw:row.record,r:graphRepsLabel(row.record),label:round1(row.weight)};
+    const loadLabel=`${String(round1(row.weight)).replace('.',',')} kg`;
+    return {x:row.record.date,y:round1(index),load:row.weight,raw:row.record,r:graphRepsLabel(row.record),label:round1(row.weight),labelText:loadLabel};
   });
 }
 function progressionChange(arr){
@@ -1440,7 +1442,11 @@ function isoWeekInfo(value){
 }
 function isoWeekCount(year){return isoWeekInfo(new Date(year,11,28)).week;}
 function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
-  const range=selectedRange(period,anchor),entries=(state.history||[]).filter(h=>typeof h.date==='string');
+  // En vue Semaine, le graphique comparatif reste toujours ancré sur la semaine
+  // actuelle : sélectionner S38 ne doit pas faire disparaître S39. Les autres
+  // données de la page continuent, elles, à suivre periodAnchor.
+  const comparisonAnchor=period==='week'?localISODate():anchor;
+  const range=selectedRange(period,comparisonAnchor),entries=(state.history||[]).filter(h=>typeof h.date==='string');
   const durationOf=rows=>({value:rows.reduce((total,h)=>total+(Number(h.duration)>0?Number(h.duration):0),0),missing:rows.filter(h=>!(Number(h.duration)>0)).length});
   if(period==='week'){
     const end=new Date(range.start+'T12:00:00');
@@ -1455,10 +1461,11 @@ function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
   }
   return Array.from({length:12},(_,i)=>({label:['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'][i],...durationOf(entries.filter(h=>h.date>=range.start&&h.date<range.end&&Number(h.date.slice(5,7))===i+1))}));
 }
-function overviewDurationBars(series){
+function overviewDurationBars(series,selectedAnchor=''){
   const max=Math.max(60,...series.map(x=>x.value)),ceil=Math.ceil(max/60)*60;
   const show=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'):m+' min';};
-  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
+  const selectedWeek=selectedAnchor?weekKeyFromDate(selectedAnchor):'';
+  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const isSelected=!!x.anchor&&weekKeyFromDate(x.anchor)===selectedWeek;const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0" aria-pressed="${isSelected?'true':'false'}"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}${isSelected?' is-selected':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
 }
 function overviewDonut(distribution,total){
   const palette=["#f2cf72","#d7ad50","#f0d596","#9e8655","#c9973d","#b9934b"];
@@ -1557,7 +1564,7 @@ function renderProgressOverview(){
     </div>
     <p class="tiny muted overview-progress-method">* Indice moyen : charge et répétitions comparables sur la période. Aucune valeur sans deux relevés exploitables.</p>
     <div class="overview-section-head duration-heading"><h2>Évolution du temps d’entraînement</h2><span>${overviewPeriod==="week"?(()=>{const w=isoWeekInfo(periodAnchor);return 'Semaine '+w.week+' / '+isoWeekCount(w.year);})():overviewPeriod==="month"?"Par semaine · mois sélectionné":"Par mois · année sélectionnée"}</span></div>
-    <div class="overview-panel duration-panel">${overviewDurationBars(trainingDurationSeries())}</div>
+    <div class="overview-panel duration-panel">${overviewDurationBars(trainingDurationSeries(),overviewPeriod==="week"?periodAnchor:"")}</div>
     <div class="overview-section-head"><h2>Répartition par groupe musculaire</h2></div>
     <div class="overview-panel">${overviewDonut(d.distribution,d.exercises)}</div>`;
   overviewMarkupCache.set(cacheKey,html);return html;
@@ -1726,7 +1733,13 @@ function graphRepsLabel(record){
   const sets=Array.isArray(record?.setReps)?record.setReps.filter(Number.isFinite):[];
   const reps=graphRepValue(record);
   if(reps==null)return '';
-  return sets.length?`${sets.length}×${reps}`:`${reps} rep${reps>1?'s':''}`;
+  if(sets.length)return `${sets.length}×${reps}`;
+  // Les anciens relevés n'ont pas toujours le détail série par série. Dans ce
+  // cas on conserve les répétitions enregistrées et on complète uniquement avec
+  // le nombre de séries programmé pour cet exercice, sans modifier l'historique.
+  const rawSeries=parseInt(defaultParams(record?.id).series);
+  const planned=Number.isInteger(rawSeries)&&rawSeries>0?Math.min(20,rawSeries):null;
+  return planned?`${planned}×${reps}`:`${reps} reps`;
 }
 function currentLoadRepDelta(nums){
   if(nums.length<2)return null;
@@ -1756,9 +1769,10 @@ function progressStatsContent(arr){
 function lineChart(nums){
   if(nums.length<1)return`<div class="empty">Le graphique apparaîtra après les premières performances chiffrées.</div>`;
   const W=320,H=170,p=25,ys=nums.map(x=>x.y),min=Math.min(...ys),max=Math.max(...ys),span=Math.max(1,max-min);
-  const pts=nums.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,nums.length-1)),y:H-p-(x.y-min)/span*(H-2*p),v:x.y,label:x.label??x.y,d:x.x,r:x.r||''}));
+  const labelText=v=>typeof v==='number'?String(round1(v)).replace('.',','):String(v??'');
+  const pts=nums.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,nums.length-1)),y:H-p-(x.y-min)/span*(H-2*p),v:x.y,label:x.labelText??x.label??x.y,d:x.x,r:x.r||''}));
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g>
-    <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${esc(round1(q.label))}</text>${q.r?`<text class="chart-rep-label" x="${q.x}" y="${q.y+14}" text-anchor="middle">${esc(q.r)}</text>`:''}`).join("")}</svg>`;
+    <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${esc(labelText(q.label))}</text>${q.r?`<text class="chart-rep-label" x="${q.x}" y="${q.y+14}" text-anchor="middle">${esc(q.r)}</text>`:''}`).join("")}</svg>`;
 }
 function comparableLoadKg(raw){
  // A dual-stack notation (e.g. "2 × 20 kg") must not be mistaken for a 2 kg lift.
