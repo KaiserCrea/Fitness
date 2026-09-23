@@ -465,7 +465,7 @@ function referenceFor(id){
   const p=defaultParams(id), t=p.type;
   if(t==="gainage")return `${p.tours||"—"} tours · ${p.normal||"—"} + ${p.gauche||"—"} + ${p.droite||"—"}`;
   if(t==="circuit")return `${p.duree||"8 min"}${p.tours?` · ${p.tours} tour(s)`:""}`;
-  return p.charge||state.refs[id]||"—";
+  return p.charge||state.refs[id]||latestFailedActualWeight(id)||"—";
 }
 function normalizeWeight(v){
   const raw=String(v??"").trim();if(!raw)return"";
@@ -605,10 +605,26 @@ function waitingTodayHeader(date,session=""){
     ${session?`<div class="session-code">${esc(niceSession(session))}</div><div class="session-groups">${esc(groupLabel(session))}</div>`:""}</div>
     <button class="cycle-chip waiting-cycle-chip" data-cycle-menu aria-label="Réglages du cycle G, semaine ${state.cycle}"><b>Cycle G</b><span>Semaine ${state.cycle}</span></button>`;
 }
+function complementDateToISO(value){
+  const raw=String(value||'').trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
+  const fr=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return fr?`${fr[3]}-${String(fr[2]).padStart(2,'0')}-${String(fr[1]).padStart(2,'0')}`:'';
+}
+function fullMixLastLabel(value){
+  const iso=complementDateToISO(value);
+  if(!iso)return 'Dernière réalisation : '+String(value||'');
+  const d=new Date(`${iso}T12:00:00`),today=new Date(`${localISODate()}T12:00:00`);
+  const days=Math.max(0,Math.round((today-d)/86400000));
+  if(days===0)return 'Réalisé aujourd’hui';
+  if(days===1)return 'Réalisé hier';
+  return `Réalisé il y a ${days} jours`;
+}
 function complementaryLastDate(session){
   const records=(state.history||[]).filter(h=>h.session===session&&/^\d{4}-\d{2}-\d{2}$/.test(String(h.date||'')));
-  const latest=records.map(h=>h.date).sort().at(-1);
-  return latest?'Dernière réalisation : '+formatDate(latest):(state.lastComplement?.[session]?'Dernière réalisation : '+state.lastComplement[session]:'Jamais réalisée');
+  const latest=records.map(h=>h.date).sort().at(-1),fallback=state.lastComplement?.[session]||'';
+  if(session.startsWith('FULL MIX')){const raw=latest||fallback;return raw?fullMixLastLabel(raw):'Jamais réalisée';}
+  return latest?'Dernière réalisation : '+formatDate(latest):(fallback?'Dernière réalisation : '+fallback:'Jamais réalisée');
 }
 const COMPLEMENT_CATEGORIES={ath:{name:'Athlétique',sessions:['ATHLÉTIQUE A','ATHLÉTIQUE B']},fm:{name:'Full Mix',sessions:['FULL MIX 1','FULL MIX 2','FULL MIX 3','FULL MIX 4']}};
 function complementarySelector(){
@@ -780,6 +796,14 @@ function latestExerciseWeight(id){
   }
   return '';
 }
+function latestFailedActualWeight(id){
+  const equip=state.progressionSettings?.[id]?.equipment||'';
+  for(const h of [...(state.history||[])].reverse())for(const e of [...(h.exercises||[])].reverse()){
+    if(canonicalId(e.id)!==canonicalId(id)||String(e.equipment||'')!==equip)continue;
+    return e.status==='Échoué'&&isNumericWeight(e.actual)?e.actual:'';
+  }
+  return '';
+}
 function openSetResultsModal(id,no,current,onDone,options={}){
  const cur=state.today,key=occKey(id,no),p=defaultParams(id),count=Math.min(20,Math.max(1,parseInt(p.series)||4)),previous=actualSetsFor(id),saved=cur.setReps?.[key]||[],base=repNumber(p.repetitions),bounds=repetitionBounds(id,cur.session);
  // AUCUNE exclusion par type d'exercice : toujours proposer le poids en échec.
@@ -813,7 +837,7 @@ function openSetResultsModal(id,no,current,onDone,options={}){
      }
      cur.setReps=cur.setReps||{};cur.setReps[key]=values;cur.reps=cur.reps||{};cur.reps[key]=Math.min(...values);
      const suggestion=targetSuggestion(id,values,actualWeight,cur.session);
-     cur.nextRefs=cur.nextRefs||{};if(options.markFailed){cur.nextRefs[key]=current;}else if(!cur.nextRefs[key])cur.nextRefs[key]=actualWeight;
+     cur.nextRefs=cur.nextRefs||{};if(options.markFailed){cur.nextRefs[key]=isNumericWeight(actualWeight)?actualWeight:current;}else if(!cur.nextRefs[key])cur.nextRefs[key]=actualWeight;
      cur.nextReps=cur.nextReps||{};
      // Even if the user declines a load increase, a partly achieved higher
      // target must no longer revert to the stale 4×10 from a technical sheet.
@@ -1180,7 +1204,7 @@ function programPrescription(id,session){
   const p=defaultParams(id),target=repetitionTargetFor(id,session);
   if(p.type==="gainage")return referenceFor(id);
   if(p.type==="circuit")return referenceFor(id);
-  const load=refWithUnit(p.charge||state.refs[id]||"—"),series=parseInt(p.series)||4,reps=String(p.repetitions||target||"").trim();
+  const load=refWithUnit(p.charge||state.refs[id]||latestFailedActualWeight(id)||"—"),series=parseInt(p.series)||4,reps=String(p.repetitions||target||"").trim();
   const repText=reps?`${series} × ${reps}`:`${series} séries`;
   return `${load} · ${repText}`;
 }
@@ -1478,6 +1502,11 @@ function bindTrainingCalendar(){
   $$('[data-history-session]',root).forEach(row=>row.onclick=()=>pushNav({type:'historyDetail',id:row.dataset.historySession}));
 }
 
+function overviewIsCurrentWeek(){
+  if(overviewPeriod!=="week")return false;
+  const anchor=new Date(`${periodAnchor}T12:00:00`);
+  return Number.isFinite(anchor.getTime())&&localISODate(mondayOf(anchor))===currentWeekKey();
+}
 function renderProgressOverview(){
   const cacheKey=overviewPeriod+"|"+periodAnchor+"|"+state.cycle+"|"+state.weekKey;
   if(overviewMarkupCache.has(cacheKey))return overviewMarkupCache.get(cacheKey);
@@ -1485,6 +1514,7 @@ function renderProgressOverview(){
   const html=`${progressHomeTabs()}
     <div class="tabs overview-period-tabs">${[["week","Semaine"],["month","Mois"],["year","Année"]].map(([p,l])=>`<button data-overview-period="${p}" class="${overviewPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     <button class="period-picker-button" id="overview-period-picker">${esc(periodLabel(overviewPeriod,periodAnchor))}</button>
+    ${overviewPeriod==="week"&&!overviewIsCurrentWeek()?'<button class="today-period-btn" id="overview-today">Aujourd’hui</button>':''}
     <div class="overview-title-row"><h2>Résumé global</h2><div><span>Cycle actuel</span><b>Cycle G - Semaine ${state.cycle}</b></div></div>
     <div class="overview-metrics">
       <div class="overview-metric"><span class="overview-metric-icon">${icon("dumbbell")}</span><b>${d.sessions}</b><span>Séances<br>réalisées</span></div>
@@ -1604,6 +1634,7 @@ function renderProgress(){
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   $$('[data-ath-progress]').forEach(b=>b.onclick=()=>openAthProgressDetail(b.dataset.athProgress));
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
+  if($("#overview-today"))$("#overview-today").onclick=()=>{periodAnchor=localISODate();persistUI();history.replaceState(navState(),"");render();};
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
@@ -1620,7 +1651,7 @@ function progressRow(id,no,arr){
 function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
   const filtered=filterPerf(arr,progressionPeriod),comparison=comparableProgressSeries(filtered);
-  const nums=comparison.map(x=>({x:x.record.date,y:x.weight,raw:x.record}));
+  const nums=comparison.map(x=>({x:x.record.date,y:x.weight,raw:x.record,r:graphRepsLabel(x.record)}));
   const change=progressionChange(filtered),trend=trendFor(id,filtered);
   const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
   shell(`<div class="detail-hero detail-sheet-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
@@ -1635,10 +1666,33 @@ function renderProgressDetail(id,sub="evolution"){
   $("#edit-prog-settings").onclick=()=>openProgressSettingsModal(id);
 }
 function filterPerf(arr,period){const st=periodStart(period);return st?arr.filter(x=>x.date>=st):arr.slice();}
+function graphRepValue(record){
+  const sets=Array.isArray(record?.setReps)?record.setReps.filter(Number.isFinite):[];
+  if(sets.length)return Math.min(...sets);
+  const reps=repNumber(record?.reps);
+  return Number.isFinite(reps)?reps:null;
+}
+function graphRepsLabel(record){
+  const sets=Array.isArray(record?.setReps)?record.setReps.filter(Number.isFinite):[];
+  const reps=graphRepValue(record);
+  if(reps==null)return '';
+  return sets.length?`${sets.length}×${reps}`:`${reps} rep${reps>1?'s':''}`;
+}
+function currentLoadRepDelta(nums){
+  if(nums.length<2)return null;
+  const load=nums.at(-1).y;let first=nums.length-1;
+  while(first>0&&nums[first-1].y===load)first--;
+  if(first===nums.length-1)return null;
+  const a=graphRepValue(nums[first].raw),b=graphRepValue(nums.at(-1).raw);
+  return Number.isFinite(a)&&Number.isFinite(b)?b-a:null;
+}
 function progressEvolutionContent(nums,change,trend,kind){
   const signed=n=>`${n>0?'+':''}${String(round1(n)).replace('.',',')}`;
-  const summary=change?[...(change.loadDelta?[signed(change.loadDelta)+(kind==='plates'?' kg de disques':' kg')]:[]),...(change.repDelta?[signed(change.repDelta)+' rép.']:[])].join(' · ')||'Stable':'—';
-  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe reste basée sur la charge ; les indicateurs d’évolution incluent les répétitions à charge égale, sans pénaliser leur remise à zéro après hausse de charge.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(summary)}</b><span>Évolution sur la période · charge et répétitions</span></div><div class="metric"><b>${change?`${change.percent>0?'+':''}${change.percent}%`:'—'}</b><span>Indice de progression · charge + répétitions</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
+  const loadDelta=nums.length>1?round1(nums.at(-1).y-nums[0].y):null;
+  const loadLabel=loadDelta==null?'—':`${signed(loadDelta)}${kind==='plates'?' kg disques':' kg'}`;
+  const repDelta=currentLoadRepDelta(nums);
+  const repsLabel=repDelta==null?'—':`${signed(repDelta)} rép.`;
+  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe reste basée sur la charge ; les répétitions enregistrées sont indiquées sous chaque point. Leur remise à zéro après une hausse de charge n’est pas considérée comme une régression.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(loadLabel)}</b><span>Évolution charge</span></div><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(repsLabel)}</b><span>Évolution répétitions</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
 }
 function progressHistoryContent(arr){
   return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b>${esc(refWithUnit(x.value))}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
@@ -1651,9 +1705,9 @@ function progressStatsContent(arr){
 function lineChart(nums){
   if(nums.length<1)return`<div class="empty">Le graphique apparaîtra après les premières performances chiffrées.</div>`;
   const W=320,H=170,p=25,ys=nums.map(x=>x.y),min=Math.min(...ys),max=Math.max(...ys),span=Math.max(1,max-min);
-  const pts=nums.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,nums.length-1)),y:H-p-(x.y-min)/span*(H-2*p),v:x.y,d:x.x}));
+  const pts=nums.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,nums.length-1)),y:H-p-(x.y-min)/span*(H-2*p),v:x.y,d:x.x,r:x.r||''}));
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g>
-    <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${round1(q.v)}</text>`).join("")}</svg>`;
+    <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${round1(q.v)}</text>${q.r?`<text class="chart-rep-label" x="${q.x}" y="${q.y+14}" text-anchor="middle">${esc(q.r)}</text>`:''}`).join("")}</svg>`;
 }
 function comparableLoadKg(raw){
  // A dual-stack notation (e.g. "2 × 20 kg") must not be mistaken for a 2 kg lift.
@@ -1773,6 +1827,7 @@ function annualWeeklyBuckets(year,now,historyEntries,legacyWeeks){
 function weeklyResults(){
   const year=weeklyResultsYear();
   const buckets=annualWeeklyBuckets(year,new Date(),state.history,state.oldWeeks);
+  buckets[0]=0; // Correctif ciblé : les semaines sans séance ne sont pas comptées dans 0/5.
   return `<div class="tiny muted" style="margin:0 0 12px">Bilan annuel ${year} · indépendant de Semaine / Mois · V24.25.6</div><div class="weekly-results">${buckets.map((n,i)=>`<div class="weekly-result ${i>=6?"over-goal":""}"><b>${i}/5</b><span>${n} semaine${n>1?"s":""}</span>${i===5?`<em>Objectif atteint</em>`:i===6?`<em>Objectif dépassé !</em>`:i===7?`<em>Exceptionnel !</em>`:""}</div>`).join("")}</div>`;
 }
 function historyForYear(y){return (state.history||[]).filter(h=>Number(String(h.date).slice(0,4))===+y);}
@@ -2565,5 +2620,5 @@ initializeSharedProgress();
 render();
 if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=24256",{updateViaCache:"none"}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=24259",{updateViaCache:"none"}).catch(()=>{});
 })();
