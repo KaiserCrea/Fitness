@@ -1851,3 +1851,85 @@ body.lock-program-home{
 .ath-progress-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:9px 0 6px}.ath-progress-values span{background:#0b0c0c;border-radius:8px;padding:6px}.ath-progress-values small{display:block;color:#99958e;font-size:8px}.ath-progress-values b{display:block;color:#f4f1e9;font-size:11px;margin-top:2px}
 .ath-detail-history{max-height:34vh;overflow:auto;margin:8px 0}.ath-detail-row{padding:8px 1px;border-bottom:1px solid #302e28}.ath-detail-row b{display:block;color:#e8c66c;font-size:11px}.ath-detail-row span{display:block;color:#b0aca4;font-size:10px;margin-top:3px;line-height:1.4}.ath-mini-chart{margin-top:8px}
 @media(max-width:380px){.ath-performance-fields{grid-template-columns:1fr}.ath-progress-values{grid-template-columns:repeat(2,minmax(0,1fr))}.program-prescription{font-size:10px}}
+
+
+/* =====================================================================
+   V24.25.10 — correctifs validés uniquement
+   ===================================================================== */
+
+/* Programme : G1/G2 utilisent déjà un cadre intégré au visuel validé.
+   On neutralise uniquement le second contour CSS ; G3 reste strictement inchangé. */
+.program-home .program-card-g1,
+.program-home .program-card-g2{
+  border-color:transparent!important;
+}
+
+/* Programme > séances G1/G2 : reprendre le personnage des cartes validées,
+   sans modifier les fichiers image. Le cadrage masque les éléments de maquette
+   incrustés et conserve le fondu sombre à gauche. G3 n'est pas ciblé. */
+.session-header.session-hero-g1::before,
+.session-header.session-hero-g2::before{
+  background-size:100% 100%,100% 100%,120% auto!important;
+  background-position:center center,center center,76% 34%!important;
+  background-repeat:no-repeat,no-repeat,no-repeat!important;
+}
+
+/* Progression > Performance : dézoom marqué de tous les bandeaux, affichage seulement. */
+.progress-detail-screen .detail-sheet-hero{
+  background-size:auto,135% auto!important;
+  background-position:0 0,86% 7%!important;
+}
+
+/* Vue d'ensemble : les barres hebdomadaires sélectionnent la semaine touchée. */
+.duration-bar-col.is-clickable{
+  cursor:pointer;
+  border-radius:8px;
+  outline:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.duration-bar-col.is-clickable:focus-visible{
+  box-shadow:0 0 0 1px #e9c76d inset;
+}
+
+/* Performances athlétiques : repliées par défaut, dépliables sans changer les données. */
+.ath-progress-toggle{
+  width:100%;
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 4px;
+  background:transparent;
+  border:0;
+  color:inherit;
+  text-align:left;
+}
+.ath-progress-toggle>span:first-child{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  flex:1;
+}
+.ath-progress-toggle b{
+  font:600 clamp(22px,5.5vw,31px)/1.1 Georgia,serif;
+  color:#f0ce88;
+}
+.ath-progress-toggle small{
+  color:#99958e;
+  font-size:10px;
+  white-space:nowrap;
+}
+.ath-progress-toggle>.icon{
+  flex:0 0 auto;
+  width:20px;
+  height:20px;
+  color:#d8b36e;
+  transition:transform .18s ease;
+  transform:rotate(90deg);
+}
+.ath-progress-section .ath-progress-list{display:none}
+.ath-progress-section.is-open .ath-progress-list{display:grid}
+.ath-progress-section.is-open .ath-progress-toggle>.icon{transform:rotate(-90deg)}

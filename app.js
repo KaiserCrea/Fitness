@@ -12,6 +12,7 @@ const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
 const BACKUP_SNOOZE_KEY="fitness-backup-snooze-v2418";
+const PERFORMANCE_CURVE_START="2026-09-21"; // Nouvelle courbe uniquement : G1A de la semaine du 21/09/2026. Les données historiques restent intactes.
 let calendarAnchor=new Date().getFullYear()+"-"+String(new Date().getMonth()+1).padStart(2,"0");
 let calendarSelectedDay=null;
 let calendarView="month";
@@ -73,6 +74,7 @@ let historyAnchor=localISODate(); // V24.25: history opens at current period.
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
 tabScroll.today=0; // Never reopen Aujourd’hui halfway down after an app restart.
 let navTransitionClass="";
+let athleticProgressExpanded=false;
 function rememberTabScroll(){
   if(view?.type==="root"&&tabs.includes(tab)){
     tabScroll[tab]=window.scrollY||0;
@@ -654,7 +656,6 @@ function renderToday(){
     const unlocked=state.completedG.includes(3);
     if(unlocked){
       shell(`${waitingTodayHeader(date)}
-        <div class="card comp-choice"><div class="small gold serif">Socle hebdomadaire terminé</div><div class="tiny muted">Choisissez librement votre séance complémentaire.</div></div>
         ${complementarySelector()}`,'today-waiting-screen');
       bindComplementarySelector();return;
     }
@@ -1182,13 +1183,18 @@ function bindProgramContent(){
   $$('[data-delete-ephemeral]').forEach(b=>b.onclick=()=>deleteEphemeral(b.dataset.deleteEphemeral));
   $$('[data-unarchive]').forEach(b=>b.onclick=()=>{state.archivedExercises=state.archivedExercises.filter(x=>x!==b.dataset.unarchive);save();render();});
 }
+function programDetailSubtitle(session){
+  if(session==="FULL MIX 3")return "Dominante jambes";
+  if(/^FULL MIX [124]$/.test(session))return "";
+  return groupLabel(session);
+}
 function renderProgramDetail(session){
   if(session.startsWith("ATHLÉTIQUE")){renderAthProgram(session);return;}
-  const ids=sessionIds(session);
-  const heroAsset=session.startsWith("G1")?"./assets/card-g1-v22.jpg":session.startsWith("G2")?"./assets/card-g2-v22.jpg":session.startsWith("G3")?"./assets/card-g3-official.jpg":"./assets/card-fm-official.jpg";
+  const ids=sessionIds(session),subtitle=programDetailSubtitle(session);
+  const heroAsset=session.startsWith("G1")?"./assets/card-g1-maquette-finale-v24254.png":session.startsWith("G2")?"./assets/card-g2-maquette-finale-v24254.png":session.startsWith("G3")?"./assets/card-g3-official.jpg":"./assets/card-fm-official.jpg";
   const heroClass=session.startsWith("G1")?" session-hero-g1":session.startsWith("G2")?" session-hero-g2":session.startsWith("G3")?" session-hero-g3":"";
   shell(`<header class="session-header${heroClass}" style="--session-image:url('${heroAsset}')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div>
-    <div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
+    <div class="session-title">${esc(niceSession(session))}</div>${subtitle?`<div class="session-group">${esc(subtitle)}</div>`:""}</div></header>
     <div class="panel session-list" id="session-list">${ids.map((id,i)=>sessionRow(id,session,i+1)).join("")}</div>
     <div class="session-bottom-actions"><button class="btn" id="edit-session">${icon("pencil")} Modifier</button><button class="btn gold add-exercise" id="add-exercise">＋ Ajouter un exercice</button></div>`);
   $("#back-program").onclick=()=>history.back();
@@ -1333,6 +1339,33 @@ function comparisonReps(record){
   const reps=repNumber(record?.reps);
   return Number.isFinite(reps)&&reps>0?{value:reps,sets:0,source:'minimum'}:null;
 }
+function progressionCurvePoints(rows){
+  if(!rows?.length)return[];
+  let index=100;
+  return rows.map((row,i)=>{
+    if(i){
+      const previous=rows[i-1],oldLoad=previous.weight,newLoad=row.weight;
+      if(oldLoad>0&&newLoad>0){
+        // Une hausse/baisse de charge fait évoluer la courbe par la charge.
+        // Après une hausse, la remise au bas de la plage de répétitions n'est donc pas une régression.
+        if(newLoad!==oldLoad)index*=newLoad/oldLoad;
+        else{
+          // À charge identique, les répétitions réelles font évoluer la courbe.
+          const a=comparisonReps(previous.record),b=comparisonReps(row.record);
+          if(a&&b){
+            let oldReps=a.value,newReps=b.value;
+            if(a.sets!==b.sets){
+              oldReps=a.sets?Math.min(...previous.record.setReps):a.value;
+              newReps=b.sets?Math.min(...row.record.setReps):b.value;
+            }
+            if(oldReps>0)index*=newReps/oldReps;
+          }
+        }
+      }
+    }
+    return {x:row.record.date,y:round1(index),load:row.weight,raw:row.record,r:graphRepsLabel(row.record),label:round1(row.weight)};
+  });
+}
 function progressionChange(arr){
   const rows=comparableProgressSeries(arr);
   if(rows.length<2)return null;
@@ -1412,7 +1445,7 @@ function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
   if(period==='week'){
     const end=new Date(range.start+'T12:00:00');
     return Array.from({length:6},(_,i)=>{const d=new Date(end);d.setDate(d.getDate()-(5-i)*7);const begin=localISODate(d);d.setDate(d.getDate()+7);const finish=localISODate(d);
-      return {label:'S'+isoWeekInfo(begin).week,...durationOf(entries.filter(h=>h.date>=begin&&h.date<finish))};});
+      return {label:'S'+isoWeekInfo(begin).week,anchor:begin,...durationOf(entries.filter(h=>h.date>=begin&&h.date<finish))};});
   }
   if(period==='month'){
     const byWeek=new Map();const cursor=new Date(range.start+'T12:00:00');
@@ -1425,7 +1458,7 @@ function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
 function overviewDurationBars(series){
   const max=Math.max(60,...series.map(x=>x.value)),ceil=Math.ceil(max/60)*60;
   const show=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'):m+' min';};
-  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');return `<div class="duration-bar-col" title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
+  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
 }
 function overviewDonut(distribution,total){
   const palette=["#f2cf72","#d7ad50","#f0d596","#9e8655","#c9973d","#b9934b"];
@@ -1536,12 +1569,12 @@ function athleticProgressMarkup(){
   const rows=state.athPerformance||[];
   const groups=new Map();rows.forEach(r=>{const key=`${r.session}|${r.index}`;(groups.get(key)||groups.set(key,[]).get(key)).push(r);});
   const cards=[...groups.values()].map(arr=>{arr.sort((a,b)=>String(a.date).localeCompare(String(b.date)));const last=arr.at(-1),keys=Object.keys(last.metrics||{}),primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],numeric=primary?arr.map(x=>({date:x.date,value:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.value!=null):[],best=numeric.length?Math.max(...numeric.map(x=>x.value)):null;return `<button class="ath-progress-card" data-ath-progress="${esc(last.session)}|${last.index}"><div><b>${esc(niceSession(last.session))} · ${esc(last.name)}</b><span>Dernière · ${formatDate(last.date)}</span></div><div class="ath-progress-values">${keys.slice(0,3).map(k=>`<span><small>${esc(athMetricLabel(k))}</small><b>${esc(athMetricDisplay(k,last.metrics[k]))}</b></span>`).join("")}</div>${best!=null?`<div class="tiny gold">Meilleure ${esc(athMetricLabel(primary).toLowerCase())} : ${esc(athMetricDisplay(primary,best))}</div>`:""}</button>`;});
-  return `<section class="ath-progress-section"><div class="overview-section-head"><h2>Performances athlétiques</h2><span>${groups.size} exercice${groups.size>1?'s':''} suivi${groups.size>1?'s':''}</span></div><div class="ath-progress-list">${cards.join("")||'<div class="card empty">Les performances Athlétique A/B apparaîtront ici après leur prochain enregistrement.</div>'}</div></section>`;
+  return `<section class="ath-progress-section${athleticProgressExpanded?' is-open':''}"><button type="button" class="ath-progress-toggle" id="ath-progress-toggle" aria-expanded="${athleticProgressExpanded?'true':'false'}"><span><b>Performances athlétiques</b><small>${groups.size} exercice${groups.size>1?'s':''} suivi${groups.size>1?'s':''}</small></span>${icon("chevron")}</button><div class="ath-progress-list">${cards.join("")||'<div class="card empty">Les performances Athlétique A/B apparaîtront ici après leur prochain enregistrement.</div>'}</div></section>`;
 }
 function openAthProgressDetail(key){
   const [session,indexRaw]=key.split('|'),index=Number(indexRaw),arr=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===index).sort((a,b)=>String(a.date).localeCompare(String(b.date)));if(!arr.length)return;const last=arr.at(-1),keys=[...new Set(arr.flatMap(x=>Object.keys(x.metrics||{})))],primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],nums=arr.map(x=>({x:x.date,y:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.y!=null);openModal(`<h3>${esc(last.name)}</h3><p class="tiny muted">${esc(niceSession(session))} · évolution objective enregistrée</p>${primary?`<div class="chart ath-mini-chart">${lineChart(nums)}</div><div class="tiny muted">Courbe : ${esc(athMetricLabel(primary))}</div>`:''}<div class="ath-detail-history">${arr.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${formatDate(x.date)}</b><span>${keys.map(k=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,x.metrics?.[k]))}`).join(' · ')}</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);}
 function renderProgressPerformance(){
-  const cacheKey=progressionPeriod+"|"+progressionGroup+"|"+localISODate();
+  const cacheKey=progressionPeriod+"|"+progressionGroup+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0");
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
   const perf=allPerf(),reg=registry();
   // Show historical Smith performances under their own retired name, without
@@ -1633,8 +1666,20 @@ function renderProgress(){
   if($("#body-measure-guide"))$("#body-measure-guide").onclick=e=>{e.preventDefault();e.stopPropagation();openFullscreenSheet("./assets/guide/mensurations.jpg","Guide des mensurations");};
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   $$('[data-ath-progress]').forEach(b=>b.onclick=()=>openAthProgressDetail(b.dataset.athProgress));
+  if($("#ath-progress-toggle"))$("#ath-progress-toggle").onclick=()=>{
+    athleticProgressExpanded=!athleticProgressExpanded;
+    const section=$("#ath-progress-toggle").closest(".ath-progress-section");
+    section?.classList.toggle("is-open",athleticProgressExpanded);
+    $("#ath-progress-toggle").setAttribute("aria-expanded",athleticProgressExpanded?"true":"false");
+    performanceMarkupCache.clear();
+  };
   if($("#overview-period-picker"))$("#overview-period-picker").onclick=()=>openPeriodPicker("overview");
   if($("#overview-today"))$("#overview-today").onclick=()=>{periodAnchor=localISODate();persistUI();history.replaceState(navState(),"");render();};
+  $$("[data-overview-week]").forEach(b=>{
+    const selectWeek=()=>{periodAnchor=b.dataset.overviewWeek;persistUI();history.replaceState(navState(),"");render();};
+    b.onclick=selectWeek;
+    b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();selectWeek();}};
+  });
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
@@ -1650,14 +1695,19 @@ function progressRow(id,no,arr){
 }
 function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
-  const filtered=filterPerf(arr,progressionPeriod),comparison=comparableProgressSeries(filtered);
-  const nums=comparison.map(x=>({x:x.record.date,y:x.weight,raw:x.record,r:graphRepsLabel(x.record)}));
-  const change=progressionChange(filtered),trend=trendFor(id,filtered);
+  // L'historique complet reste disponible. Seule la nouvelle courbe repart de G1A du 21/09/2026.
+  const filtered=filterPerf(arr,progressionPeriod);
+  const curveRecords=arr.filter(x=>String(x.date||"")>=PERFORMANCE_CURVE_START);
+  const curveComparison=comparableProgressSeries(curveRecords),curveAll=progressionCurvePoints(curveComparison);
+  const curvePeriodStart=periodStart(progressionPeriod);
+  const nums=curvePeriodStart?curveAll.filter(x=>x.x>=curvePeriodStart):curveAll;
+  const curveFiltered=curvePeriodStart?curveRecords.filter(x=>x.date>=curvePeriodStart):curveRecords.slice();
+  const change=progressionChange(curveFiltered),trend=trendFor(id,curveFiltered);
   const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
   shell(`<div class="detail-hero detail-sheet-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
-    ${sub==="evolution"?progressEvolutionContent(nums,change,trend,comparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
+    ${sub==="evolution"?progressEvolutionContent(nums,change,trend,curveComparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
     <div class="card progress-settings-card"><div class="row-between"><b class="serif gold">Paramètres de progression</b><button class="backlink" id="edit-prog-settings">Modifier</button></div>${progressSettingsContent(id)}</div><div class="card"><div class="section-title">Records personnels</div>${personalRecordsContent(id)}</div>`,"progress-detail-screen");
   $("#back-progress").onclick=()=>history.back();
   $$("[data-detail-tab]").forEach(b=>b.onclick=()=>{view={type:"progressDetail",id,sub:b.dataset.detailTab};history.replaceState(navState(),"");render();});
@@ -1680,19 +1730,20 @@ function graphRepsLabel(record){
 }
 function currentLoadRepDelta(nums){
   if(nums.length<2)return null;
-  const load=nums.at(-1).y;let first=nums.length-1;
-  while(first>0&&nums[first-1].y===load)first--;
+  const load=nums.at(-1).load??nums.at(-1).y;let first=nums.length-1;
+  while(first>0&&(nums[first-1].load??nums[first-1].y)===load)first--;
   if(first===nums.length-1)return null;
   const a=graphRepValue(nums[first].raw),b=graphRepValue(nums.at(-1).raw);
   return Number.isFinite(a)&&Number.isFinite(b)?b-a:null;
 }
 function progressEvolutionContent(nums,change,trend,kind){
   const signed=n=>`${n>0?'+':''}${String(round1(n)).replace('.',',')}`;
-  const loadDelta=nums.length>1?round1(nums.at(-1).y-nums[0].y):null;
+  const firstLoad=nums[0]?.load??nums[0]?.y,lastLoad=nums.at(-1)?.load??nums.at(-1)?.y;
+  const loadDelta=nums.length>1?round1(lastLoad-firstLoad):null;
   const loadLabel=loadDelta==null?'—':`${signed(loadDelta)}${kind==='plates'?' kg disques':' kg'}`;
   const repDelta=currentLoadRepDelta(nums);
   const repsLabel=repDelta==null?'—':`${signed(repDelta)} rép.`;
-  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe reste basée sur la charge ; les répétitions enregistrées sont indiquées sous chaque point. Leur remise à zéro après une hausse de charge n’est pas considérée comme une régression.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(loadLabel)}</b><span>Évolution charge</span></div><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(repsLabel)}</b><span>Évolution répétitions</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
+  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe combine la charge et les répétitions réalisées. À charge identique, davantage de répétitions fait progresser la courbe ; après une hausse de charge, le retour au bas de la plage de répétitions n’est pas compté comme une régression. Nouvelle base : G1A du 21/09/2026.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(loadLabel)}</b><span>Évolution charge</span></div><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(repsLabel)}</b><span>Évolution répétitions</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
 }
 function progressHistoryContent(arr){
   return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b>${esc(refWithUnit(x.value))}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
@@ -1705,9 +1756,9 @@ function progressStatsContent(arr){
 function lineChart(nums){
   if(nums.length<1)return`<div class="empty">Le graphique apparaîtra après les premières performances chiffrées.</div>`;
   const W=320,H=170,p=25,ys=nums.map(x=>x.y),min=Math.min(...ys),max=Math.max(...ys),span=Math.max(1,max-min);
-  const pts=nums.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,nums.length-1)),y:H-p-(x.y-min)/span*(H-2*p),v:x.y,d:x.x,r:x.r||''}));
+  const pts=nums.map((x,i)=>({x:p+i*((W-2*p)/Math.max(1,nums.length-1)),y:H-p-(x.y-min)/span*(H-2*p),v:x.y,label:x.label??x.y,d:x.x,r:x.r||''}));
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="chart-grid">${[0,1,2,3].map(i=>`<line x1="${p}" y1="${p+i*(H-2*p)/3}" x2="${W-p}" y2="${p+i*(H-2*p)/3}"/>`).join("")}</g>
-    <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${round1(q.v)}</text>${q.r?`<text class="chart-rep-label" x="${q.x}" y="${q.y+14}" text-anchor="middle">${esc(q.r)}</text>`:''}`).join("")}</svg>`;
+    <polyline class="chart-line" points="${pts.map(q=>`${q.x},${q.y}`).join(" ")}"/>${pts.map(q=>`<circle class="chart-point" cx="${q.x}" cy="${q.y}" r="4"/><text class="chart-label" x="${q.x}" y="${q.y-8}" text-anchor="middle">${esc(round1(q.label))}</text>${q.r?`<text class="chart-rep-label" x="${q.x}" y="${q.y+14}" text-anchor="middle">${esc(q.r)}</text>`:''}`).join("")}</svg>`;
 }
 function comparableLoadKg(raw){
  // A dual-stack notation (e.g. "2 × 20 kg") must not be mistaken for a 2 kg lift.
@@ -2620,5 +2671,5 @@ initializeSharedProgress();
 render();
 if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=24259",{updateViaCache:"none"}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242510",{updateViaCache:"none"}).catch(()=>{});
 })();
