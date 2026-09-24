@@ -2252,18 +2252,17 @@ body.lock-program-home{
 }
 
 
-/* ==========================================================================\n   V24.25.13 — Bandeau Performance universel depuis les miniatures validées\n   --------------------------------------------------------------------------\n   Chaque exercice utilise automatiquement sa miniature officielle à droite.\n   Le fond noir/anthracite/doré, le fondu et la typographie sont communs à tous\n   les exercices. Aucune fiche technique et aucune image source n'est modifiée.\n   ========================================================================== */
+/* ==========================================================================\n   V24.25.14 — Bandeau Performance premium, cadrage par famille\n   --------------------------------------------------------------------------\n   Miniature source intacte. Le bandeau ajoute uniquement le décor premium,\n   le fondu et des règles de cadrage automatiques par famille d'exercice.\n   ========================================================================== */
 .progress-detail-screen .detail-performance-hero{
   isolation:isolate;
   min-height:210px;
   padding:calc(var(--safe-top) + 12px) 14px 14px;
   overflow:hidden;
-  border-bottom:1px solid #4a3820;
+  border-bottom:1px solid rgba(174,130,57,.48);
   background:
-    radial-gradient(circle at 13% 87%,rgba(224,172,70,.16) 0%,rgba(190,133,45,.06) 18%,transparent 39%),
-    radial-gradient(ellipse 64% 118% at -10% 53%,transparent 61.8%,rgba(246,207,112,.27) 62.4%,rgba(192,136,49,.12) 63.2%,transparent 64.1%),
-    radial-gradient(ellipse 88% 152% at -17% 56%,transparent 70.2%,rgba(192,139,54,.16) 70.8%,transparent 71.7%),
-    linear-gradient(112deg,#040404 0%,#070706 43%,#0c0a07 70%,#151008 100%)!important;
+    radial-gradient(circle at 19% 74%,rgba(232,184,80,.18) 0%,rgba(198,141,49,.075) 22%,transparent 48%),
+    radial-gradient(circle at 37% 15%,rgba(210,157,61,.055) 0%,transparent 34%),
+    linear-gradient(115deg,#030303 0%,#070706 39%,#0d0b08 67%,#161008 100%)!important;
 }
 .progress-detail-screen .detail-performance-hero::before{
   content:"";
@@ -2272,49 +2271,69 @@ body.lock-program-home{
   top:0;
   right:0;
   bottom:0;
-  width:62%;
+  width:64%;
   background-image:var(--detail-image)!important;
   background-size:cover!important;
-  background-position:center 35%!important;
+  background-position:var(--perf-position,74% 42%)!important;
   background-repeat:no-repeat!important;
-  filter:saturate(.94) contrast(1.08) brightness(.93);
-  opacity:.98;
-  -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.35) 12%,#000 30%,#000 100%);
-  mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.35) 12%,#000 30%,#000 100%);
+  filter:saturate(.96) contrast(1.08) brightness(.94);
+  opacity:.99;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.14) 7%,rgba(0,0,0,.58) 22%,#000 43%,#000 100%);
+  mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.14) 7%,rgba(0,0,0,.58) 22%,#000 43%,#000 100%);
   pointer-events:none;
+  transform:translateZ(0);
 }
+/* Families: only display behaviour changes; the original thumbnail is untouched. */
+.progress-detail-screen .detail-performance-hero.perf-family-machine::before{width:64%;background-size:cover!important}
+.progress-detail-screen .detail-performance-hero.perf-family-vertical::before{width:61%;background-size:cover!important}
+.progress-detail-screen .detail-performance-hero.perf-family-wide::before{width:68%;background-size:cover!important}
+.progress-detail-screen .detail-performance-hero.perf-family-lower::before{width:62%;background-size:cover!important}
+
 .progress-detail-screen .detail-performance-hero::after{
   content:"";
   position:absolute;
   z-index:1;
   inset:0;
   background:
-    radial-gradient(ellipse 67% 116% at -8% 50%,transparent 61.5%,rgba(242,199,98,.20) 62.2%,transparent 63.0%),
-    linear-gradient(90deg,#050505 0%,#050505fb 28%,rgba(5,5,5,.92) 40%,rgba(5,5,5,.67) 51%,rgba(5,5,5,.25) 66%,transparent 81%),
-    linear-gradient(0deg,rgba(3,3,3,.62) 0%,transparent 39%);
+    /* premium luminous arcs */
+    radial-gradient(ellipse 76% 132% at -18% 52%,transparent 58.6%,rgba(247,207,111,.34) 59.1%,rgba(217,164,64,.13) 59.8%,transparent 60.8%),
+    radial-gradient(ellipse 102% 168% at -31% 55%,transparent 67.7%,rgba(202,149,58,.17) 68.25%,transparent 69.1%),
+    radial-gradient(ellipse 55% 82% at 8% 84%,rgba(225,171,64,.14) 0%,rgba(196,137,44,.045) 33%,transparent 66%),
+    /* broad fusion between typography and photograph */
+    linear-gradient(90deg,#040404 0%,#050505fd 27%,rgba(5,5,5,.95) 39%,rgba(5,5,5,.76) 50%,rgba(5,5,5,.43) 61%,rgba(5,5,5,.12) 75%,transparent 88%),
+    linear-gradient(0deg,rgba(3,3,3,.58) 0%,transparent 37%);
   pointer-events:none;
 }
 .progress-detail-screen .detail-performance-hero>*{position:relative;z-index:2}
-.progress-detail-screen .detail-performance-hero .backlink{color:#e7c56f}
+.progress-detail-screen .detail-performance-hero .backlink{color:#e7c56f;text-shadow:0 2px 8px #000}
 .progress-detail-screen .detail-performance-hero h1{
-  max-width:57%;
+  max-width:51%;
   margin-top:58px;
   margin-bottom:5px;
   font-family:Georgia,serif;
-  font-size:clamp(23px,5.25vw,30px);
-  line-height:1.02;
+  font-size:clamp(23px,5.2vw,30px);
+  line-height:1.015;
   color:#fffdf7;
   text-wrap:balance;
-  text-shadow:0 2px 10px #000,0 0 20px #000;
+  text-shadow:0 2px 10px #000,0 0 22px rgba(0,0,0,.95);
 }
+.progress-detail-screen .detail-performance-hero.perf-title-long h1{font-size:clamp(21px,4.8vw,27px);max-width:52%;line-height:1.02}
+.progress-detail-screen .detail-performance-hero.perf-title-very-long h1{font-size:clamp(19px,4.45vw,25px);max-width:53%;line-height:1.025}
 .progress-detail-screen .detail-performance-hero .small{
-  max-width:54%;
-  color:#c9c1b4;
+  max-width:50%;
+  color:#c8c0b4;
   font-size:12px;
-  text-shadow:0 2px 7px #000;
+  letter-spacing:.01em;
+  text-shadow:0 2px 8px #000;
 }
 @media(max-width:365px){
-  .progress-detail-screen .detail-performance-hero{min-height:198px}
-  .progress-detail-screen .detail-performance-hero::before{width:60%;background-position:center 34%!important}
-  .progress-detail-screen .detail-performance-hero h1{max-width:59%;font-size:clamp(21px,5.5vw,26px);margin-top:54px}
+  .progress-detail-screen .detail-performance-hero{min-height:198px;padding-left:12px;padding-right:12px}
+  .progress-detail-screen .detail-performance-hero::before{width:63%}
+  .progress-detail-screen .detail-performance-hero.perf-family-wide::before{width:68%}
+  .progress-detail-screen .detail-performance-hero.perf-family-vertical::before{width:61%}
+  .progress-detail-screen .detail-performance-hero h1{max-width:54%;font-size:clamp(21px,5.35vw,26px);margin-top:54px}
+  .progress-detail-screen .detail-performance-hero.perf-title-long h1{font-size:clamp(19px,4.9vw,24px);max-width:55%}
+  .progress-detail-screen .detail-performance-hero.perf-title-very-long h1{font-size:clamp(18px,4.5vw,22px);max-width:56%}
+  .progress-detail-screen .detail-performance-hero .small{max-width:54%;font-size:11px}
 }
+

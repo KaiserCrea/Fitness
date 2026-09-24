@@ -1723,6 +1723,35 @@ function progressRow(id,no,arr){
     <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">${Number.isFinite(repNumber(last.reps))?`${repNumber(last.reps)} reps · `:""}Dernière séance ${formatDate(last.date)}</div>`:""}</div>
     <div class="trend ${esc(trend.key)}">${trendBadgeInner(trend)}</div></div>`;
 }
+function performanceHeroProfile(id,e){
+  const raw=String(e?.name||"");
+  const name=raw.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const group=String(groupForId(id)||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+
+  // Four display families keep the automatic banner reliable without altering
+  // any source thumbnail. A small set of verified exercises gets a precise
+  // focal point; every other exercise falls back to its family defaults.
+  let family="vertical";
+  if(/hack squat|squat|fente|leg press|presse a cuisses|leg extension|leg curl|mollet|mollets|hip thrust|souleve de terre|deadlift/.test(name)||group.includes("jamb")) family="lower";
+  else if(/elevation lateral|elevations lateral|tirage menton|ecarte|barre|developpe epaule|oiseau|reverse fly/.test(name)) family="wide";
+  else if(/machine|assis|assise|pec deck|butterfly|presse|rowing assis|tirage horizontal/.test(name)) family="machine";
+
+  const overrides=[
+    [/developpe couche.*machine convergente/,"machine","77% 43%"],
+    [/tirage menton/,"wide","76% 38%"],
+    [/ecarte unilateral.*poulie basse/,"vertical","72% 44%"],
+    [/elevations? laterales?.*halteres/,"wide","72% 40%"],
+    [/hack squat/,"lower","72% 48%"],
+    [/developpe epaule.*assis.*haltere/,"machine","75% 39%"]
+  ];
+  let position=null;
+  for(const [rx,f,pos] of overrides){if(rx.test(name)){family=f;position=pos;break;}}
+  const defaults={machine:"76% 42%",vertical:"73% 43%",wide:"75% 40%",lower:"72% 48%"};
+  const len=raw.length;
+  const titleClass=len>48?"perf-title-very-long":len>31?"perf-title-long":"perf-title-normal";
+  return {family,position:position||defaults[family],titleClass};
+}
+
 function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
   // L'historique complet reste disponible. Seule la nouvelle courbe repart de G1A du 21/09/2026.
@@ -1737,7 +1766,8 @@ function renderProgressDetail(id,sub="evolution"){
   // l'exercice. Il ne dépend plus de la fiche technique complète : le même
   // modèle premium s'applique ainsi automatiquement à tous les exercices.
   const detailImg=thumbnailFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
-  shell(`<div class="detail-hero detail-performance-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div></div>
+  const heroProfile=performanceHeroProfile(id,e);
+  shell(`<div class="detail-hero detail-performance-hero perf-family-${heroProfile.family} ${heroProfile.titleClass}" style="--detail-image:url('${detailImg}');--perf-position:${heroProfile.position}"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${sub==="evolution"?progressEvolutionContent(nums,change,trend,curveComparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
