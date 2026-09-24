@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 45;
+const APP_REV = 46;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -64,6 +64,7 @@ let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedU
 let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
 let progressionPeriod=savedUI?.progressionPeriod||"1m";
 let progressionGroup=savedUI?.progressionGroup||"Tous";
+let progressionStatusFilter=!needsCleanReset&&["all","progressing"].includes(savedUI?.progressionStatusFilter)?savedUI.progressionStatusFilter:"all";
 let progressionView=!needsCleanReset&&["overview","performance","measurements"].includes(savedUI?.progressionView)?savedUI.progressionView:"overview";
 let measurementPeriod=!needsCleanReset&&savedUI?.measurementPeriod||"month";
 let overviewPeriod=!needsCleanReset&&savedUI?.overviewPeriod||"week";
@@ -83,7 +84,7 @@ function rememberTabScroll(){
 }
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 function persistUI(){
-  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor}));}catch{}
+  try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionStatusFilter,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor}));}catch{}
 }
 
 function localISODate(d=new Date()){
@@ -482,10 +483,10 @@ function occKey(id,no){return `${id}@@${no}`;}
 function occurrenceStatus(cur,id,no){return cur?.status?.[occKey(id,no)] ?? cur?.status?.[id] ?? "";}
 function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.values?.[id] ?? referenceFor(id);}
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
-function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor};}
+function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionStatusFilter,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor};}
 function applyNavState(st){
   if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
-  progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionView=st.progressionView||progressionView; measurementPeriod=(st.measurementPeriod==="week"?"month":st.measurementPeriod)||measurementPeriod;
+  progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionStatusFilter=["all","progressing"].includes(st.progressionStatusFilter)?st.progressionStatusFilter:progressionStatusFilter; progressionView=st.progressionView||progressionView; measurementPeriod=(st.measurementPeriod==="week"?"month":st.measurementPeriod)||measurementPeriod;
   overviewPeriod=st.overviewPeriod||overviewPeriod;periodAnchor=st.periodAnchor||periodAnchor;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;historyAnchor=st.historyAnchor||historyAnchor;
   persistUI();
@@ -1280,28 +1281,42 @@ function allPerf(){
 function periodStart(period){
   const d=new Date(); if(period==="1m")d.setMonth(d.getMonth()-1);else if(period==="3m")d.setMonth(d.getMonth()-3);else if(period==="6m")d.setMonth(d.getMonth()-6);else if(period==="1y")d.setFullYear(d.getFullYear()-1);else return null;return localISODate(d);
 }
+function performanceTrendRecords(arr,period=progressionPeriod){
+  const periodFloor=periodStart(period);
+  const floor=periodFloor&&periodFloor>PERFORMANCE_CURVE_START?periodFloor:PERFORMANCE_CURVE_START;
+  return (arr||[]).filter(x=>String(x.date||"")>=floor);
+}
+function trendLoadStep(id,kind){
+  const configured=Number(state.progressionSettings?.[id]?.increment);
+  if(Number.isFinite(configured)&&configured>0)return kind==="plates"?configured*2:configured;
+  // Sans incrément enregistré, on conserve la règle validée : un palier simple
+  // correspond à environ 2 kg (4 kg au total pour une notation 2 × charge).
+  return kind==="plates"?4:2;
+}
 function trendFor(id,arr){
-  if(!arr||arr.length<2)return{key:"none",label:"Données insuffisantes"};
-  const a=arr[arr.length-2],b=arr[arr.length-1],oldLoad=loadForProgressComparison(a.value),newLoad=loadForProgressComparison(b.value),ra=repNumber(a.reps),rb=repNumber(b.reps);
-  // A plate notation compares plate weight only against the same notation.
-  // Never treat the leading 2 in "2×40" as a 2 kg machine load, or add an
-  // unknown Smith-machine/bar weight to it.
-  if(oldLoad&&newLoad&&oldLoad.kind===newLoad.kind){
-    const wa=oldLoad.weight,wb=newLoad.weight;
-    if(wb>wa)return{key:"up",label:"Progression nette"};
-    // +1 repetition on just ONE set also counts, even if the minimum set stays at 10.
-    if(wb===wa&&Array.isArray(a.setReps)&&Array.isArray(b.setReps)&&a.setReps.length===b.setReps.length&&a.setReps.length&&[...a.setReps,...b.setReps].every(Number.isFinite)){
-      const oldTotal=a.setReps.reduce((sum,v)=>sum+v,0),newTotal=b.setReps.reduce((sum,v)=>sum+v,0);
-      if(newTotal>oldTotal)return{key:"up",label:"Progression nette"};
-      if(newTotal<oldTotal)return{key:"down",label:"Régression"};
-    }
-    if(wb===wa&&Number.isFinite(ra)&&Number.isFinite(rb)&&rb>ra)return{key:"up",label:"Progression nette"};
-    if(wb<wa)return{key:"down",label:"Régression"};
-    if(wb===wa&&Number.isFinite(ra)&&Number.isFinite(rb)&&rb<ra)return{key:"down",label:"Régression"};
+  const rows=comparableProgressSeries(arr);
+  if(rows.length<2)return{key:"none",label:"Données insuffisantes"};
+  const a=rows.at(-2),b=rows.at(-1),wa=a.weight,wb=b.weight;
+  if(wb>wa)return{key:"up-net",label:"Progression nette"};
+  if(wb<wa){
+    const drop=wa-wb,step=trendLoadStep(id,b.kind);
+    return drop+1e-9>=step*2?{key:"down-net",label:"Régression nette"}:{key:"down-light",label:"Régression légère"};
   }
-  let same=1;for(let i=arr.length-1;i>0;i--){if(normalizeRef(arr[i].value)===normalizeRef(arr[i-1].value)&&repNumber(arr[i].reps)===repNumber(arr[i-1].reps))same++;else break;}
-  if(same>=6)return{key:"flat",label:"Stagnation"};if(same>=4)return{key:"slow",label:"Progression lente"};
-  return{key:"none",label:"Données insuffisantes"};
+  const ra=graphRepValue(a.record),rb=graphRepValue(b.record);
+  if(!Number.isFinite(ra)||!Number.isFinite(rb))return{key:"none",label:"Données insuffisantes"};
+  const diff=rb-ra;
+  if(diff>2)return{key:"up-light",label:"Progression légère"};
+  if(diff<=-2)return{key:"down-light",label:"Régression légère"};
+  return{key:"flat",label:"Stable"};
+}
+function trendSymbol(key){
+  if(key==="up-net"||key==="up-light")return "↗";
+  if(key==="down-net"||key==="down-light")return "↘";
+  if(key==="flat")return "→";
+  return "—";
+}
+function trendBadgeInner(trend){
+  return `<span class="trend-icon" aria-hidden="true">${trendSymbol(trend.key)}</span><span class="trend-label">${esc(trend.label)}</span>`;
 }
 function normalizeRef(v){return String(v??"").trim().toLowerCase();}
 function loadForProgressComparison(raw){
@@ -1581,7 +1596,7 @@ function athleticProgressMarkup(){
 function openAthProgressDetail(key){
   const [session,indexRaw]=key.split('|'),index=Number(indexRaw),arr=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===index).sort((a,b)=>String(a.date).localeCompare(String(b.date)));if(!arr.length)return;const last=arr.at(-1),keys=[...new Set(arr.flatMap(x=>Object.keys(x.metrics||{})))],primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],nums=arr.map(x=>({x:x.date,y:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.y!=null);openModal(`<h3>${esc(last.name)}</h3><p class="tiny muted">${esc(niceSession(session))} · évolution objective enregistrée</p>${primary?`<div class="chart ath-mini-chart">${lineChart(nums)}</div><div class="tiny muted">Courbe : ${esc(athMetricLabel(primary))}</div>`:''}<div class="ath-detail-history">${arr.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${formatDate(x.date)}</b><span>${keys.map(k=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,x.metrics?.[k]))}`).join(' · ')}</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);}
 function renderProgressPerformance(){
-  const cacheKey=progressionPeriod+"|"+progressionGroup+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0");
+  const cacheKey=progressionPeriod+"|"+progressionGroup+"|status:"+progressionStatusFilter+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0");
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
   const perf=allPerf(),reg=registry();
   // Show historical Smith performances under their own retired name, without
@@ -1590,12 +1605,15 @@ function renderProgressPerformance(){
     .filter(id=>!state.archivedExercises.includes(id));
   if(progressionGroup!=="Tous")ids=ids.filter(id=>groupForId(id)===progressionGroup);
   const start=periodStart(progressionPeriod);if(start)ids=ids.filter(id=>(perf[id]||[]).some(x=>x.date>=start));
-  const active=ids.filter(id=>(perf[id]||[]).length),progressing=active.filter(id=>["up","slow"].includes(trendFor(id,perf[id]).key)).length;
+  const active=ids.filter(id=>(perf[id]||[]).length);
+  const progressingIds=new Set(active.filter(id=>{const t=trendFor(id,performanceTrendRecords(perf[id]||[]));return t.key==="up-net"||t.key==="up-light";}));
+  const progressing=progressingIds.size;
+  const visibleIds=progressionStatusFilter==="progressing"?ids.filter(id=>progressingIds.has(id)):ids;
   const html=`${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${athleticProgressMarkup()}
-    <div class="metrics"><div class="metric"><b>${active.length}</b><span>Exercices suivis</span></div><div class="metric"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></div><div class="metric"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></div></div>
+    <div class="metrics performance-summary"><button type="button" class="metric metric-action ${progressionStatusFilter==="all"?"is-active":""}" data-performance-filter="all" aria-pressed="${progressionStatusFilter==="all"?"true":"false"}"><b>${active.length}</b><span>Exercices suivis</span></button><button type="button" class="metric metric-action ${progressionStatusFilter==="progressing"?"is-active":""}" data-performance-filter="progressing" aria-pressed="${progressionStatusFilter==="progressing"?"true":"false"}"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></button><div class="metric"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></div></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
-    <div class="panel progress-list">${ids.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">Aucune donnée pour ce filtre.</div>`}</div>`;
+    <div class="panel progress-list">${visibleIds.map((id,i)=>progressRow(id,i+1,perf[id]||[])).join("")||`<div class="empty">${progressionStatusFilter==="progressing"?"Aucun exercice en progression pour ce filtre.":"Aucune donnée pour ce filtre."}</div>`}</div>`;
   performanceMarkupCache.set(cacheKey,html);return html;
 }
 function renderProgressHistoryHome(){
@@ -1673,6 +1691,11 @@ function renderProgress(){
   if($("#body-measure-guide"))$("#body-measure-guide").onclick=e=>{e.preventDefault();e.stopPropagation();openFullscreenSheet("./assets/guide/mensurations.jpg","Guide des mensurations");};
   $$('[data-body-chart]').forEach(b=>b.onclick=e=>{e.preventDefault();openBodyMeasurementChart(b.dataset.bodyChart);});
   $$('[data-ath-progress]').forEach(b=>b.onclick=()=>openAthProgressDetail(b.dataset.athProgress));
+  $$('[data-performance-filter]').forEach(b=>b.onclick=()=>{
+    const wanted=b.dataset.performanceFilter||"all";
+    progressionStatusFilter=(wanted==="progressing"&&progressionStatusFilter==="progressing")?"all":wanted;
+    persistUI();performanceMarkupCache.clear();history.replaceState(navState(),"");render();
+  });
   if($("#ath-progress-toggle"))$("#ath-progress-toggle").onclick=()=>{
     athleticProgressExpanded=!athleticProgressExpanded;
     const section=$("#ath-progress-toggle").closest(".ath-progress-section");
@@ -1691,14 +1714,14 @@ function renderProgress(){
   $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
 }
 function averageIncrease(perf,ids){
-  const vals=ids.map(id=>progressionChange(perf[id])?.percent).filter(Number.isFinite);
+  const vals=ids.map(id=>progressionChange(performanceTrendRecords(perf[id]||[]))?.percent).filter(Number.isFinite);
   return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):0;
 }
 function progressRow(id,no,arr){
-  const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),trend=trendFor(id,arr),last=arr.at(-1);
+  const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),trend=trendFor(id,performanceTrendRecords(arr)),last=arr.at(-1);
   return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
     <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">${Number.isFinite(repNumber(last.reps))?`${repNumber(last.reps)} reps · `:""}Dernière séance ${formatDate(last.date)}</div>`:""}</div>
-    <div class="trend ${trend.key==="slow"?"slow":trend.key==="flat"?"flat":trend.key==="down"?"down":""}">${trend.key==="up"?"↗ ":trend.key==="down"?"↘ ":trend.key==="flat"?"→ ":""}${trend.label}</div></div>`;
+    <div class="trend ${esc(trend.key)}">${trendBadgeInner(trend)}</div></div>`;
 }
 function renderProgressDetail(id,sub="evolution"){
   const arr=allPerf()[id]||[],e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo};
@@ -1756,7 +1779,7 @@ function progressEvolutionContent(nums,change,trend,kind){
   const loadLabel=loadDelta==null?'—':`${signed(loadDelta)}${kind==='plates'?' kg disques':' kg'}`;
   const repDelta=currentLoadRepDelta(nums);
   const repsLabel=repDelta==null?'—':`${signed(repDelta)} rép.`;
-  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe combine la charge et les répétitions réalisées. À charge identique, davantage de répétitions fait progresser la courbe ; après une hausse de charge, le retour au bas de la plage de répétitions n’est pas compté comme une régression. Nouvelle base : G1A du 21/09/2026.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(loadLabel)}</b><span>Évolution charge</span></div><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(repsLabel)}</b><span>Évolution répétitions</span></div><div class="metric"><b style="font-size:15px">${trend.label}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
+  return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe combine la charge et les répétitions réalisées. À charge identique, davantage de répétitions fait progresser la courbe ; après une hausse de charge, le retour au bas de la plage de répétitions n’est pas compté comme une régression. Nouvelle base : G1A du 21/09/2026.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(loadLabel)}</b><span>Évolution charge</span></div><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(repsLabel)}</b><span>Évolution répétitions</span></div><div class="metric trend-metric"><b class="detail-trend ${esc(trend.key)}">${trendBadgeInner(trend)}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
 }
 function progressHistoryContent(arr){
   return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b>${esc(refWithUnit(x.value))}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
