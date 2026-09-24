@@ -2375,3 +2375,12 @@ body.lock-program-home{
   .progress-detail-screen .detail-performance-hero.perf-family-wide::before{width:60%!important}
   .progress-detail-screen .detail-performance-hero.perf-family-vertical::before{width:54%!important}
 }
+
+
+/* ==========================================================================
+   V24.25.16 — Performance : séries réelles dans « Dernières séances »
+   ========================================================================== */
+.progress-detail-screen .last-row .last-performance{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.progress-detail-screen .last-row .last-performance>span{font-weight:700;color:#f3eee4}
+.progress-detail-screen .last-row .last-performance>small{font-size:8px;font-weight:500;line-height:1;color:#e4c36d;white-space:nowrap}
+@media(max-width:365px){.progress-detail-screen .last-row .last-performance>small{font-size:7.5px}}

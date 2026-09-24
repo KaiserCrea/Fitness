@@ -483,12 +483,16 @@ function occKey(id,no){return `${id}@@${no}`;}
 function occurrenceStatus(cur,id,no){return cur?.status?.[occKey(id,no)] ?? cur?.status?.[id] ?? "";}
 function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.values?.[id] ?? referenceFor(id);}
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
-function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionStatusFilter,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor};}
+function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionStatusFilter,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor,calendarView,calendarAnchor,calendarSelectedDay,annualReturnAnchor};}
 function applyNavState(st){
   if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
   progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionStatusFilter=["all","progressing"].includes(st.progressionStatusFilter)?st.progressionStatusFilter:progressionStatusFilter; progressionView=st.progressionView||progressionView; measurementPeriod=(st.measurementPeriod==="week"?"month":st.measurementPeriod)||measurementPeriod;
   overviewPeriod=st.overviewPeriod||overviewPeriod;periodAnchor=st.periodAnchor||periodAnchor;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;historyAnchor=st.historyAnchor||historyAnchor;
+  if(st.calendarView==="year"||st.calendarView==="month")calendarView=st.calendarView;
+  if(/^\d{4}-\d{2}$/.test(String(st.calendarAnchor||"")))calendarAnchor=st.calendarAnchor;
+  calendarSelectedDay=st.calendarSelectedDay||null;
+  annualReturnAnchor=st.annualReturnAnchor||null;
   persistUI();
 }
 function pushNav(v=null,newTab=null){
@@ -1302,9 +1306,9 @@ function trendFor(id,arr){
     const drop=wa-wb,step=trendLoadStep(id,b.kind);
     return drop+1e-9>=step*2?{key:"down-net",label:"Régression nette"}:{key:"down-light",label:"Régression légère"};
   }
-  const ra=graphRepValue(a.record),rb=graphRepValue(b.record);
-  if(!Number.isFinite(ra)||!Number.isFinite(rb))return{key:"none",label:"Données insuffisantes"};
-  const diff=rb-ra;
+  const ra=comparisonReps(a.record),rb=comparisonReps(b.record);
+  if(!ra||!rb||ra.sets!==rb.sets)return{key:"none",label:"Données insuffisantes"};
+  const diff=rb.value-ra.value;
   if(diff>2)return{key:"up-light",label:"Progression légère"};
   if(diff<=-2)return{key:"down-light",label:"Régression légère"};
   return{key:"flat",label:"Stable"};
@@ -1348,12 +1352,22 @@ function weekKeyFromDate(date){
 // Charge + répétitions, sans assimiler la reprise au bas de la plage après
 // augmentation de charge à une régression. Cette métrique est un indice de suivi,
 // pas un volume d'entraînement ni une mesure physiologique.
+function validPerformanceSets(record){
+  if(!Array.isArray(record?.setReps))return [];
+  return record.setReps.map(Number).filter(n=>Number.isFinite(n)&&n>=0&&n<=200);
+}
+function plannedSeriesCount(record){
+  const raw=parseInt(defaultParams(record?.id).series);
+  return Number.isInteger(raw)&&raw>0?Math.min(20,raw):null;
+}
 function comparisonReps(record){
-  const sets=record?.setReps;
-  if(Array.isArray(sets)&&sets.length&&sets.every(n=>Number.isInteger(n)&&n>=0&&n<=200))
-    return {value:sets.reduce((sum,n)=>sum+n,0),sets:sets.length,source:'actual'};
-  const reps=repNumber(record?.reps);
-  return Number.isFinite(reps)&&reps>0?{value:reps,sets:0,source:'minimum'}:null;
+  const sets=validPerformanceSets(record);
+  if(sets.length)return {value:sets.reduce((sum,n)=>sum+n,0),sets:sets.length,source:'actual'};
+  const reps=repNumber(record?.reps),planned=plannedSeriesCount(record);
+  if(!Number.isFinite(reps)||reps<=0)return null;
+  // Les anciens relevés sans détail série par série restent comparables grâce
+  // au nombre de séries programmé, sans réécrire l'historique.
+  return {value:planned?reps*planned:reps,sets:planned||1,source:'recorded'};
 }
 function progressionCurvePoints(rows){
   if(!rows?.length)return[];
@@ -1368,13 +1382,10 @@ function progressionCurvePoints(rows){
         else{
           // À charge identique, les répétitions réelles font évoluer la courbe.
           const a=comparisonReps(previous.record),b=comparisonReps(row.record);
-          if(a&&b){
-            let oldReps=a.value,newReps=b.value;
-            if(a.sets!==b.sets){
-              oldReps=a.sets?Math.min(...previous.record.setReps):a.value;
-              newReps=b.sets?Math.min(...row.record.setReps):b.value;
-            }
-            if(oldReps>0)index*=newReps/oldReps;
+          if(a&&b&&a.sets===b.sets&&a.value>0){
+            // À nombre de séries comparable, toute la performance réalisée
+            // est utilisée (total des répétitions), jamais la seule dernière série.
+            index*=b.value/a.value;
           }
         }
       }
@@ -1397,15 +1408,10 @@ function progressionChange(arr){
     if(oldLoad!==newLoad)continue;
     const ra=comparisonReps(a.record),rb=comparisonReps(b.record);
     if(!ra||!rb)continue;
-    // Actual sets are compared as totals only when the same number of sets was done.
-    // If one result lacks set details, compare the per-set minimum instead.
-    let previous=ra.value,current=rb.value;
-    if(ra.sets!==rb.sets){
-      previous=ra.sets?Math.min(...a.record.setReps):ra.value;
-      current=rb.sets?Math.min(...b.record.setReps):rb.value;
-    }
-    if(previous<=0)continue;
-    multiplier*=current/previous;repDelta+=current-previous;comparisons++;
+    // Une évolution de répétitions n'est comparable que sur le même nombre de séries.
+    // Quand elle l'est, toutes les séries comptent dans le calcul.
+    if(ra.sets!==rb.sets||ra.value<=0)continue;
+    multiplier*=rb.value/ra.value;repDelta+=rb.value-ra.value;comparisons++;
   }
   if(!comparisons)return null;
   const delta=rows.at(-1).weight-rows[0].weight;
@@ -1533,23 +1539,29 @@ function bindTrainingCalendar(){
   const root=$('#history-training-calendar');if(!root)return;
   const refresh=()=>{root.outerHTML=trainingCalendar();bindTrainingCalendar();};
   const yearButton=$('[data-calendar-open-year]',root);
-  if(yearButton)yearButton.onclick=()=>{annualReturnAnchor=calendarAnchor;calendarView='year';refresh();};
+  if(yearButton)yearButton.onclick=()=>{
+    // L'entrée courante représente le mois affiché. La vue Année obtient sa
+    // propre entrée d'historique : le bouton Retour Android revient donc au mois.
+    history.replaceState(navState(),"");
+    annualReturnAnchor=calendarAnchor;calendarSelectedDay=null;calendarView='year';
+    history.pushState(navState(),"");refresh();
+  };
   const returnMonth=$('[data-calendar-return-month]',root);
-  if(returnMonth)returnMonth.onclick=()=>{calendarAnchor=annualReturnAnchor||calendarAnchor;annualReturnAnchor=null;calendarSelectedDay=null;calendarView='month';refresh();};
+  if(returnMonth)returnMonth.onclick=()=>history.back();
   $$('[data-calendar-year-shift]',root).forEach(b=>b.onclick=()=>{
     const d=new Date(calendarAnchor+'-01T12:00:00');d.setFullYear(d.getFullYear()+Number(b.dataset.calendarYearShift));
-    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;refresh();
+    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;history.replaceState(navState(),"");refresh();
   });
   $$('[data-calendar-month]',root).forEach(b=>b.onclick=()=>{
     calendarAnchor=calendarAnchor.slice(0,4)+'-'+String(b.dataset.calendarMonth).padStart(2,'0');
-    calendarSelectedDay=null;calendarView='month';annualReturnAnchor=null;refresh();
+    calendarSelectedDay=null;calendarView='month';annualReturnAnchor=null;history.replaceState(navState(),"");refresh();
   });
   $$('[data-calendar-shift]',root).forEach(b=>b.onclick=()=>{
     const d=new Date(calendarAnchor+'-01T12:00:00');d.setMonth(d.getMonth()+Number(b.dataset.calendarShift));
-    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;refresh();
+    calendarAnchor=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');calendarSelectedDay=null;history.replaceState(navState(),"");refresh();
   });
   $$('[data-calendar-day]',root).forEach(b=>b.onclick=()=>{
-    calendarSelectedDay=b.dataset.calendarDay;
+    calendarSelectedDay=b.dataset.calendarDay;history.replaceState(navState(),"");
     $$('[data-calendar-day]',root).forEach(day=>{const selected=day.dataset.calendarDay===calendarSelectedDay;day.classList.toggle('selected',selected);day.setAttribute('aria-pressed',String(selected));});
     $('#calendar-day-details',root).innerHTML=calendarDayDetails(calendarSelectedDay);
     $$('[data-history-session]',root).forEach(row=>row.onclick=()=>pushNav({type:'historyDetail',id:row.dataset.historySession}));
@@ -1779,21 +1791,18 @@ function renderProgressDetail(id,sub="evolution"){
 }
 function filterPerf(arr,period){const st=periodStart(period);return st?arr.filter(x=>x.date>=st):arr.slice();}
 function graphRepValue(record){
-  const sets=Array.isArray(record?.setReps)?record.setReps.filter(Number.isFinite):[];
-  if(sets.length)return Math.min(...sets);
-  const reps=repNumber(record?.reps);
-  return Number.isFinite(reps)?reps:null;
+  const metric=comparisonReps(record);
+  return metric?metric.value:null;
 }
 function graphRepsLabel(record){
-  const sets=Array.isArray(record?.setReps)?record.setReps.filter(Number.isFinite):[];
-  const reps=graphRepValue(record);
-  if(reps==null)return '';
-  if(sets.length)return `${sets.length}×${reps}`;
-  // Les anciens relevés n'ont pas toujours le détail série par série. Dans ce
-  // cas on conserve les répétitions enregistrées et on complète uniquement avec
-  // le nombre de séries programmé pour cet exercice, sans modifier l'historique.
-  const rawSeries=parseInt(defaultParams(record?.id).series);
-  const planned=Number.isInteger(rawSeries)&&rawSeries>0?Math.min(20,rawSeries):null;
+  const sets=validPerformanceSets(record);
+  if(sets.length){
+    // Compact si toutes les séries sont identiques, détail fidèle sinon.
+    return sets.every(n=>n===sets[0])?`${sets.length}×${sets[0]}`:sets.join('/');
+  }
+  const reps=repNumber(record?.reps);
+  if(!Number.isFinite(reps))return '';
+  const planned=plannedSeriesCount(record);
   return planned?`${planned}×${reps}`:`${reps} reps`;
 }
 function currentLoadRepDelta(nums){
@@ -1814,7 +1823,7 @@ function progressEvolutionContent(nums,change,trend,kind){
   return `<div class="chart">${lineChart(nums)}</div>${kind==='plates'?'<div class="tiny muted">Graphique : kg de disques uniquement, hors poids de la barre ou de la machine.</div>':''}<div class="tiny muted">La courbe combine la charge et les répétitions réalisées. À charge identique, davantage de répétitions fait progresser la courbe ; après une hausse de charge, le retour au bas de la plage de répétitions n’est pas compté comme une régression. Nouvelle base : G1A du 21/09/2026.</div><div class="metrics"><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(loadLabel)}</b><span>Évolution charge</span></div><div class="metric"><b style="font-size:clamp(12px,3.2vw,20px)">${esc(repsLabel)}</b><span>Évolution répétitions</span></div><div class="metric trend-metric"><b class="detail-trend ${esc(trend.key)}">${trendBadgeInner(trend)}</b><span>Tendance</span></div></div>${progressHistoryContent(nums.map(x=>x.raw).slice(-5))}`;
 }
 function progressHistoryContent(arr){
-  return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b>${esc(refWithUnit(x.value))}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
+  return `<div class="card"><div class="section-title" style="margin:0 0 5px">Dernières séances</div>${arr.length?arr.slice().reverse().map(x=>`<div class="last-row"><span>${formatDate(x.date)}</span><b class="last-performance"><span>${esc(refWithUnit(x.value))}</span>${graphRepsLabel(x)?`<small>${esc(graphRepsLabel(x))}</small>`:''}</b><span>${esc(x.session)}</span><span>${esc(x.status)}</span></div>`).join(""):`<div class="empty">Pas encore de données.</div>`}</div>`;
 }
 function progressStatsContent(arr){
   const comparison=comparableProgressSeries(arr),vals=comparison.map(x=>x.weight),suffix=comparison.at(-1)?.kind==='plates'?' kg de disques (hors barre)':'';
