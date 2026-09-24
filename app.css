@@ -2337,3 +2337,41 @@ body.lock-program-home{
   .progress-detail-screen .detail-performance-hero .small{max-width:54%;font-size:11px}
 }
 
+
+/* ==========================================================================\n   V24.25.15 — Bandeau Performance : miniature respectée, cadrage adaptatif\n   --------------------------------------------------------------------------\n   La miniature officielle n'est jamais modifiée. Elle est affichée entière\n   dans une zone dédiée à droite, sur le fond premium validé, avec fusion.\n   ========================================================================== */
+.progress-detail-screen .detail-performance-hero{
+  min-height:220px;
+  background:
+    radial-gradient(ellipse 88% 150% at -23% 54%,transparent 58.5%,rgba(225,184,91,.22) 59.1%,rgba(181,130,45,.08) 59.8%,transparent 60.8%),
+    radial-gradient(circle at 22% 80%,rgba(191,139,49,.10),transparent 44%),
+    linear-gradient(112deg,#020202 0%,#070706 46%,#0b0907 72%,#120d07 100%)!important;
+}
+.progress-detail-screen .detail-performance-hero::before{
+  top:7px!important;
+  right:7px!important;
+  bottom:7px!important;
+  width:58%!important;
+  background-size:contain!important;
+  background-position:right center!important;
+  background-repeat:no-repeat!important;
+  filter:saturate(.98) contrast(1.04) brightness(.96)!important;
+  opacity:1!important;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.22) 12%,rgba(0,0,0,.72) 27%,#000 43%,#000 100%)!important;
+  mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.22) 12%,rgba(0,0,0,.72) 27%,#000 43%,#000 100%)!important;
+}
+.progress-detail-screen .detail-performance-hero.perf-family-machine::before{width:59%!important;background-size:contain!important;background-position:right center!important}
+.progress-detail-screen .detail-performance-hero.perf-family-vertical::before{width:55%!important;background-size:contain!important;background-position:right center!important}
+.progress-detail-screen .detail-performance-hero.perf-family-wide::before{width:61%!important;background-size:contain!important;background-position:right center!important}
+.progress-detail-screen .detail-performance-hero.perf-family-lower::before{width:57%!important;background-size:contain!important;background-position:right center!important}
+.progress-detail-screen .detail-performance-hero::after{
+  background:
+    radial-gradient(ellipse 84% 146% at -20% 54%,transparent 59%,rgba(232,193,102,.20) 59.5%,rgba(183,132,48,.07) 60.1%,transparent 61%),
+    linear-gradient(90deg,#030303 0%,#040404 30%,rgba(4,4,4,.96) 39%,rgba(4,4,4,.80) 48%,rgba(4,4,4,.48) 57%,rgba(4,4,4,.18) 67%,transparent 78%),
+    linear-gradient(0deg,rgba(3,3,3,.46) 0%,transparent 31%)!important;
+}
+@media(max-width:365px){
+  .progress-detail-screen .detail-performance-hero{min-height:208px}
+  .progress-detail-screen .detail-performance-hero::before{width:57%!important;right:5px!important}
+  .progress-detail-screen .detail-performance-hero.perf-family-wide::before{width:60%!important}
+  .progress-detail-screen .detail-performance-hero.perf-family-vertical::before{width:54%!important}
+}
