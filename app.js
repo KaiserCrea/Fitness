@@ -1733,8 +1733,11 @@ function renderProgressDetail(id,sub="evolution"){
   const nums=curvePeriodStart?curveAll.filter(x=>x.x>=curvePeriodStart):curveAll;
   const curveFiltered=curvePeriodStart?curveRecords.filter(x=>x.date>=curvePeriodStart):curveRecords.slice();
   const change=progressionChange(curveFiltered),trend=trendFor(id,curveFiltered);
-  const detailImg=sheetFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
-  shell(`<div class="detail-hero detail-sheet-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div><button class="star" data-open-detail-sheet="1">${icon("star")}</button></div>
+  // Le bandeau Performance réutilise la miniature officielle déjà validée de
+  // l'exercice. Il ne dépend plus de la fiche technique complète : le même
+  // modèle premium s'applique ainsi automatiquement à tous les exercices.
+  const detailImg=thumbnailFor(id,o.s,o.n)||"./assets/hero-progress.jpg";
+  shell(`<div class="detail-hero detail-performance-hero" style="--detail-image:url('${detailImg}')"><button class="backlink" id="back-progress">${icon("arrowleft")} Progression</button><h1>${esc(e.name)}</h1><div class="small">${esc(groupForId(id))}</div></div>
     <div class="tabs">${["evolution","history","stats"].map((x,i)=>`<button data-detail-tab="${x}" class="${sub===x?"on":""}">${["Évolution","Historique","Statistiques"][i]}</button>`).join("")}</div>
     <div class="filter-row">${[["1m","1 mois"],["3m","3 mois"],["6m","6 mois"],["1y","1 an"],["all","Tous"]].map(([p,l])=>`<button data-detail-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${sub==="evolution"?progressEvolutionContent(nums,change,trend,curveComparison.at(-1)?.kind):sub==="history"?progressHistoryContent(filtered):progressStatsContent(filtered)}
@@ -1742,7 +1745,6 @@ function renderProgressDetail(id,sub="evolution"){
   $("#back-progress").onclick=()=>history.back();
   $$("[data-detail-tab]").forEach(b=>b.onclick=()=>{view={type:"progressDetail",id,sub:b.dataset.detailTab};history.replaceState(navState(),"");render();});
   $$("[data-detail-period]").forEach(b=>b.onclick=()=>{progressionPeriod=b.dataset.detailPeriod;history.replaceState(navState(),"");render();});
-  $("[data-open-detail-sheet]").onclick=()=>openSheet(id,o.s,o.n);
   $("#edit-prog-settings").onclick=()=>openProgressSettingsModal(id);
 }
 function filterPerf(arr,period){const st=periodStart(period);return st?arr.filter(x=>x.date>=st):arr.slice();}
