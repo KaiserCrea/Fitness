@@ -6,7 +6,7 @@ window.FITNESS_THUMBNAILS = {
   "FULL MIX 1|5": "miniatures/FM1/05_rowing_barre_EZ.jpg",
   "FULL MIX 1|6": "miniatures/FM1/06_biceps_black_jack_poulie_basse_barre_droite.jpg",
   "FULL MIX 1|7": "miniatures/FM1/07_magic_triceps_barre_EZ.jpg",
-  "FULL MIX 1|8": "miniatures/FM1/08_crunch_poulie_haute_a_genoux.jpg",
+  "FULL MIX 1|8": "miniatures/G1A/08_crunch_abdominal.jpg",
   "FULL MIX 1|9": "miniatures/FM1/09_releve_genoux_suspendu.jpg",
   "FULL MIX 1|10": "miniatures/FM1/10_wood_chop_poulie.jpg",
   "FULL MIX 2|1": "miniatures/FM2/01_rowing_poitrine_appuyee_banc_incline_halteres.jpg",
