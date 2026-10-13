@@ -2411,17 +2411,18 @@ body.lock-program-home{
   .progress-list .trend-label{font-size:8px}
 }
 
+
 /* V24.25.18 — lisibilité des lignes Performance et des étiquettes annuelles */
 .progress-row{grid-template-columns:34px 96px minmax(0,1fr) max-content!important;min-height:0;gap:8px}
-.progress-row>div:nth-child(3){align-self:stretch}
-.progress-row .thumb{width:96px!important;height:auto!important;min-height:0;align-self:stretch}
-.progress-row .trend{min-width:78px;min-height:0;height:auto;align-self:stretch;padding:9px 6px;font-size:10px}
+.progress-row>div:nth-child(3){align-self:center}
+.progress-row .thumb{width:96px!important;height:128px!important;min-height:0;align-self:center}
+.progress-row .trend{width:78px;min-width:78px;min-height:88px;height:88px;align-self:center;padding:9px 6px;font-size:10px}
 .progress-row .trend-icon{width:25px;height:25px;font-size:25px}
 .duration-bars-annual{gap:2px}
 .duration-bars-annual .duration-bar-col{gap:3px}
 .duration-bars-annual .duration-bar-col>b{font-family:Inter,system-ui,sans-serif;font-size:clamp(8px,2vw,10px);letter-spacing:-.03em}
 @media(max-width:390px){
   .progress-row{grid-template-columns:30px 76px minmax(0,1fr) max-content!important;min-height:0;gap:7px;padding:8px}
-  .progress-row .thumb{width:76px!important;height:auto!important}
-  .progress-row .trend{min-width:72px;min-height:0;padding:8px 5px;font-size:9px}
+  .progress-row .thumb{width:76px!important;height:102px!important}
+  .progress-row .trend{width:72px;min-width:72px;min-height:88px;height:88px;padding:8px 5px;font-size:9px}
 }

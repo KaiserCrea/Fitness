@@ -7,7 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 47;
+const APP_REV = 48;
 const RETIRED_PULLEY_CRUNCH_ID="ex-crunch-a-la-poulie-haute-a-genoux";
 const MACHINE_CRUNCH_ID="ex-crunch-abdominal";
 const RETIRED_PULLEY_CRUNCH_NAME="Crunch à la poulie haute à genoux";
@@ -154,6 +154,19 @@ function purgeRetiredPulleyCrunchRecoveryCopies(){
   const keys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith("fitness-pre-migration-"))keys.push(key);}
   keys.forEach(key=>{try{const saved=JSON.parse(localStorage.getItem(key));purgeRetiredPulleyCrunchData(saved);localStorage.setItem(key,JSON.stringify(saved));}catch{}});
 }
+function applyConfirmedHistoryCorrections(container){
+  if(!container||typeof container!=="object")return;
+  if(container.state&&typeof container.state==="object")return applyConfirmedHistoryCorrections(container.state);
+  for(const h of Array.isArray(container.history)?container.history:[]){
+    if(h.date!=="2026-10-02"||h.session!=="FULL MIX 1")continue;
+    for(const e of Array.isArray(h.exercises)?h.exercises:[]){
+      // Confirmed by the user: only this attempt was performed with 8 kg.
+      if(e.id!=="ex-elevations-laterales-avec-halteres"||Number(e.no)!==4||e.actual!=="Poids du corps")continue;
+      if(!Array.isArray(e.setReps)||e.setReps.length!==4||e.setReps.some((n,i)=>Number(n)!==[12,12,12,10][i]))continue;
+      e.actual="8 kg";
+    }
+  }
+}
 function migrate(){
   let raw=null; try{raw=JSON.parse(localStorage.getItem(KEY)||"null")}catch{}
   purgeRetiredPulleyCrunchData(raw);
@@ -178,6 +191,7 @@ function migrate(){
     const safeExercises=exercises.filter(e=>e&&typeof e==="object").map((e,j)=>Object.assign({},e,{id:e.id||e.name||`ancien-exercice-${i+1}-${j+1}`}));
     return Object.assign({},h,{id:h.id||`legacy-${i}-${String(h.date||"")}`,date:String(h.date||"").slice(0,10),exercises:safeExercises});
   });
+  applyConfirmedHistoryCorrections(s);
   s.completedG=Array.isArray(s.completedG)?s.completedG:[];
   s.oldWeeks=(Array.isArray(s.oldWeeks)?s.oldWeeks:[]).filter(w=>w&&typeof w==="object");
   s.refs=s.refs||{}; s.params=s.params||{}; s.sharedProgress=s.sharedProgress||{}; s.sessionOrder=s.sessionOrder||{};
@@ -2838,6 +2852,7 @@ function restoreJSON(e){
       if(localStorage.getItem("fitness-before-restore-v2418")!==previous)throw Error("Copie de sécurité non vérifiée");
       const next=Object.assign(defaultState(),incoming.state,{appRev:APP_REV});if(!Array.isArray(next.history)||!Array.isArray(next.measurements))throw Error("Données restaurées invalides");
       purgeRetiredPulleyCrunchData(next);
+      applyConfirmedHistoryCorrections(next);
       const serialized=JSON.stringify(next);
       try{
         localStorage.setItem(KEY,serialized);
