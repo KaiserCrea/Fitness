@@ -54,26 +54,36 @@ const app=$("#app"), overlayRoot=$("#overlay-root");
 
 const UI_KEY="fitness-ui-v9";
 const SCROLL_KEY="fitness-tab-scroll-v9";
-// Never reset existing workout data merely because a legacy UI-reset marker is absent.
-const needsCleanReset=false;
-let savedUI=null;try{savedUI=JSON.parse(localStorage.getItem(UI_KEY)||"null")}catch{}
-let savedScroll=null;try{savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
-let tab=!needsCleanReset&&["today","program","progress","history"].includes(savedUI?.tab)?savedUI.tab:"today"; // V24.25.8: restore the last validated main tab after reload.
+const RELOAD_NAV_KEY="fitness-reload-navigation-v1";
+const RELOAD_SCROLL_KEY="fitness-reload-scroll-v1";
+const navigationEntry=performance.getEntriesByType?.("navigation")?.[0];
+const isPageReload=navigationEntry?.type==="reload";
+let reloadNavState=null;
+if(isPageReload){try{reloadNavState=history.state||JSON.parse(sessionStorage.getItem(RELOAD_NAV_KEY)||"null")}catch{}}
+let reloadScrollY=0;
+if(isPageReload){try{reloadScrollY=Math.max(0,Number(sessionStorage.getItem(RELOAD_SCROLL_KEY))||0)}catch{}}
+let savedScroll=null;try{if(isPageReload)savedScroll=JSON.parse(sessionStorage.getItem(SCROLL_KEY)||"null")}catch{}
+if(!isPageReload){
+  // A fresh app launch starts from the home screen. Keep route/scroll state only
+  // for an actual page reload, where the user expects to resume the same screen.
+  try{sessionStorage.removeItem(RELOAD_NAV_KEY);sessionStorage.removeItem(RELOAD_SCROLL_KEY);sessionStorage.removeItem(SCROLL_KEY)}catch{}
+}
+let tab="today"; // Cold launch always starts from the home tab; reload restoration uses the current history entry.
 let view={type:"root"};
-let programMode=!needsCleanReset&&["sessions","groups","manage"].includes(savedUI?.programMode)?savedUI.programMode:(!needsCleanReset&&savedUI?.programMode==="exercises"?"groups":"sessions");
-let programExerciseGroup=!needsCleanReset&&savedUI?.programExerciseGroup||"Tous";
-let progressionPeriod=savedUI?.progressionPeriod||"1m";
-let progressionGroup=savedUI?.progressionGroup||"Tous";
-let progressionStatusFilter=!needsCleanReset&&["all","progressing","average"].includes(savedUI?.progressionStatusFilter)?savedUI.progressionStatusFilter:"all";
-let progressionView=!needsCleanReset&&["overview","performance","measurements"].includes(savedUI?.progressionView)?savedUI.progressionView:"overview";
-let measurementPeriod=!needsCleanReset&&savedUI?.measurementPeriod||"month";
-let overviewPeriod=!needsCleanReset&&savedUI?.overviewPeriod||"week";
+let programMode="sessions";
+let programExerciseGroup="Tous";
+let progressionPeriod="1m";
+let progressionGroup="Tous";
+let progressionStatusFilter="all";
+let progressionView="overview";
+let measurementPeriod="month";
+let overviewPeriod="week";
 let periodAnchor=localISODate(); // V24.25: overview opens at the actual current period.
-let historyPeriod=!needsCleanReset&&savedUI?.historyPeriod||"week";
+let historyPeriod="week";
 let historyYear=new Date().getFullYear(); // V24.25: current year on full launch.
 let historyAnchor=localISODate(); // V24.25: history opens at current period.
 const tabScroll=Object.assign({today:0,program:0,progress:0,history:0},savedScroll||{});
-tabScroll.today=0; // Never reopen Aujourd’hui halfway down after an app restart.
+if(!isPageReload){for(const name of tabs)tabScroll[name]=0;}
 let navTransitionClass="";
 let athleticProgressExpanded=false;
 function rememberTabScroll(){
@@ -85,6 +95,7 @@ function rememberTabScroll(){
 function restoreTabScroll(name=tab){requestAnimationFrame(()=>window.scrollTo({top:tabScroll[name]||0,left:0,behavior:"auto"}));}
 function persistUI(){
   try{localStorage.setItem(UI_KEY,JSON.stringify({tab,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionStatusFilter,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor}));}catch{}
+  try{sessionStorage.setItem(RELOAD_NAV_KEY,JSON.stringify(navState()));}catch{}
 }
 
 function localISODate(d=new Date()){
@@ -506,7 +517,7 @@ function occurrenceValue(cur,id,no){return cur?.values?.[occKey(id,no)] ?? cur?.
 function occurrenceNext(cur,id,no){return cur?.nextRefs?.[occKey(id,no)] ?? cur?.nextRefs?.[id] ?? "";}
 function navState(){return {tab,view,programMode,programExerciseGroup,progressionPeriod,progressionGroup,progressionStatusFilter,progressionView,measurementPeriod,overviewPeriod,periodAnchor,historyPeriod,historyYear,historyAnchor,calendarView,calendarAnchor,calendarSelectedDay,annualReturnAnchor};}
 function applyNavState(st){
-  if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; view=st.view||{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
+  if(!st)return; tab=tabs.includes(st.tab)?st.tab:tab; const validViews=["root","programDetail","progressDetail","historyMonth","historyDetail"];view=validViews.includes(st.view?.type)?st.view:{type:"root"}; programMode=["sessions","groups","manage"].includes(st.programMode)?st.programMode:(st.programMode==="exercises"?"groups":programMode); programExerciseGroup=st.programExerciseGroup||programExerciseGroup;
   progressionPeriod=st.progressionPeriod||progressionPeriod; progressionGroup=st.progressionGroup||progressionGroup; progressionStatusFilter=["all","progressing","average"].includes(st.progressionStatusFilter)?st.progressionStatusFilter:progressionStatusFilter; progressionView=st.progressionView||progressionView; measurementPeriod=(st.measurementPeriod==="week"?"month":st.measurementPeriod)||measurementPeriod;
   overviewPeriod=st.overviewPeriod||overviewPeriod;periodAnchor=st.periodAnchor||periodAnchor;
   historyPeriod=st.historyPeriod||historyPeriod; historyYear=st.historyYear||historyYear;historyAnchor=st.historyAnchor||historyAnchor;
@@ -532,6 +543,7 @@ function pushNav(v=null,newTab=null){
   history.pushState(navState(),""); render();
   if(newTab){restoreTabScroll(newTab);setTimeout(()=>{navTransitionClass="";},220);}
 }
+if(reloadNavState&&typeof reloadNavState==="object")applyNavState(reloadNavState);
 history.replaceState(navState(),"");
 persistUI();
 window.addEventListener("popstate",e=>{
@@ -2862,11 +2874,13 @@ document.addEventListener("pointercancel",()=>{tabSwipe=null;},{passive:true});
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-tab]");if(!b||b.onclick)return;const next=b.dataset.tab;if(!tabs.includes(next)||next===tab&&view.type==="root")return;pushNav(null,next);
 });
-window.addEventListener("pagehide",()=>{rememberTabScroll();persistUI();});
-window.addEventListener("beforeunload",()=>{rememberTabScroll();persistUI();});
+function persistReloadPosition(){try{sessionStorage.setItem(RELOAD_SCROLL_KEY,String(window.scrollY||0));}catch{}rememberTabScroll();persistUI();}
+window.addEventListener("pagehide",persistReloadPosition);
+window.addEventListener("beforeunload",persistReloadPosition);
 initializeSharedProgress();
 render();
-if(view.type==="root")restoreTabScroll(tab);
+if(isPageReload)requestAnimationFrame(()=>window.scrollTo({top:reloadScrollY,left:0,behavior:"auto"}));
+else if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242518",{updateViaCache:"none"}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242520",{updateViaCache:"none"}).catch(()=>{});
 })();
