@@ -1,9 +1,8 @@
-const CACHE = "fitness-v24-25-19-uniformite-performances-1";
+const CACHE = "fitness-v24-26-01-athletic-session";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
   "./thumbnail-map.js",
-  "./miniatures/G1A/08_crunch_abdominal.jpg",
   "./miniatures/G1A/05_curl_biceps_barre_EZ_debout_v24251.png",
   "./miniatures/G1A/05_curl_biceps_barre_EZ_debout_vertical_v24253.png",
   "./assets/card-g1-maquette-finale-v24254.png",
@@ -44,7 +43,7 @@ self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache=await caches.open(CACHE);
     // A missing optional older image must never block the updated app from installing.
-    await cache.addAll(["./", "./index.html", "./app.js?v=242519", "./app.css?v=242519", "./data.js?v=242518", "./sheet-layouts.js", "./thumbnail-map.js?v=242518"]);
+    await cache.addAll(["./", "./index.html", "./app.js?v=242517", "./app.css?v=242517", "./data.js?v=24240", "./sheet-layouts.js", "./thumbnail-map.js?v=24253"]);
     await Promise.allSettled(ROOT.map(path=>cache.add(path)));
     await self.skipWaiting();
   })());
@@ -63,11 +62,6 @@ self.addEventListener("activate", event => {
         }
       }
     }
-    const retiredImages=[
-      new URL("./miniatures/FM1/08_crunch_poulie_haute_a_genoux.jpg",self.location.href).href,
-      new URL("./fiches/FM1/FM1_EX08_Crunch a la poulie haute a genoux.png",self.location.href).href
-    ];
-    await Promise.all(retiredImages.map(url=>imageCache.delete(url)));
     await Promise.all(keys.filter(k=>k!==CACHE&&k!==IMAGE_CACHE&&/^fitness-v24-(?:18|19|20|21|22|23|24|25)-/.test(k)).map(k=>caches.delete(k)));
     await self.clients.claim();
   })());

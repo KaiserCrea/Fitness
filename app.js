@@ -7,10 +7,7 @@ const ATH_SHEETS = window.FITNESS_ATH_SHEETS || {};
 const THUMBNAILS = window.FITNESS_THUMBNAILS || {};
 const KEY = "fitness-reconstruit-v2";
 const RESET_KEY = "fitness-v23-clean-reset";
-const APP_REV = 48;
-const RETIRED_PULLEY_CRUNCH_ID="ex-crunch-a-la-poulie-haute-a-genoux";
-const MACHINE_CRUNCH_ID="ex-crunch-abdominal";
-const RETIRED_PULLEY_CRUNCH_NAME="Crunch à la poulie haute à genoux";
+const APP_REV = 46;
 const BACKUP_DATE_KEY="fitness-last-verified-export-v2418";
 const BACKUP_FILE_VERIFIED_KEY="fitness-file-verified-v24183";
 const BACKUP_PENDING_KEY="fitness-pending-export-v24183";
@@ -117,63 +114,11 @@ function inferRotations(s){
   const lastFm=[...hist].reverse().find(h=>String(h.session||"").startsWith("FULL MIX"));
   if(lastFm){ const n=Number(String(lastFm.session).match(/\d+/)?.[0]||1); s.nextFm=(n%4)+1; }
 }
-function isRetiredPulleyCrunch(value){
-  const key=String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-  return value===RETIRED_PULLEY_CRUNCH_ID||key==="crunch a la poulie haute a genoux";
-}
-function purgeRetiredPulleyCrunchData(container){
-  if(!container||typeof container!=="object")return;
-  if(container.state&&typeof container.state==="object")return purgeRetiredPulleyCrunchData(container.state);
-  const cleanKeyedMap=map=>{
-    if(!map||typeof map!=="object"||Array.isArray(map))return;
-    Object.keys(map).forEach(key=>{if(isRetiredPulleyCrunch(key)||key.includes(RETIRED_PULLEY_CRUNCH_ID))delete map[key];});
-  };
-  if(Array.isArray(container.history))container.history.forEach(h=>{
-    if(!h||typeof h!=="object")return;
-    const rows=Array.isArray(h.exercises)?h.exercises:(h.exercises&&typeof h.exercises==="object"?Object.values(h.exercises):[]);
-    h.exercises=rows.filter(e=>e&&typeof e==="object"&&!isRetiredPulleyCrunch(e.id)&&!isRetiredPulleyCrunch(e.name));
-  });
-  ["refs","params","progressionSettings","sharedProgress","customExercises","guideConfigs"].forEach(key=>cleanKeyedMap(container[key]));
-  if(container.customExercises&&typeof container.customExercises==="object")Object.keys(container.customExercises).forEach(key=>{if(isRetiredPulleyCrunch(container.customExercises[key]?.name))delete container.customExercises[key];});
-  if(Array.isArray(container.archivedExercises))container.archivedExercises=container.archivedExercises.filter(x=>!isRetiredPulleyCrunch(typeof x==="object"?x?.id||x?.name:x));
-  const cleanOrder=(ids,replace)=>{
-    if(!Array.isArray(ids))return ids;
-    const hasReplacement=replace&&ids.includes(MACHINE_CRUNCH_ID);
-    return ids.map(id=>isRetiredPulleyCrunch(id)?(hasReplacement?null:MACHINE_CRUNCH_ID):id).filter(Boolean);
-  };
-  if(container.programOverrides&&typeof container.programOverrides==="object")Object.entries(container.programOverrides).forEach(([session,ids])=>{container.programOverrides[session]=cleanOrder(ids,session==="FULL MIX 1");});
-  if(container.sessionOrder&&typeof container.sessionOrder==="object")Object.entries(container.sessionOrder).forEach(([session,ids])=>{container.sessionOrder[session]=cleanOrder(ids,session==="FULL MIX 1");});
-  if(Array.isArray(container.ephemeralSessions))container.ephemeralSessions.forEach(session=>{if(Array.isArray(session?.exerciseIds))session.exerciseIds=session.exerciseIds.filter(id=>!isRetiredPulleyCrunch(id));});
-  const today=container.today;
-  if(today&&typeof today==="object"){
-    if(Array.isArray(today.exerciseIds))today.exerciseIds=cleanOrder(today.exerciseIds,today.session==="FULL MIX 1");
-    ["values","status","nextRefs","reps","nextReps","setReps","equipment"].forEach(key=>cleanKeyedMap(today[key]));
-  }
-}
-function purgeRetiredPulleyCrunchRecoveryCopies(){
-  const keys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith("fitness-pre-migration-"))keys.push(key);}
-  keys.forEach(key=>{try{const saved=JSON.parse(localStorage.getItem(key));purgeRetiredPulleyCrunchData(saved);localStorage.setItem(key,JSON.stringify(saved));}catch{}});
-}
-function applyConfirmedHistoryCorrections(container){
-  if(!container||typeof container!=="object")return;
-  if(container.state&&typeof container.state==="object")return applyConfirmedHistoryCorrections(container.state);
-  for(const h of Array.isArray(container.history)?container.history:[]){
-    if(h.date!=="2026-10-02"||h.session!=="FULL MIX 1")continue;
-    for(const e of Array.isArray(h.exercises)?h.exercises:[]){
-      // Confirmed by the user: only this attempt was performed with 8 kg.
-      if(e.id!=="ex-elevations-laterales-avec-halteres"||Number(e.no)!==4||e.actual!=="Poids du corps")continue;
-      if(!Array.isArray(e.setReps)||e.setReps.length!==4||e.setReps.some((n,i)=>Number(n)!==[12,12,12,10][i]))continue;
-      e.actual="8 kg";
-    }
-  }
-}
 function migrate(){
   let raw=null; try{raw=JSON.parse(localStorage.getItem(KEY)||"null")}catch{}
-  purgeRetiredPulleyCrunchData(raw);
-  purgeRetiredPulleyCrunchRecoveryCopies();
   if(raw && (raw.appRev||0)<APP_REV){
-    // Recovery copies are also sanitized so the retired movement is not retained.
-    const oldText=JSON.stringify(raw);
+    const oldText=localStorage.getItem(KEY);
+    // Keep the original V24.17 recovery copy; never overwrite it on subsequent releases.
     const backupKey="fitness-pre-migration-v2418-from-"+String(raw.appRev||0);
     try{
       const target=localStorage.getItem(backupKey)===null?backupKey:backupKey+"-latest";
@@ -191,7 +136,6 @@ function migrate(){
     const safeExercises=exercises.filter(e=>e&&typeof e==="object").map((e,j)=>Object.assign({},e,{id:e.id||e.name||`ancien-exercice-${i+1}-${j+1}`}));
     return Object.assign({},h,{id:h.id||`legacy-${i}-${String(h.date||"")}`,date:String(h.date||"").slice(0,10),exercises:safeExercises});
   });
-  applyConfirmedHistoryCorrections(s);
   s.completedG=Array.isArray(s.completedG)?s.completedG:[];
   s.oldWeeks=(Array.isArray(s.oldWeeks)?s.oldWeeks:[]).filter(w=>w&&typeof w==="object");
   s.refs=s.refs||{}; s.params=s.params||{}; s.sharedProgress=s.sharedProgress||{}; s.sessionOrder=s.sessionOrder||{};
@@ -959,9 +903,9 @@ function editSessionTimes(focus="start"){
 }
 function athMetricDefinition(step){
   const name=String(step?.name||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-  if(/sled/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"loadKg",label:"Charge (kg)",step:"0.5"},{key:"passages",label:"Passages",step:"1"},{key:"distanceM",label:"Distance totale (m)",step:"1"}];
-  if(/rameur/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceM",label:"Distance (m)",step:"1"},{key:"pace",label:"Allure moyenne / 500 m",type:"text",placeholder:"ex. 2:08"}];
-  if(/velo/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceKm",label:"Distance (km)",step:"0.1"},{key:"resistance",label:"Résistance / niveau",step:"1"}];
+  if(/sled/.test(name))return [{key:"passages",label:"Passages (aller-retour)",step:"1"},{key:"loadBreakdown",label:"Répartition des charges",type:"text",placeholder:"ex. 3 passages à 80 kg, 3 à 100 kg"}];
+  if(/rameur/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"resistance",label:"Niveau de résistance",step:"1"},{key:"distanceM",label:"Distance (m)",step:"1"}];
+  if(/velo/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"resistance",label:"Niveau de résistance",step:"1"},{key:"distanceKm",label:"Distance (km)",step:"0.1"}];
   if(/tapis/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceKm",label:"Distance (km)",step:"0.1"},{key:"speedKmh",label:"Vitesse moyenne (km/h)",step:"0.1"},{key:"inclinePct",label:"Inclinaison (%)",step:"0.5"}];
   if(/mobilite|etirement/.test(name))return [];
   return [];
@@ -972,7 +916,7 @@ function athPreviousMetric(session,index,key){
 }
 function athPerformanceForm(session){
   const steps=DATA.ath?.[session]||[];
-  return `<div class="ath-performance-form">${steps.map((step,i)=>{const fields=athMetricDefinition(step);if(!fields.length)return `<div class="ath-performance-block ath-completed-only"><b>${i+1}. ${esc(step.name)}</b><span>Réalisé</span></div>`;return `<div class="ath-performance-block" data-ath-performance="${i}"><b>${i+1}. ${esc(step.name)}</b><div class="ath-performance-fields">${fields.map(f=>{const previous=athPreviousMetric(session,i,f.key),cfg=athStepConfig(session,i),prev=previous!==""?previous:(f.key==="durationMin"&&cfg?.durationSeconds?String(Math.round(cfg.durationSeconds/6)/10):"");return `<label>${esc(f.label)}<input data-ath-metric="${esc(f.key)}" type="${f.type||'number'}" ${f.type?'':`inputmode="decimal" step="${f.step||'0.1'}" min="0"`} value="${esc(prev)}" placeholder="${esc(f.placeholder||'')}"></label>`}).join("")}</div></div>`}).join("")}</div>`;
+  return `<div class="ath-performance-form">${steps.map((step,i)=>{const fields=athMetricDefinition(step);if(!fields.length)return `<div class="ath-performance-block ath-completed-only"><b>${i+1}. ${esc(step.name)}</b><span>Réalisé</span></div>`;return `<div class="ath-performance-block" data-ath-performance="${i}"><b>${i+1}. ${esc(step.name)}</b><div class="ath-performance-fields">${fields.map(f=>{const previous=athPreviousMetric(session,i,f.key),cfg=athStepConfig(session,i),cfgValue=f.key==="resistance"?(cfg?.saved?.[session==="ATHLÉTIQUE A"&&i===1?"Niveau / intensité":"Résistance / niveau"]||""):f.key==="passages"?(cfg?.saved?.Passages||""):f.key==="loadBreakdown"?(cfg?.saved?.["Répartition des charges"]||""):"",prev=previous!==""?previous:(f.key==="durationMin"&&cfg?.durationSeconds?String(Math.round(cfg.durationSeconds/6)/10):cfgValue);return `<label>${esc(f.label)}<input data-ath-metric="${esc(f.key)}" type="${f.type||'number'}" ${f.type?'':`inputmode="decimal" step="${f.step||'0.1'}" min="0"`} value="${esc(prev)}" placeholder="${esc(f.placeholder||'')}"></label>`}).join("")}</div></div>`}).join("")}</div>`;
 }
 function requestAthPerformance(cur){
   openModal(`<h3>Résultats athlétiques</h3><p class="tiny muted">Renseignez les données disponibles. Les dernières valeurs sont proposées pour accélérer la saisie. Aucun effort ressenti n’est demandé.</p>${athPerformanceForm(cur.session)}<div class="modal-actions"><button class="btn ghost" id="ath-perf-skip">Enregistrer sans valeurs</button><button class="btn gold" id="ath-perf-save">Enregistrer les résultats</button></div>`,modal=>{
@@ -1012,7 +956,7 @@ function commitCurrentSession(){
   const exRecords=ids.map((id,i)=>{const no=i+1,key=occKey(id,no),status=occurrenceStatus(cur,id,no),actual=occurrenceValue(cur,id,no),next=occurrenceNext(cur,id,no)||(status==='Échoué'?'':actual),reps=cur.reps?.[key]??repNumber(defaultParams(id).repetitions),nextReps=cur.nextReps?.[key]??reps,setReps=cur.setReps?.[key]||null,equipment=state.progressionSettings[id]?.equipment||"";return status==="Non réalisé"?{id,name:exercise(id).name,status,no}:{id,name:exercise(id).name,status,actual,next,reps,nextReps,no,setReps,equipment};});
   const historyId="h"+Date.now();
   const athRecords=cur.session.startsWith("ATHLÉTIQUE")?Object.entries(cur.athPerformance||{}).map(([index,metrics])=>{const step=DATA.ath?.[cur.session]?.[Number(index)];return {session:cur.session,index:Number(index),name:step?.name||`Exercice ${Number(index)+1}`,date:localISODate(),historyId,metrics:Object.assign({},metrics)};}):[];
-  state.history.push({id:historyId,date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords,athPerformance:athRecords});
+  state.history.push({id:historyId,date:localISODate(),session:cur.ephemeral?ephemeralDisplayName(cur):cur.session,ephemeral:!!cur.ephemeral,start:cur.start,end:cur.end,duration:mins,exercises:exRecords,athPerformance:athRecords,athStatus:cur.session.startsWith("ATHLÉTIQUE")?{...(cur.athStatus||{})}:undefined});
   if(athRecords.length)state.athPerformance.push(...athRecords);
   // Commit ONLY recorded exercises; each occurrence keeps its four actual sets
   // in history while its next working charge/repetitions are shared by identity.
@@ -1038,14 +982,12 @@ function commitCurrentSession(){
   state.todayDismissed=null;state.today=null;save();render();
 }
 function renderActiveAth(cur,date){
-  const p=ATH_SHEETS[cur.session],img=p?pathUrl(p):"";
   const todayHeroClass=cur.session.startsWith("G1")?"tall session-hero-g1":cur.session.startsWith("G2")?"tall session-hero-g2":"tall";
   shell(`${header("Aujourd’hui",date,`<div class="session-code">${niceSession(cur.session)}</div><div class="session-groups">${groupLabel(cur.session)}</div>`,todayHeroClass)}
     <div class="today-meta today-meta-single"><div><div class="meta-label">Heure de début</div>${timeButton(cur.start,"edit-start")}</div></div>
-    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-today.jpg"}" alt=""><span>Ouvrir la fiche technique complète ${icon("chevron")}</span></button>
-    <button class="btn gold block" id="ath-guide">${esc(guideEntryLabel("ath:"+cur.session))}</button>${athListMarkup(cur.session)}
-    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div><div class="tiny muted" style="text-align:right">60 min + 15 min mobilité</div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
-  $("#ath-guide").onclick=()=>openAthGuide(cur.session);$("#open-ath-sheet").onclick=()=>openAthSheet(cur.session);bindAthList(cur.session);$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
+    ${athListMarkup(cur.session,{today:true,cur})}
+    <div class="card finish-card"><div class="finish-head"><div><div class="finish-title">${icon("flag")} Fin de séance</div><div class="tiny muted">Heure de fin</div>${timeButton(cur.end,"edit-end")}</div><div class="finish-stat"><span>Durée totale</span><b>${durationClock(cur)}</b></div></div><button class="btn gold block save-session-btn" id="save-session">${icon("save")} Enregistrer la séance</button></div><button class="btn session-cancel-bottom" id="cancel-session">${icon("x")} Annuler la séance</button>`,"today-screen");
+  bindAthList(cur.session,{today:true,cur});$("#edit-start").onclick=()=>editSessionTimes("start");$("#edit-end").onclick=()=>editSessionTimes("end");$("#save-session").onclick=saveCurrentSession;$("#cancel-session").onclick=cancelCurrentSession;
 }
 // V24.19: workout settings have one source of truth for the form, the list and the guide.
 function athDefaultInterval(step){
@@ -1055,7 +997,8 @@ function athDefaultInterval(step){
 }
 function athStepConfig(session,index){
   const step=DATA.ath?.[session]?.[index];if(!step)return null;
-  const saved=state.athParams?.[session]?.[index]||{};
+  const defaults=session==="ATHLÉTIQUE A"&&index===1?{"Niveau / intensité":"2"}:session==="ATHLÉTIQUE A"&&index===2?{"Résistance / niveau":"6"}:session==="ATHLÉTIQUE A"&&index===3?{"Passages":"6","Répartition des charges":"3 passages à 80 kg, 3 passages à 100 kg"}:{};
+  const saved={...defaults,...(state.athParams?.[session]?.[index]||{})};
   const isRemaining=/temps restant/i.test(step.duration||'');
   // "Temps restant pour atteindre 60 min" is a dynamic remainder, not 60 minutes of extra work.
   const defaultDuration=isRemaining?null:athDurationSeconds(step.duration);
@@ -1071,6 +1014,7 @@ function athStepConfig(session,index){
 }
 function athStepDurationText(session,index){
   const c=athStepConfig(session,index);if(!c)return '';
+  if(/sled/i.test(c.step.name||'')&&c.saved.Passages)return `${c.saved.Passages} passages (aller-retour)`;
   if(c.isRemaining&&!c.durationSeconds)return 'Temps restant pour atteindre 60 min';
   if(!c.durationSeconds)return c.step.duration;
   const mins=c.durationSeconds/60;
@@ -1078,7 +1022,7 @@ function athStepDurationText(session,index){
 }
 function athStepSummary(session,index,step){
   const c=athStepConfig(session,index);if(!c)return '';
-  const other=(step.fields||[]).filter(f=>f!=='Durée'&&!/\d+\s*s.*\d+\s*s/i.test(f)).map(f=>c.saved[f]?`${f} : ${c.saved[f]}`:f);
+  const other=(step.fields||[]).filter(f=>f!=='Durée'&&!(/sled/i.test(step.name||'')&&f==='Passages')&&!/\d+\s*s.*\d+\s*s/i.test(f)).map(f=>c.saved[f]?`${f} : ${c.saved[f]}`:f);
   if(c.interval)other.push(`Effort ${c.effortSeconds} s / récupération ${c.recoverySeconds} s`);
   return other.join(' · ');
 }
@@ -1113,16 +1057,16 @@ function readAthSettings(editor,session,index){
   return result;
 }
 function openAthStepSettings(session,index){
-  if(pendingGuide()?.key==='ath:'+session){alert('Une séance guidée est en pause. Terminez-la avant de modifier ses paramètres.');return;}
   const step=DATA.ath?.[session]?.[index];if(!step)return;
   openModal(`<h3>${esc(index+1)}. ${esc(step.name)}</h3><p class="tiny muted">Les réglages seront enregistrés uniquement pour ${esc(niceSession(session))}.</p>${athSettingsMarkup(session,index)}<div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-ath-step">Enregistrer</button></div>`,modal=>{
     $('#save-ath-step',modal).onclick=()=>{const next=readAthSettings($('[data-ath-editor]',modal),session,index);if(!next)return;state.athParams[session]=state.athParams[session]||{};state.athParams[session][index]=next;save();closeOverlay(true);render();};
   });
 }
-function athListMarkup(session){
-  return `<div class="card ath-edit-list">${(DATA.ath?.[session]||[]).map((step,i)=>`<button type="button" class="ath-edit-row" data-edit-ath="${i}" aria-label="Régler ${esc(step.name)}"><div class="ath-edit-row-heading"><b class="gold">${i+1}. ${esc(step.name)}</b><span>${esc(athStepDurationText(session,i))} ${icon('pencil')}</span></div><div class="tiny muted">${esc(athStepSummary(session,i,step))}</div></button>`).join('')}</div>`;
+function athListMarkup(session,options={}){
+  const {today=false,cur}=options;
+  return `<div class="card ath-edit-list">${(DATA.ath?.[session]||[]).map((step,i)=>`<div class="ath-edit-row"><button type="button" class="ath-edit-main" data-edit-ath="${i}" aria-label="Régler ${esc(step.name)}"><div class="ath-edit-row-heading"><b class="gold">${i+1}. ${esc(step.name)}</b><span>${esc(athStepDurationText(session,i))} ${icon('pencil')}</span></div><div class="tiny muted">${esc(athStepSummary(session,i,step))}</div></button>${today?`<div class="ath-status-actions">${[["Réussi","check"],["Échoué","x"]].map(([status,ic])=>`<button type="button" class="status-btn ${cur?.athStatus?.[i]===status?'sel':''}" data-ath-status="${i}" data-status="${status}">${icon(ic)} ${status}</button>`).join('')}</div>`:''}</div>`).join('')}</div>`;
 }
-function bindAthList(session){$$('[data-edit-ath]').forEach(b=>b.onclick=()=>openAthStepSettings(session,Number(b.dataset.editAth)));}
+function bindAthList(session,options={}){$$('[data-edit-ath]').forEach(b=>b.onclick=()=>openAthStepSettings(session,Number(b.dataset.editAth)));if(options.today)$$('[data-ath-status]').forEach(b=>b.onclick=()=>{const cur=options.cur,i=Number(b.dataset.athStatus);cur.athStatus=cur.athStatus||{};cur.athStatus[i]=cur.athStatus[i]===b.dataset.status?"":b.dataset.status;save();render();});}
 function openAthSheet(session){
   const img=pathUrl(ATH_SHEETS[session]||""),steps=DATA.ath?.[session]||[];
   state.athParams[session]=state.athParams[session]||{};
@@ -1350,14 +1294,9 @@ function openExerciseActionModal(session,id){
     });
 }
 function renderAthProgram(session){
-  const img=pathUrl(ATH_SHEETS[session]||"");
   shell(`<header class="session-header" style="--session-image:url('./assets/card-ath-official.jpg')"><div class="session-header__content"><div class="backline"><button class="backlink" id="back-program">${icon("arrowleft")} Programme</button></div><div class="session-title">${esc(niceSession(session))}</div><div class="session-group">${esc(groupLabel(session))}</div></div></header>
-    <button class="card ath-sheet-preview" id="open-ath-sheet"><img data-fallback src="${img||"./assets/hero-program-official.jpg"}" alt=""><span>Ouvrir la fiche technique complète ›</span></button>
-    <button class="btn gold block guide-program-ath" id="program-ath-guide">${esc(guideEntryLabel('ath:'+session))}</button>
     ${athListMarkup(session)}`);
   $("#back-program").onclick=()=>history.back();
-  $("#open-ath-sheet").onclick=()=>openAthSheet(session);
-  $("#program-ath-guide").onclick=()=>openAthGuide(session);
   bindAthList(session);
 }
 
@@ -1563,22 +1502,15 @@ function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
     const byWeek=new Map();const cursor=new Date(range.start+'T12:00:00');
     while(localISODate(cursor)<range.end){const key=weekKeyFromDate(localISODate(cursor));if(!byWeek.has(key))byWeek.set(key,[]);cursor.setDate(cursor.getDate()+1);}
     entries.filter(h=>h.date>=range.start&&h.date<range.end).forEach(h=>{const k=weekKeyFromDate(h.date);if(byWeek.has(k))byWeek.get(k).push(h);});
-    const startsMidweek=(new Date(range.start+'T12:00:00').getDay()+6)%7!==0;
-    return [...byWeek.values()].map((rows,i)=>({label:'S'+(i+1),partial:i===0&&startsMidweek,...durationOf(rows)}));
+    return [...byWeek.values()].map((rows,i)=>({label:'S'+(i+1),...durationOf(rows)}));
   }
   return Array.from({length:12},(_,i)=>({label:['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'][i],...durationOf(entries.filter(h=>h.date>=range.start&&h.date<range.end&&Number(h.date.slice(5,7))===i+1))}));
 }
 function overviewDurationBars(series,selectedAnchor=''){
   const max=Math.max(60,...series.map(x=>x.value)),ceil=Math.ceil(max/60)*60;
   const show=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'):m+' min';};
-  const compactYearLabels=series.length===12;
-  const showCompact=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+'h'+String(m%60).padStart(2,'0'):m+'m';};
   const selectedWeek=selectedAnchor?weekKeyFromDate(selectedAnchor):'';
-  const aria=series.map(x=>x.label+(x.partial?' semaine partielle':'')+', '+show(x.value)).join(' ; ');
-  const hints=[];
-  if(series.some(x=>x.partial))hints.push('* S1 correspond à une semaine partielle au début du mois.');
-  if(series.some(x=>x.missing))hints.push('† Certaines séances sans durée ne sont pas comptées comme zéro minute.');
-  return `<div class="duration-bars${compactYearLabels?' duration-bars-annual':''}" role="img" aria-label="Durées d’entraînement : ${esc(aria)}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+(x.partial?' · semaine partielle au début du mois':'')+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const isSelected=!!x.anchor&&weekKeyFromDate(x.anchor)===selectedWeek;const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0" aria-pressed="${isSelected?'true':'false'}"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}${isSelected?' is-selected':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(compactYearLabels?showCompact(x.value):show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">†</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span title="${esc(title)}">${esc(x.label)}${x.partial?'*':''}</span></div>`;}).join('')}</div>${hints.map(h=>`<p class="duration-data-hint">${h}</p>`).join('')}`;
+  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const isSelected=!!x.anchor&&weekKeyFromDate(x.anchor)===selectedWeek;const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0" aria-pressed="${isSelected?'true':'false'}"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}${isSelected?' is-selected':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
 }
 function overviewDonut(distribution,total){
   const palette=["#f2cf72","#d7ad50","#f0d596","#9e8655","#c9973d","#b9934b"];
@@ -1689,7 +1621,7 @@ function renderProgressOverview(){
   overviewMarkupCache.set(cacheKey,html);return html;
 }
 function athMetricNumber(v){const n=Number(String(v??"").replace(",","."));return Number.isFinite(n)?n:null;}
-function athMetricLabel(key){return ({durationMin:"Durée",loadKg:"Charge",passages:"Passages",distanceM:"Distance",distanceKm:"Distance",speedKmh:"Vitesse",inclinePct:"Inclinaison",resistance:"Résistance",pace:"Allure"})[key]||key;}
+function athMetricLabel(key){return ({durationMin:"Durée",loadKg:"Charge",passages:"Passages",loadBreakdown:"Répartition des charges",distanceM:"Distance",distanceKm:"Distance",speedKmh:"Vitesse",inclinePct:"Inclinaison",resistance:"Résistance",pace:"Allure"})[key]||key;}
 function athMetricDisplay(key,v){if(v==null||v==="")return "—";const unit=({durationMin:" min",loadKg:" kg",distanceM:" m",distanceKm:" km",speedKmh:" km/h",inclinePct:" %"})[key]||"";return `${String(v).replace('.',',')}${unit}`;}
 function athleticProgressMarkup(){
   const rows=state.athPerformance||[];
@@ -2127,6 +2059,9 @@ function renderHistoryMonth(year,month){
 }
 function historyExercisesForDisplay(h){
   const rows=(h.exercises||[]).slice();
+  if(String(h.session||'').startsWith('ATHLÉTIQUE')&&h.athStatus){
+    (DATA.ath?.[h.session]||[]).forEach((step,i)=>{const status=h.athStatus[i];if(['Réussi','Échoué'].includes(status))rows.push({name:step.name,status,no:i+1,athOnly:true});});
+  }
   // Only the omission explicitly confirmed by the user is reconstructed for display.
   // Never infer old exercises from today's potentially reordered program.
   const expected=['ex-ecarte-a-la-poulie-basse-assis-sur-banc','ex-developpe-couche-avec-halteres',
@@ -2141,7 +2076,7 @@ function historyExercisesForDisplay(h){
 function historyExerciseMarkup(e,i){
   const skipped=e.status==='Non réalisé';
   const no=Number.isInteger(e.no)&&e.no>0?e.no:i+1;
-  return `<div class="history-row${skipped?' history-skipped':''}"><span class="gold">${String(no).padStart(2,'0')}</span> <b>${esc(e.name)}</b><span class="history-exercise-status">${esc(e.status)}</span>${skipped?'':`<div class="tiny muted">${esc(refWithUnit(e.actual||'—'))}${Array.isArray(e.setReps)?` · séries : ${esc(e.setReps.join(' / '))}`:''}${e.next?` · prochaine : ${esc(refWithUnit(e.next))}`:''}</div>`}</div>`;
+  return `<div class="history-row${skipped?' history-skipped':''}"><span class="gold">${String(no).padStart(2,'0')}</span> <b>${esc(e.name)}</b><span class="history-exercise-status">${esc(e.status)}</span>${skipped||e.athOnly?'':`<div class="tiny muted">${esc(refWithUnit(e.actual||'—'))}${Array.isArray(e.setReps)?` · séries : ${esc(e.setReps.join(' / '))}`:''}${e.next?` · prochaine : ${esc(refWithUnit(e.next))}`:''}</div>`}</div>`;
 }
 function renderHistoryDetail(id){
   const h=(state.history||[]).find(x=>x.id===id);if(!h){history.back();return;}
@@ -2406,8 +2341,6 @@ function guideEntryLabel(key){return pendingGuide()?.key===key?'Reprendre la sé
 function refreshGuideEntrypoints(){
  $$('[data-circuit-guide]').forEach(b=>{b.textContent=guideEntryLabel('circuit:'+b.dataset.session+':'+b.dataset.no+':'+b.dataset.circuitGuide);});
  $$('[data-program-circuit]').forEach(b=>{b.textContent=guideEntryLabel('circuit:'+view.session+':'+b.dataset.no+':'+b.dataset.programCircuit);});
- if($('#program-ath-guide')&&view.session)$('#program-ath-guide').textContent=guideEntryLabel('ath:'+view.session);
- if($('#ath-guide')&&state.today)$('#ath-guide').textContent=guideEntryLabel('ath:'+state.today.session);
 }
 function voiceGuide(text,enabled,onDone,options={}){
  if(!enabled||!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){onDone?.();return false;}
@@ -2851,8 +2784,6 @@ function restoreJSON(e){
       localStorage.setItem("fitness-before-restore-v2418",previous);
       if(localStorage.getItem("fitness-before-restore-v2418")!==previous)throw Error("Copie de sécurité non vérifiée");
       const next=Object.assign(defaultState(),incoming.state,{appRev:APP_REV});if(!Array.isArray(next.history)||!Array.isArray(next.measurements))throw Error("Données restaurées invalides");
-      purgeRetiredPulleyCrunchData(next);
-      applyConfirmedHistoryCorrections(next);
       const serialized=JSON.stringify(next);
       try{
         localStorage.setItem(KEY,serialized);
@@ -2903,5 +2834,5 @@ initializeSharedProgress();
 render();
 if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242517",{updateViaCache:"none"}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242518",{updateViaCache:"none"}).catch(()=>{});
 })();
