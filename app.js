@@ -910,19 +910,19 @@ function athMetricDefinition(step){
   if(/mobilite|etirement/.test(name))return [];
   return [];
 }
-function athPreviousMetric(session,index,key){
-  const rows=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===Number(index));
-  return rows.at(-1)?.metrics?.[key]??"";
+function athPerformanceForm(session,index){
+  const step=DATA.ath?.[session]?.[index];if(!step)return "";
+  const fields=athMetricDefinition(step),cfg=athStepConfig(session,index);
+  return `<div class="ath-performance-form"><div class="ath-performance-block" data-ath-performance="${index}"><b>${index+1}. ${esc(step.name)}</b><div class="ath-performance-fields">${fields.map(f=>{const cfgValue=f.key==="resistance"?(cfg?.saved?.[session==="ATHLÉTIQUE A"&&index===1?"Niveau / intensité":"Résistance / niveau"]||""):f.key==="passages"?(cfg?.saved?.Passages||""):f.key==="loadBreakdown"?(cfg?.saved?.["Répartition des charges"]||""):f.key==="speedKmh"?(cfg?.saved?.Vitesse||cfg?.saved?.["Vitesse moyenne"]||""):f.key==="inclinePct"?(cfg?.saved?.Inclinaison||""):"",value=f.key==="durationMin"&&cfg?.durationSeconds?String(Math.round(cfg.durationSeconds/6)/10):cfgValue;return `<label>${esc(f.label)}<input data-ath-metric="${esc(f.key)}" type="${f.type||'number'}" ${f.type?'':`inputmode="decimal" step="${f.step||'0.1'}" min="0"`} value="${esc(value)}" placeholder="${esc(f.placeholder||'')}"></label>`}).join("")}</div></div></div>`;
 }
-function athPerformanceForm(session){
-  const steps=DATA.ath?.[session]||[];
-  return `<div class="ath-performance-form">${steps.map((step,i)=>{const fields=athMetricDefinition(step);if(!fields.length)return `<div class="ath-performance-block ath-completed-only"><b>${i+1}. ${esc(step.name)}</b><span>Réalisé</span></div>`;return `<div class="ath-performance-block" data-ath-performance="${i}"><b>${i+1}. ${esc(step.name)}</b><div class="ath-performance-fields">${fields.map(f=>{const previous=athPreviousMetric(session,i,f.key),cfg=athStepConfig(session,i),cfgValue=f.key==="resistance"?(cfg?.saved?.[session==="ATHLÉTIQUE A"&&i===1?"Niveau / intensité":"Résistance / niveau"]||""):f.key==="passages"?(cfg?.saved?.Passages||""):f.key==="loadBreakdown"?(cfg?.saved?.["Répartition des charges"]||""):"",prev=previous!==""?previous:(f.key==="durationMin"&&cfg?.durationSeconds?String(Math.round(cfg.durationSeconds/6)/10):cfgValue);return `<label>${esc(f.label)}<input data-ath-metric="${esc(f.key)}" type="${f.type||'number'}" ${f.type?'':`inputmode="decimal" step="${f.step||'0.1'}" min="0"`} value="${esc(prev)}" placeholder="${esc(f.placeholder||'')}"></label>`}).join("")}</div></div>`}).join("")}</div>`;
-}
-function requestAthPerformance(cur){
-  openModal(`<h3>Résultats athlétiques</h3><p class="tiny muted">Renseignez les données disponibles. Les dernières valeurs sont proposées pour accélérer la saisie. Aucun effort ressenti n’est demandé.</p>${athPerformanceForm(cur.session)}<div class="modal-actions"><button class="btn ghost" id="ath-perf-skip">Enregistrer sans valeurs</button><button class="btn gold" id="ath-perf-save">Enregistrer les résultats</button></div>`,modal=>{
-    const finish=()=>{cur.athPerformanceRecorded=true;save();closeOverlay(true);setTimeout(saveCurrentSession,0);};
-    $('#ath-perf-skip',modal).onclick=finish;
-    $('#ath-perf-save',modal).onclick=()=>{cur.athPerformance=cur.athPerformance||{};$$('[data-ath-performance]',modal).forEach(block=>{const metrics={};$$('[data-ath-metric]',block).forEach(input=>{const raw=input.value.trim();if(raw!=="")metrics[input.dataset.athMetric]=raw;});if(Object.keys(metrics).length)cur.athPerformance[block.dataset.athPerformance]=metrics;});finish();};
+function requestAthPerformance(cur,index){
+  const step=DATA.ath?.[cur.session]?.[index];
+  const previous=(state.athPerformance||[]).filter(x=>x.session===cur.session&&Number(x.index)===index).at(-1);
+  const ref=previous?.metrics?`<p class="tiny muted">Séance précédente : ${Object.entries(previous.metrics).map(([k,v])=>`${esc(athMetricLabel(k))} ${esc(athMetricDisplay(k,v))}`).join(' · ')}</p>`:"";
+  openModal(`<h3>Performance du jour</h3><p class="tiny muted">Saisis les valeurs réellement réalisées pendant ce mouvement. Elles serviront de repère à la prochaine séance.</p>${ref}${athPerformanceForm(cur.session,index)}<div class="modal-actions"><button class="btn ghost" id="ath-perf-skip">Continuer sans valeurs</button><button class="btn gold" id="ath-perf-save">Enregistrer la performance</button></div>`,modal=>{
+    const finish=metrics=>{cur.athStatus=cur.athStatus||{};cur.athPerformance=cur.athPerformance||{};cur.athStatus[index]="Réalisé";if(Object.keys(metrics).length)cur.athPerformance[index]=metrics;else delete cur.athPerformance[index];save();closeOverlay(true);render();};
+    $('#ath-perf-skip',modal).onclick=()=>finish({});
+    $('#ath-perf-save',modal).onclick=()=>{const metrics={};$$('[data-ath-metric]',modal).forEach(input=>{const raw=input.value.trim();if(raw!=="")metrics[input.dataset.athMetric]=raw;});finish(metrics);};
   });
 }
 function saveCurrentSession(){
@@ -935,7 +935,15 @@ function saveCurrentSession(){
       });
     return;
   }
-  if(cur.session.startsWith("ATHLÉTIQUE")&&!cur.athPerformanceRecorded){requestAthPerformance(cur);return;}
+  if(cur.session.startsWith("ATHLÉTIQUE")){
+    const steps=DATA.ath?.[cur.session]||[],missing=steps.map((step,index)=>({step,index})).filter(({index})=>!['Réalisé','Non réalisé'].includes(cur.athStatus?.[index]));
+    if(missing.length){
+      openModal(`<h3>Statuts à compléter</h3><p>${missing.length} mouvement${missing.length>1?'s':''} ${missing.length>1?'n’ont':'n’a'} pas encore de statut. Tu peux revenir à la séance ou marquer les mouvements restants comme non réalisés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Revenir à la séance</button><button class="btn gold" id="ath-mark-skipped">Marquer les mouvements restants comme non réalisés</button></div>`,()=>{
+        $('#ath-mark-skipped').onclick=()=>{cur.athStatus=cur.athStatus||{};missing.forEach(({index})=>{cur.athStatus[index]='Non réalisé';if(cur.athPerformance)delete cur.athPerformance[index];});save();closeOverlay(true);setTimeout(saveCurrentSession,0);};
+      });
+      return;
+    }
+  }
   if(!cur.session.startsWith("ATHLÉTIQUE")){
     const ids=activeSessionIds(cur);
     const missing=ids.map((id,i)=>({id,no:i+1,key:occKey(id,i+1)})).filter(o=>!["Réussi","Échoué","Non réalisé"].includes(occurrenceStatus(cur,o.id,o.no)));
@@ -1062,11 +1070,16 @@ function openAthStepSettings(session,index){
     $('#save-ath-step',modal).onclick=()=>{const next=readAthSettings($('[data-ath-editor]',modal),session,index);if(!next)return;state.athParams[session]=state.athParams[session]||{};state.athParams[session][index]=next;save();closeOverlay(true);render();};
   });
 }
+function athPreviousMetricsSummary(session,index){
+  const row=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===Number(index)).at(-1);
+  if(!row?.metrics||!Object.keys(row.metrics).length)return "";
+  return `<div class="tiny muted ath-previous-reference">Repère précédent · ${Object.entries(row.metrics).map(([k,v])=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,v))}`).join(' · ')}</div>`;
+}
 function athListMarkup(session,options={}){
   const {today=false,cur}=options;
-  return `<div class="card ath-edit-list">${(DATA.ath?.[session]||[]).map((step,i)=>`<div class="ath-edit-row"><button type="button" class="ath-edit-main" data-edit-ath="${i}" aria-label="Régler ${esc(step.name)}"><div class="ath-edit-row-heading"><b class="gold">${i+1}. ${esc(step.name)}</b><span>${esc(athStepDurationText(session,i))} ${icon('pencil')}</span></div><div class="tiny muted">${esc(athStepSummary(session,i,step))}</div></button>${today?`<div class="ath-status-actions">${[["Réussi","check"],["Échoué","x"]].map(([status,ic])=>`<button type="button" class="status-btn ${cur?.athStatus?.[i]===status?'sel':''}" data-ath-status="${i}" data-status="${status}">${icon(ic)} ${status}</button>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+  return `<div class="card ath-edit-list">${(DATA.ath?.[session]||[]).map((step,i)=>`<div class="ath-edit-row"><button type="button" class="ath-edit-main" data-edit-ath="${i}" aria-label="Régler ${esc(step.name)}"><div class="ath-edit-row-heading"><b class="gold">${i+1}. ${esc(step.name)}</b><span>${esc(athStepDurationText(session,i))} ${icon('pencil')}</span></div><div class="tiny muted">${esc(athStepSummary(session,i,step))}</div>${today?athPreviousMetricsSummary(session,i):''}</button>${today?`<div class="ath-status-actions">${[["Réalisé","check"],["Non réalisé","ban"]].map(([status,ic])=>`<button type="button" class="status-btn ${cur?.athStatus?.[i]===status?'sel':''}" data-ath-status="${i}" data-status="${status}">${icon(ic)} ${status}</button>`).join('')}</div>`:''}</div>`).join('')}</div>`;
 }
-function bindAthList(session,options={}){$$('[data-edit-ath]').forEach(b=>b.onclick=()=>openAthStepSettings(session,Number(b.dataset.editAth)));if(options.today)$$('[data-ath-status]').forEach(b=>b.onclick=()=>{const cur=options.cur,i=Number(b.dataset.athStatus);cur.athStatus=cur.athStatus||{};cur.athStatus[i]=cur.athStatus[i]===b.dataset.status?"":b.dataset.status;save();render();});}
+function bindAthList(session,options={}){$$('[data-edit-ath]').forEach(b=>b.onclick=()=>openAthStepSettings(session,Number(b.dataset.editAth)));if(options.today)$$('[data-ath-status]').forEach(b=>b.onclick=()=>{const cur=options.cur,i=Number(b.dataset.athStatus),status=b.dataset.status;cur.athStatus=cur.athStatus||{};if(cur.athStatus[i]===status){delete cur.athStatus[i];if(cur.athPerformance)delete cur.athPerformance[i];save();render();return;}if(status==="Réalisé"&&athMetricDefinition(DATA.ath?.[session]?.[i]||{}).length){requestAthPerformance(cur,i);return;}cur.athStatus[i]=status;if(cur.athPerformance)delete cur.athPerformance[i];save();render();});}
 function openAthSheet(session){
   const img=pathUrl(ATH_SHEETS[session]||""),steps=DATA.ath?.[session]||[];
   state.athParams[session]=state.athParams[session]||{};
@@ -1457,15 +1470,15 @@ function progressOverviewData(){
   const range=selectedRange(overviewPeriod),hist=(state.history||[]).filter(h=>h.date>=range.start&&h.date<range.end),perf={};
   Object.entries(allPerf()).forEach(([id,arr])=>perf[id]=arr.filter(x=>x.date>=range.start&&x.date<range.end));
   const sessions=hist.length;
-  const exercises=hist.reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0);
+  const exercises=hist.reduce((n,h)=>n+historyExerciseCount(h),0);
   const minutes=hist.reduce((n,h)=>n+(Number(h.duration)||0),0);
   const global=progressionGlobalPercent(perf);
   const weeks=[];
   if(overviewPeriod==="week"){
-    const monday=new Date(`${range.start}T12:00:00`);["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].forEach((label,i)=>{const d=new Date(monday);d.setDate(d.getDate()+i);const iso=localISODate(d);weeks.push({label,value:hist.filter(h=>h.date===iso).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0)});});
+    const monday=new Date(`${range.start}T12:00:00`);["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].forEach((label,i)=>{const d=new Date(monday);d.setDate(d.getDate()+i);const iso=localISODate(d);weeks.push({label,value:hist.filter(h=>h.date===iso).reduce((n,h)=>n+historyExerciseCount(h),0)});});
   }else if(overviewPeriod==="month"){
-    const cursor=new Date(`${range.start}T12:00:00`);let i=1;while(localISODate(cursor)<range.end){const wk=weekKeyFromDate(localISODate(cursor));weeks.push({label:`S${i++}`,value:hist.filter(h=>weekKeyFromDate(h.date)===wk).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0)});cursor.setDate(cursor.getDate()+7);}
-  }else{"J F M A M J J A S O N D".split(" ").forEach((label,i)=>weeks.push({label,value:hist.filter(h=>+h.date.slice(5,7)===i+1).reduce((n,h)=>n+(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length,0)}));}
+    const cursor=new Date(`${range.start}T12:00:00`);let i=1;while(localISODate(cursor)<range.end){const wk=weekKeyFromDate(localISODate(cursor));weeks.push({label:`S${i++}`,value:hist.filter(h=>weekKeyFromDate(h.date)===wk).reduce((n,h)=>n+historyExerciseCount(h),0)});cursor.setDate(cursor.getDate()+7);}
+  }else{"J F M A M J J A S O N D".split(" ").forEach((label,i)=>weeks.push({label,value:hist.filter(h=>+h.date.slice(5,7)===i+1).reduce((n,h)=>n+historyExerciseCount(h),0)}));}
   const groups={Pectoraux:0,Dos:0,"Épaules":0,Bras:0,Jambes:0,Abdos:0};
   hist.forEach(h=>(h.exercises||[]).forEach(e=>{
     if(e.status==="Non réalisé")return;
@@ -1519,10 +1532,17 @@ function overviewDonut(distribution,total){
   if(cursor<100)stops.push(`#2b2924 ${cursor}% 100%`);
   return `<div class="overview-donut-wrap"><div class="overview-donut" style="background:conic-gradient(${stops.join(",")})"><div><b>${total}</b><span>exercices</span></div></div><div class="overview-legend">${distribution.map((x,i)=>`<div><span><i style="background:${palette[i]}"></i>${x.name}</span><b>${x.pct}%</b></div>`).join("")}</div></div>`;
 }
+function historyExerciseCount(h){
+  if(String(h.session||"").startsWith("ATHLÉTIQUE")){
+    const statuses=h.athStatus||{},performed=new Set((h.athPerformance||[]).filter(x=>x&&x.metrics&&Object.keys(x.metrics).length).map(x=>Number(x.index)));
+    return new Set([...Object.entries(statuses).filter(([,s])=>["Réalisé","Réussi","Échoué"].includes(s)).map(([i])=>Number(i)),...performed]).size;
+  }
+  return (h.exercises||[]).filter(e=>e.status!=="Non réalisé").length;
+}
 function calendarDayDetails(day){
   if(!day)return '<div class="calendar-hint">Touchez une date pour consulter les séances de cette journée.</div>';
   const sessions=(state.history||[]).filter(h=>h.date===day).slice().sort((a,b)=>String(a.start||'').localeCompare(String(b.start||'')));
-  return `<div class="calendar-detail-heading">Séances du ${esc(formatDate(day))}</div>${sessions.length?sessions.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||'Séance'))}</b><span>${esc(h.start||'')}${h.end?' → '+esc(h.end):''}</span></div><div><b>${Number(h.duration)>0?formatMinutes(h.duration):'Durée non renseignée'}</b><span>${(h.exercises||[]).filter(e=>e.status!=='Non réalisé').length} exercices</span></div><i>›</i></button>`).join(''):'<div class="calendar-hint">Aucune séance enregistrée ce jour.</div>'}`;
+  return `<div class="calendar-detail-heading">Séances du ${esc(formatDate(day))}</div>${sessions.length?sessions.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||'Séance'))}</b><span>${esc(h.start||'')}${h.end?' → '+esc(h.end):''}</span></div><div><b>${Number(h.duration)>0?formatMinutes(h.duration):'Durée non renseignée'}</b><span>${historyExerciseCount(h)} exercices</span></div><i>›</i></button>`).join(''):'<div class="calendar-hint">Aucune séance enregistrée ce jour.</div>'}`;
 }
 // The annual calendar is a read-only visualization of dated history, independent
 // of the main Historique period filters and of the saved training records.
@@ -1623,14 +1643,25 @@ function renderProgressOverview(){
 function athMetricNumber(v){const n=Number(String(v??"").replace(",","."));return Number.isFinite(n)?n:null;}
 function athMetricLabel(key){return ({durationMin:"Durée",loadKg:"Charge",passages:"Passages",loadBreakdown:"Répartition des charges",distanceM:"Distance",distanceKm:"Distance",speedKmh:"Vitesse",inclinePct:"Inclinaison",resistance:"Résistance",pace:"Allure"})[key]||key;}
 function athMetricDisplay(key,v){if(v==null||v==="")return "—";const unit=({durationMin:" min",loadKg:" kg",distanceM:" m",distanceKm:" km",speedKmh:" km/h",inclinePct:" %"})[key]||"";return `${String(v).replace('.',',')}${unit}`;}
+function athComparableRows(arr,primary,reference=arr.at(-1)){
+  const keys=primary==="passages"?["loadBreakdown"]:["durationMin","resistance"];
+  if(["speedKmh","distanceKm","distanceM"].includes(primary))keys.push("inclinePct");
+  return arr.filter(x=>keys.every(k=>String(x.metrics?.[k]??"")===String(reference.metrics?.[k]??"")));
+}
+function athComparablePair(arr,primary){
+  const valid=arr.filter(x=>athMetricNumber(x.metrics?.[primary])!=null).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  if(valid.length<2)return null;
+  const last=valid.at(-1),previous=athComparableRows(valid,primary,last).filter(x=>x!==last).at(-1);
+  return previous?{last,previous,delta:athMetricNumber(last.metrics[primary])-athMetricNumber(previous.metrics[primary])}:null;
+}
 function athleticProgressMarkup(){
   const rows=state.athPerformance||[];
   const groups=new Map();rows.forEach(r=>{const key=`${r.session}|${r.index}`;(groups.get(key)||groups.set(key,[]).get(key)).push(r);});
-  const cards=[...groups.values()].map(arr=>{arr.sort((a,b)=>String(a.date).localeCompare(String(b.date)));const last=arr.at(-1),keys=Object.keys(last.metrics||{}),primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],numeric=primary?arr.map(x=>({date:x.date,value:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.value!=null):[],best=numeric.length?Math.max(...numeric.map(x=>x.value)):null;return `<button class="ath-progress-card" data-ath-progress="${esc(last.session)}|${last.index}"><div><b>${esc(niceSession(last.session))} · ${esc(last.name)}</b><span>Dernière · ${formatDate(last.date)}</span></div><div class="ath-progress-values">${keys.slice(0,3).map(k=>`<span><small>${esc(athMetricLabel(k))}</small><b>${esc(athMetricDisplay(k,last.metrics[k]))}</b></span>`).join("")}</div>${best!=null?`<div class="tiny gold">Meilleure ${esc(athMetricLabel(primary).toLowerCase())} : ${esc(athMetricDisplay(primary,best))}</div>`:""}</button>`;});
+  const cards=[...groups.values()].map(arr=>{arr.sort((a,b)=>String(a.date).localeCompare(String(b.date)));const last=arr.at(-1),keys=Object.keys(last.metrics||{}),primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||null,numeric=primary?athComparableRows(arr,primary,last).map(x=>({date:x.date,value:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.value!=null):[],best=numeric.length?Math.max(...numeric.map(x=>x.value)):null,comparison=primary?athComparablePair(arr,primary):null,delta=comparison?.delta,deltaText=delta==null?"":`${delta>0?"+":""}${athMetricDisplay(primary,Number(delta.toFixed(2)))}`;return `<button class="ath-progress-card" data-ath-progress="${esc(last.session)}|${last.index}"><div><b>${esc(niceSession(last.session))} · ${esc(last.name)}</b><span>Dernière · ${formatDate(last.date)}</span></div><div class="ath-progress-values">${keys.slice(0,3).map(k=>`<span><small>${esc(athMetricLabel(k))}</small><b>${esc(athMetricDisplay(k,last.metrics[k]))}</b></span>`).join("")}</div>${comparison?`<div class="tiny gold">${esc(deltaText)} depuis la séance comparable précédente</div>`:""}${best!=null?`<div class="tiny muted">Meilleure ${esc(athMetricLabel(primary).toLowerCase())} (même réglage) : ${esc(athMetricDisplay(primary,best))}</div>`:""}</button>`;});
   return `<section class="ath-progress-section${athleticProgressExpanded?' is-open':''}"><button type="button" class="ath-progress-toggle" id="ath-progress-toggle" aria-expanded="${athleticProgressExpanded?'true':'false'}"><span><b>Performances athlétiques</b><small>${groups.size} exercice${groups.size>1?'s':''} suivi${groups.size>1?'s':''}</small></span>${icon("chevron")}</button><div class="ath-progress-list">${cards.join("")||'<div class="card empty">Les performances Athlétique A/B apparaîtront ici après leur prochain enregistrement.</div>'}</div></section>`;
 }
 function openAthProgressDetail(key){
-  const [session,indexRaw]=key.split('|'),index=Number(indexRaw),arr=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===index).sort((a,b)=>String(a.date).localeCompare(String(b.date)));if(!arr.length)return;const last=arr.at(-1),keys=[...new Set(arr.flatMap(x=>Object.keys(x.metrics||{})))],primary=keys.find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||keys[0],nums=arr.map(x=>({x:x.date,y:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.y!=null);openModal(`<h3>${esc(last.name)}</h3><p class="tiny muted">${esc(niceSession(session))} · évolution objective enregistrée</p>${primary?`<div class="chart ath-mini-chart">${lineChart(nums)}</div><div class="tiny muted">Courbe : ${esc(athMetricLabel(primary))}</div>`:''}<div class="ath-detail-history">${arr.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${formatDate(x.date)}</b><span>${keys.map(k=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,x.metrics?.[k]))}`).join(' · ')}</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);}
+  const [session,indexRaw]=key.split('|'),index=Number(indexRaw),arr=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===index).sort((a,b)=>String(a.date).localeCompare(String(b.date)));if(!arr.length)return;const last=arr.at(-1),keys=[...new Set(arr.flatMap(x=>Object.keys(x.metrics||{})))],primary=Object.keys(last.metrics||{}).find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||null,plotRows=primary?athComparableRows(arr,primary,last):[],nums=plotRows.map(x=>({x:x.date,y:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.y!=null);openModal(`<h3>${esc(last.name)}</h3><p class="tiny muted">${esc(niceSession(session))} · évolution objective enregistrée</p>${primary?`<div class="chart ath-mini-chart">${lineChart(nums)}</div><div class="tiny muted">Courbe : ${esc(athMetricLabel(primary))}, mêmes réglages que la dernière séance</div>`:''}<div class="ath-detail-history">${arr.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${formatDate(x.date)}</b><span>${keys.map(k=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,x.metrics?.[k]))}`).join(' · ')}</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);}
 function renderProgressPerformance(){
   const cacheKey=progressionPeriod+"|"+progressionGroup+"|status:"+progressionStatusFilter+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0");
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
@@ -1655,7 +1686,7 @@ function renderProgressPerformance(){
 }
 function renderProgressHistoryHome(){
   const recent=[...(state.history||[])].slice().reverse().slice(0,20);
-  return `${progressHomeTabs()}<div class="overview-section-head"><h2>Historique des séances</h2><span>${recent.length} dernières</span></div><div class="panel progress-history-home">${recent.map(h=>`<div class="progress-history-row"><div><b>${esc(h.session||"Séance")}</b><span>${esc(h.date||"")}</span></div><div><b>${Number(h.duration)||0} min</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div></div>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`}</div>`;
+  return `${progressHomeTabs()}<div class="overview-section-head"><h2>Historique des séances</h2><span>${recent.length} dernières</span></div><div class="panel progress-history-home">${recent.map(h=>`<div class="progress-history-row"><div><b>${esc(h.session||"Séance")}</b><span>${esc(h.date||"")}</span></div><div><b>${Number(h.duration)||0} min</b><span>${historyExerciseCount(h)} exercices</span></div></div>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`}</div>`;
 }
 function measurementRange(period){
   if(period==="all")return null;
@@ -1925,11 +1956,11 @@ function openProgressSettingsModal(id){
 let historyVolumeMode="duration";
 function historySessionRows(limit=5){
   const rows=[...(state.history||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,limit);
-  return rows.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div><i>›</i></button>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
+  return rows.map(h=>`<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${historyExerciseCount(h)} exercices</span></div><i>›</i></button>`).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
 }
 function openAllSessionHistory(){
   const rows=[...(state.history||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date)));let lastMonth="";
-  const html=rows.map(h=>{const key=String(h.date).slice(0,7),d=new Date(`${key}-01T12:00:00`),head=key!==lastMonth?`<h4 class="session-month-title">${d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}</h4>`:"";lastMonth=key;return `${head}<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${(h.exercises||[]).filter(e=>e.status!=="Non réalisé").length} exercices</span></div><i>›</i></button>`;}).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
+  const html=rows.map(h=>{const key=String(h.date).slice(0,7),d=new Date(`${key}-01T12:00:00`),head=key!==lastMonth?`<h4 class="session-month-title">${d.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}</h4>`:"";lastMonth=key;return `${head}<button class="history-session-row" data-history-session="${esc(h.id)}"><div><b>${esc(niceSession(h.session||"Séance"))}</b><span>${formatDate(h.date)}</span></div><div><b>${formatMinutes(+h.duration||0)}</b><span>${historyExerciseCount(h)} exercices</span></div><i>›</i></button>`;}).join("")||`<div class="empty">Aucune séance enregistrée.</div>`;
   openModal(`<h3>Toutes les séances</h3><div class="all-session-history">${html}</div><div class="modal-actions"><button class="btn gold" data-close-modal>Fermer</button></div>`,()=>{$$("[data-history-session]").forEach(b=>b.onclick=()=>{const id=b.dataset.historySession;closeOverlay(true);pushNav({type:"historyDetail",id});});});
 }
 function historyIsCurrentPeriod(){
@@ -2059,8 +2090,10 @@ function renderHistoryMonth(year,month){
 }
 function historyExercisesForDisplay(h){
   const rows=(h.exercises||[]).slice();
-  if(String(h.session||'').startsWith('ATHLÉTIQUE')&&h.athStatus){
-    (DATA.ath?.[h.session]||[]).forEach((step,i)=>{const status=h.athStatus[i];if(['Réussi','Échoué'].includes(status))rows.push({name:step.name,status,no:i+1,athOnly:true});});
+  if(String(h.session||'').startsWith('ATHLÉTIQUE')){
+    const statusMap=h.athStatus||{},records=[...(h.athPerformance||[]),...(state.athPerformance||[]).filter(x=>x.historyId===h.id)],byIndex=new Map(records.map(x=>[Number(x.index),x]));
+    rows.length=0;
+    (DATA.ath?.[h.session]||[]).forEach((step,i)=>{let status=statusMap[i]||"Non renseigné";if(status==="Réussi"||status==="Échoué")status="Réalisé";const record=byIndex.get(i);rows.push({name:step.name,status,no:i+1,athOnly:true,metrics:record?.metrics||{}});});
   }
   // Only the omission explicitly confirmed by the user is reconstructed for display.
   // Never infer old exercises from today's potentially reordered program.
@@ -2076,7 +2109,8 @@ function historyExercisesForDisplay(h){
 function historyExerciseMarkup(e,i){
   const skipped=e.status==='Non réalisé';
   const no=Number.isInteger(e.no)&&e.no>0?e.no:i+1;
-  return `<div class="history-row${skipped?' history-skipped':''}"><span class="gold">${String(no).padStart(2,'0')}</span> <b>${esc(e.name)}</b><span class="history-exercise-status">${esc(e.status)}</span>${skipped||e.athOnly?'':`<div class="tiny muted">${esc(refWithUnit(e.actual||'—'))}${Array.isArray(e.setReps)?` · séries : ${esc(e.setReps.join(' / '))}`:''}${e.next?` · prochaine : ${esc(refWithUnit(e.next))}`:''}</div>`}</div>`;
+  const athMetrics=e.athOnly?Object.entries(e.metrics||{}).map(([k,v])=>`${athMetricLabel(k)} : ${athMetricDisplay(k,v)}`).join(' · '):'';
+  return `<div class="history-row${skipped?' history-skipped':''}"><span class="gold">${String(no).padStart(2,'0')}</span> <b>${esc(e.name)}</b><span class="history-exercise-status">${esc(e.status)}</span>${e.athOnly?(athMetrics?`<div class="tiny muted">${esc(athMetrics)}</div>`:''):skipped?'':`<div class="tiny muted">${esc(refWithUnit(e.actual||'—'))}${Array.isArray(e.setReps)?` · séries : ${esc(e.setReps.join(' / '))}`:''}${e.next?` · prochaine : ${esc(refWithUnit(e.next))}`:''}</div>`}</div>`;
 }
 function renderHistoryDetail(id){
   const h=(state.history||[]).find(x=>x.id===id);if(!h){history.back();return;}
