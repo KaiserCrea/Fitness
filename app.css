@@ -2435,32 +2435,3 @@ body.lock-program-home{
     radial-gradient(120% 90% at 10% 0%, rgba(185,138,60,.18) 0%, rgba(117,87,45,.07) 42%, transparent 70%),
     linear-gradient(145deg, #211d16 0%, #171614 54%, #101112 100%);
 }
-
-
-/* V24.25.19 — Titres et chiffres dorés métallisés. Les médias restent intacts. */
-:root{--gold-metal:linear-gradient(180deg,#fff8e5 0%,#f7df9d 17%,#d4a347 38%,#fff2c1 51%,#bc8631 68%,#f8d98a 83%,#fff1c8 100%)}
-.header h1,
-.program-header h1,
-.waiting-copy h1,
-.section-title,
-.overview-title-row h2,
-.overview-section-head h2,
-.measure-head h2,
-.guide-heading h2,
-.guide-list-heading h3,
-.today-complement-section h3,
-.progress-detail-screen .detail-performance-hero h1,
-.calendar-detail-heading,
-.history-screen .training-calendar h2,
-.overview-month-year>b,
-.metrics .metric:not(.trend-metric)>b,
-.overview-metric>b,
-.overview-donut b,
-.calendar-stats b,
-.duration-bar-col>b{
-  background-image:var(--gold-metal);
-  -webkit-background-clip:text;
-  background-clip:text;
-  color:transparent!important;
-  -webkit-text-fill-color:transparent!important;
-}

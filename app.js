@@ -2882,5 +2882,5 @@ render();
 if(isPageReload)requestAnimationFrame(()=>window.scrollTo({top:reloadScrollY,left:0,behavior:"auto"}));
 else if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242523",{updateViaCache:"none"}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242521",{updateViaCache:"none"}).catch(()=>{});
 })();
