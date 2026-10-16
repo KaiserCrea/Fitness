@@ -2416,3 +2416,22 @@ body.lock-program-home{
   .progress-list .trend{width:61px;min-height:65px}
   .progress-list .trend-label{font-size:8px}
 }
+
+/* V24.25.18 — Essai de dégradés chauds dans les fonds des cartes, sans toucher aux images. */
+.card:not(.program-card),
+.panel:not(.program-card),
+.metric,
+.overview-metric,
+.overview-panel,
+.chart,
+.progress-row,
+.session-row,
+.exercise-card,
+.history-grid>div,
+.ath-progress-card,
+.ath-performance-block,
+.group-card {
+  background-image:
+    radial-gradient(120% 90% at 10% 0%, rgba(185,138,60,.18) 0%, rgba(117,87,45,.07) 42%, transparent 70%),
+    linear-gradient(145deg, #211d16 0%, #171614 54%, #101112 100%);
+}
