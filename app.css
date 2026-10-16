@@ -2435,3 +2435,9 @@ body.lock-program-home{
     radial-gradient(120% 90% at 10% 0%, rgba(185,138,60,.18) 0%, rgba(117,87,45,.07) 42%, transparent 70%),
     linear-gradient(145deg, #211d16 0%, #171614 54%, #101112 100%);
 }
+
+
+
+/* Vue annuelle : valeurs compactes, sans étiquette pour les mois à zéro. */
+.duration-bars.is-year{gap:4px}
+.duration-bars.is-year .duration-bar-col>b{font-size:clamp(7px,2vw,9px)}

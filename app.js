@@ -1534,8 +1534,10 @@ function trainingDurationSeries(period=overviewPeriod,anchor=periodAnchor){
 function overviewDurationBars(series,selectedAnchor=''){
   const max=Math.max(60,...series.map(x=>x.value)),ceil=Math.ceil(max/60)*60;
   const show=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'):m+' min';};
+  const compact=mins=>{const m=Math.round(mins);return m>=60?Math.floor(m/60)+'h'+String(m%60).padStart(2,'0'):m+'m';};
+  const compactAnnual=series.length===12;
   const selectedWeek=selectedAnchor?weekKeyFromDate(selectedAnchor):'';
-  return `<div class="duration-bars" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const isSelected=!!x.anchor&&weekKeyFromDate(x.anchor)===selectedWeek;const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0" aria-pressed="${isSelected?'true':'false'}"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}${isSelected?' is-selected':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${x.value?esc(show(x.value)):'0'}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
+  return `<div class="duration-bars${compactAnnual?' is-year':''}" role="img" aria-label="Durées d’entraînement : ${esc(series.map(x=>x.label+', '+show(x.value)).join(' ; '))}">${series.map(x=>{const pct=x.value>0?Math.max(3,Math.round(x.value/ceil*100)):0;const valueLabel=x.value?(compactAnnual?compact(x.value):show(x.value)):"";const title=x.label+' : '+show(x.value)+(x.missing?' · '+x.missing+' séance(s) sans durée renseignée':'');const isSelected=!!x.anchor&&weekKeyFromDate(x.anchor)===selectedWeek;const weekAttrs=x.anchor?` data-overview-week="${esc(x.anchor)}" role="button" tabindex="0" aria-pressed="${isSelected?'true':'false'}"`:"";return `<div class="duration-bar-col${x.anchor?' is-clickable':''}${isSelected?' is-selected':''}"${weekAttrs} title="${esc(title)}" aria-label="${esc(title)}"><b>${esc(valueLabel)}${x.missing?'<sup title="Séances sans durée renseignée">*</sup>':''}</b><div class="duration-bar-space"><i class="${x.value?'':'duration-zero'}" style="${x.value?'height:'+pct+'%':'height:4px'}"></i></div><span>${esc(x.label)}</span></div>`;}).join('')}</div>${series.some(x=>x.missing)?'<p class="duration-data-hint">* Certaines séances sans durée ne sont pas comptées comme zéro minute.</p>':''}`;
 }
 function overviewDonut(distribution,total){
   const palette=["#f2cf72","#d7ad50","#f0d596","#9e8655","#c9973d","#b9934b"];
@@ -2882,5 +2884,5 @@ render();
 if(isPageReload)requestAnimationFrame(()=>window.scrollTo({top:reloadScrollY,left:0,behavior:"auto"}));
 else if(view.type==="root")restoreTabScroll(tab);
 showBackupReminder();
-if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242521",{updateViaCache:"none"}).catch(()=>{});
+if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js?v=242524",{updateViaCache:"none"}).catch(()=>{});
 })();
