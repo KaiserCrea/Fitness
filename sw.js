@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-26-04-metal-gradient";
+const CACHE = "fitness-v24-26-05-metal-gradient-v2";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",
@@ -43,7 +43,7 @@ self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache=await caches.open(CACHE);
     // A missing optional older image must never block the updated app from installing.
-    await cache.addAll(["./", "./index.html", "./app.js?v=242521", "./app.css?v=242520", "./data.js?v=24241", "./sheet-layouts.js", "./thumbnail-map.js?v=24253"]);
+    await cache.addAll(["./", "./index.html", "./app.js?v=242521", "./app.css?v=242521", "./data.js?v=24241", "./sheet-layouts.js", "./thumbnail-map.js?v=24253"]);
     await Promise.allSettled(ROOT.map(path=>cache.add(path)));
     await self.skipWaiting();
   })());
