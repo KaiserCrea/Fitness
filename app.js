@@ -2682,17 +2682,23 @@ function guideScreen(title,providedSteps,options={}){
  function countdown(token){
    if(token!==prepToken||model.paused||model.finished)return;
    const seconds=3;
-   model.phase='prep';model.remaining=seconds;
+   model.phase='intro';model.remaining=seconds;
    prepLength=seconds;prepStarted=false;announcedCues=new Set();
    let fallback=null;
    const beginVisual=()=>{
      if(prepStarted||token!==prepToken||model.paused||model.finished)return;
-     prepStarted=true;clearTimeout(fallback);beginTicker(seconds);
+     prepStarted=true;clearTimeout(fallback);
+     model.phase='prep';beginTicker(seconds);
    };
    if(model.voice){
-     // The first number starts the countdown; subsequent numbers follow the true clock.
-     fallback=setTimeout(beginVisual,2500);
-     if(!voiceGuide(model.source==='circuit'?'Préparez-vous. '+model.steps[model.index].name+'. '+(model.steps[model.index].target||'')+'. Trois': 'Trois',true,undefined,{onStart:beginVisual}))beginVisual();
+     // Wait for the entire spoken introduction before starting the 3-second preparation.
+     // The watchdog only handles browsers that fail to dispatch speech completion.
+     const step=model.steps[model.index];
+     const announcement=model.source==='circuit'
+       ?'Préparez-vous. '+step.name+'. '+(step.target||'')+'.'
+       :'Préparez-vous.';
+     fallback=setTimeout(beginVisual,15000);
+     voiceGuide(announcement,true,beginVisual);
    }else beginVisual();
    renderActive();
  }
