@@ -2132,7 +2132,7 @@ function historyExercisesForDisplay(h){
     'ex-curl-marteau-avec-halteres','ex-curl-biceps-a-la-poulie-basse-en-v'];
   if(h.date==='2026-09-28'&&h.session==='G1B'&&!h.ephemeral&&rows.length===7&&
     rows.every((e,i)=>canonicalId(e.id)===canonicalId(expected[i])&&(!e.no||e.no===i+1))){
-    rows.push({id:'ex-circuit-abdos-8-min',name:'Circuit abdos 8 min',status:'Non réalisé',no:8});
+    rows.push({id:'ex-circuit-abdos-8-min',name:'Circuit abdos',status:'Non réalisé',no:8});
   }
   return rows;
 }
@@ -2463,7 +2463,7 @@ function openCircuitGuide(id,session,no){
  const key='circuit:'+session+':'+no+':'+id;
  const cfg=state.guideConfigs?.[key]||{};
  const steps=circuitSettings(id,session,no).steps;
- const title=(intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name).replace(/8\s*min/i,cfg.durationLabel||(intensive?'10 min':'12 min'));
+ const title=intensive?'Circuit abdos intensif':exercise(id).name;
  const rounds=1;
  guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds,loopToTarget:true,targetSeconds:cfg.targetSeconds||athDurationSeconds(cfg.durationLabel)||(intensive?600:720),voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
 }
