@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-26-06-annual-labels";
+const CACHE = "fitness-v24-27-00-circuits";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",

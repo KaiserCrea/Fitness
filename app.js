@@ -451,7 +451,7 @@ const REP_TARGETS_BY_ORIGINAL_SLOT=Object.freeze({
   'FULL MIX 4|8':'15–20','FULL MIX 4|9':'15–20'
 });
 function repetitionTargetFor(id,session){
-  if(id==='ex-flexion-laterale-lestee-sur-banc-decline-avec-kettlebell')return '20–40';
+  if(id==='ex-flexion-laterale-lestee-sur-banc-decline-avec-kettlebell'||id==='ex-crunch-leste-sur-banc-decline-10-kg')return '20–40';
   // Historical Smith workout already open during the update keeps its FM1 target.
   if(id==='ex-developpe-incline-a-la-smith-machine'&&session==='FULL MIX 1')return '10–15';
   if(session){
@@ -850,7 +850,7 @@ function openSetResultsModal(id,no,current,onDone,options={}){
  const last=isNumericWeight(current)?current:latestExerciseWeight(id);
  const weightEditor=(value='')=>`<div class="weight-entry"><input id="failed-weight" type="text" inputmode="text" autocomplete="off" autocapitalize="off" value="${esc(value)}" placeholder="Ex. : 40 ou 2×40"><button type="button" class="weight-times" aria-label="Insérer le signe multiplication" title="Insérer ×">×</button></div><div class="tiny muted">2×40 représente deux disques de 40 kg, sans supposer le poids de la barre.</div>`;
  const loadMarkup=options.markFailed?`<div class="field initial-failure-load"><label for="failed-weight">Charge réellement utilisée (kg) — modifiable</label>${weightEditor(last)}<label class="failure-bodyweight"><input type="checkbox" id="failed-no-load"> Sans charge / poids du corps</label><div class="tiny muted">Laissez le champ vide si aucune charge n'est connue ; la référence prévue ne sera pas modifiée automatiquement.</div></div>`:'';
- openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(last||current))}</p>${loadMarkup}${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{
+ openModal(`<h3>Répétitions réellement réalisées</h3><p>${esc(exercise(id).name)} · ${esc(refWithUnit(last||current))}</p>${loadMarkup}${previous?`<p class="tiny muted">Dernière fois : ${esc(previous.sets.join(' / '))} (${esc(previous.weight)})</p>`:''}<div class="param-grid">${Array.from({length:count},(_,i)=>`<div class="field"><label>Série ${i+1}</label><input data-set-reps="${i}" inputmode="numeric" type="number" min="0" max="200" value="${saved[i]??previous?.sets?.[i]??(Number.isFinite(base)?base:'')}"></div>`).join('')}</div><p class="tiny muted">${bounds?`Plage cible : ${bounds.min}–${bounds.max}. `:''}Saisissez les répétitions réellement faites, y compris la série inachevée.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Annuler</button><button class="btn gold" id="save-set-results">Enregistrer</button></div>`,()=>{
    const noLoad=$('#failed-no-load'),weightInput=$('#failed-weight');
    if(noLoad&&weightInput)noLoad.onchange=()=>{weightInput.disabled=noLoad.checked;};
    const times=$('.weight-times');if(times&&weightInput)times.onclick=()=>{
@@ -1686,6 +1686,11 @@ function athleticProgressMarkup(){
 }
 function openAthProgressDetail(key){
   const [session,indexRaw]=key.split('|'),index=Number(indexRaw),arr=(state.athPerformance||[]).filter(x=>x.session===session&&Number(x.index)===index).sort((a,b)=>String(a.date).localeCompare(String(b.date)));if(!arr.length)return;const last=arr.at(-1),keys=[...new Set(arr.flatMap(x=>Object.keys(x.metrics||{})))],primary=Object.keys(last.metrics||{}).find(k=>["distanceM","distanceKm","loadKg","speedKmh","passages"].includes(k))||null,plotRows=primary?athComparableRows(arr,primary,last):[],nums=plotRows.map(x=>({x:x.date,y:athMetricNumber(x.metrics?.[primary])})).filter(x=>x.y!=null);openModal(`<h3>${esc(last.name)}</h3><p class="tiny muted">${esc(niceSession(session))} · évolution objective enregistrée</p>${primary?`<div class="chart ath-mini-chart">${lineChart(nums)}</div><div class="tiny muted">Courbe : ${esc(athMetricLabel(primary))}, mêmes réglages que la dernière séance</div>`:''}<div class="ath-detail-history">${arr.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${formatDate(x.date)}</b><span>${keys.map(k=>`${esc(athMetricLabel(k))} : ${esc(athMetricDisplay(k,x.metrics?.[k]))}`).join(' · ')}</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);}
+function circuitProgressMarkup(){
+ const entries=state.circuitPerformances||[];
+ const grouped=new Map();for(const x of entries){const group=x.id==='ex-circuit-abdos-intensif-8-min'?'Intensif':'Classique';if(!grouped.has(group))grouped.set(group,[]);grouped.get(group).push(x);}
+ return `<section class="ath-progress-section is-open"><div class="ath-progress-toggle" style="cursor:default"><span><b>Circuits abdos — performances</b><small>${entries.length} séance(s) guidée(s) enregistrée(s)</small></span></div><div class="ath-progress-list" style="display:block">${[...grouped].map(([name,rows])=>`<div class="ath-progress-card" style="display:block"><b>Circuit abdos ${esc(name.toLowerCase())}</b>${rows.slice(-12).reverse().map(x=>`<div class="ath-detail-row"><b>${esc(formatDate(x.date))} · ${Math.round(x.targetSeconds/60)} min</b><span>${Math.floor(x.movements/x.stepCount)} tour(s) + ${x.movements%x.stepCount} mouvement(s) · ${esc(x.status)} · ${Math.floor(x.elapsedSeconds/60)} min ${String(x.elapsedSeconds%60).padStart(2,'0')} s</span></div>`).join('')}</div>`).join('')||'<div class="card empty">Les résultats des circuits apparaîtront ici après un guidage terminé.</div>'}</div></section>`;
+}
 function renderProgressPerformance(){
   const cacheKey=progressionPeriod+"|"+progressionGroup+"|status:"+progressionStatusFilter+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0");
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
@@ -1702,6 +1707,7 @@ function renderProgressPerformance(){
     progressionStatusFilter==="average"?ids.filter(id=>contributions.has(id)):ids;
   const html=`${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${athleticProgressMarkup()}
+    ${circuitProgressMarkup()}
     <div class="metrics performance-summary"><button type="button" class="metric metric-action ${progressionStatusFilter==="all"?"is-active":""}" data-performance-filter="all" aria-pressed="${progressionStatusFilter==="all"?"true":"false"}"><b>${active.length}</b><span>Exercices suivis</span></button><button type="button" class="metric metric-action ${progressionStatusFilter==="progressing"?"is-active":""}" data-performance-filter="progressing" aria-pressed="${progressionStatusFilter==="progressing"?"true":"false"}"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></button><button type="button" class="metric metric-action ${progressionStatusFilter==="average"?"is-active":""}" data-performance-filter="average" aria-pressed="${progressionStatusFilter==="average"?"true":"false"}"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></button></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
     ${progressionStatusFilter==='average'?`<p class="tiny muted average-explanation">${contributions.size} exercice${contributions.size>1?'s':''} pris en compte dans la moyenne, y compris les évolutions stables ou en baisse.</p>`:''}
@@ -2146,17 +2152,29 @@ function renderHistoryDetail(id){
 
 // Circuit preferences are indexed by SESSION + OCCURRENCE: changing G2C must not edit G1B.
 function circuitKey(id,session,no){return 'circuit:'+session+':'+no+':'+id;}
+function reconcileCircuitSteps(id,session,no,stored){
+ const defaults=circuitGuideSteps(id,session,no);
+ // Preserve individually customized targets while migrating the old standard
+ // circuit order and default ranges to the newly approved program.
+ if(id==='ex-circuit-abdos-intensif-8-min')return clone(stored);
+ const oldDefaults={'Crunch classique':'10 à 20 répétitions','Ciseaux':'20 à 40 secondes','Relevé de jambes':'10 à 20 répétitions','Planche':'30 à 60 secondes','Toucher talons':'15 à 25 répétitions','Crunch inversé':'10 à 15 répétitions','Gainage latéral — côté droit':'30 à 45 secondes · côté droit','Gainage latéral — côté gauche':'30 à 45 secondes · côté gauche','Mountain climbers':'30 à 60 secondes'};
+ const byName=new Map(stored.map(x=>[x.name,x]));
+ return defaults.map(d=>{const old=byName.get(d.name);if(!old)return d;
+   if(old.target===oldDefaults[d.name])return d;
+   return {...d,...old,ficheNo:d.ficheNo,preview:d.preview};
+ });
+}
 function circuitSettings(id,session,no){
   const cfg=state.guideConfigs?.[circuitKey(id,session,no)]||{},base=defaultParams(id);
-  return {key:circuitKey(id,session,no),cfg,params:{type:'circuit',duree:cfg.durationLabel||base.duree||'8 min',tours:String(cfg.toursLabel||base.tours||'1')},
-    steps:Array.isArray(cfg.steps)&&cfg.steps.length&&cfg.steps.every(s=>s&&typeof s.name==='string')?clone(cfg.steps):circuitGuideSteps(id,session,no)};
+  return {key:circuitKey(id,session,no),cfg,params:{type:'circuit',duree:cfg.durationLabel||(id==='ex-circuit-abdos-intensif-8-min'?'10 min':'12 min'),tours:'Automatiques'},
+    steps:Array.isArray(cfg.steps)&&cfg.steps.length&&cfg.steps.every(s=>s&&typeof s.name==='string')?reconcileCircuitSteps(id,session,no,cfg.steps):circuitGuideSteps(id,session,no)};
 }
 function circuitSettingsMarkup(id,session,no){
   const {cfg,steps}=circuitSettings(id,session,no);
   return `<div class="circuit-tuning"><h3>Réglages par mouvement</h3><p class="tiny muted">Chaque valeur remplace l’objectif du circuit guidé. Les répétitions se valident manuellement.</p>
     ${steps.map((s,i)=>`<div class="circuit-tune-row"><label for="circuit-step-${i}">${i+1}. ${esc(s.name)} <span>${s.manual?'Répétitions':'Durée (secondes)'}</span></label><input id="circuit-step-${i}" data-circuit-value="${i}" type="number" inputmode="numeric" min="${s.manual?1:5}" max="${s.manual?500:3600}" value="${esc(s.manual?(s.repetitions||repNumber(s.target)||15):(s.seconds||45))}"></div>`).join('')}
     <div class="param-grid"><div class="field"><label>Repos entre tours (secondes)</label><input type="number" inputmode="numeric" min="0" max="600" data-circuit-round-rest value="${esc(cfg.roundRest??(id==='ex-circuit-abdos-intensif-8-min'?30:0))}"></div></div>
-    <p class="tiny muted">Avec 1 tour, le circuit se répète jusqu’à la durée totale. Avec plusieurs tours, il se termine à la fin du nombre choisi.</p>
+    <p class="tiny muted">Les tours sont automatiques jusqu’à la durée totale choisie.</p>
   </div>`;
 }
 function readCircuitSettings(overlay,id,session,no){
@@ -2165,7 +2183,7 @@ function readCircuitSettings(overlay,id,session,no){
   const durationMatch=rawDuration.match(/^(\d+(?:\.\d+)?)\s*(min(?:utes?)?|s(?:econdes?)?)?$/i);
   if(!durationMatch){alert('Durée totale : indiquez par exemple 8 min ou 480 s.');return null;}
   const targetSeconds=Math.round(Number(durationMatch[1])*(durationMatch[2]?.toLowerCase().startsWith('s')?1:60));
-  const rounds=Number($('[data-param="tours"]',overlay)?.value);
+  const rounds=1;
   // The technical-sheet field was removed by request. Its existing timing is
   // retained and remains editable in the dedicated guided-workout controls.
   const rest=Number(cfg.rest??0),roundRest=Number($('[data-circuit-round-rest]',overlay)?.value);
@@ -2187,14 +2205,14 @@ function readCircuitSettings(overlay,id,session,no){
       step.seconds=value;step.target=value+' secondes'+suffix;
     }
   }
-  return {key,next:{...cfg,steps,rest,roundRest,rounds,loopToTarget:rounds===1,targetSeconds,durationLabel:rawDuration,toursLabel:String(rounds)}};
+  return {key,next:{...cfg,steps,rest,roundRest,rounds,loopToTarget:true,targetSeconds,durationLabel:rawDuration,toursLabel:'Automatiques'}};
 }
 function openSheet(id,session,no){
   const e=exercise(id),img=sheetFor(id,session,no),p=isAbCircuit(id)?circuitSettings(id,session,no).params:defaultParams(id);
   const overlay=document.createElement("div");overlay.className="sheet-overlay";overlay.innerHTML=`<div class="sheet">
     <button class="sheet-close" data-close-sheet>Fermer</button>
     <div class="sheet-canvas fiche-visual">${img?`<img data-fallback src="${img}" alt="${esc(e.name)}">`:`<div class="empty" style="min-height:360px">Fiche technique non associée.</div>`}</div>
-    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel(circuitKey(id,session,no)))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id,session)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id,session))}</b></div>`:""}<div class="param-grid">${paramInputs(p)}</div>${isAbCircuit(id)?circuitSettingsMarkup(id,session,no):''}<button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
+    <div class="sheet-params">${isAbCircuit(id)?`<button class="btn gold block sheet-guide-start" id="sheet-guide-start">${esc(guideEntryLabel(circuitKey(id,session,no)))}</button>`:''}<h3>Paramètres de l’exercice</h3>${repetitionTargetFor(id,session)?`<div class="rep-target-callout"><span>Répétitions cibles</span><b>${esc(repetitionTargetFor(id,session))}</b></div>`:""}<div class="param-grid">${paramInputs(isAbCircuit(id)?{type:'circuit',duree:p.duree}:p)}</div>${isAbCircuit(id)?circuitSettingsMarkup(id,session,no):''}<button class="btn gold block" id="save-params" style="margin-top:10px">Enregistrer</button></div>
   </div>`;
   overlayRoot.innerHTML="";overlayRoot.appendChild(overlay);history.pushState(Object.assign(navState(),{overlay:"sheet"}),"");
   $("[data-close-sheet]",overlay).onclick=()=>closeOverlay(true);
@@ -2413,15 +2431,15 @@ function voiceGuide(text,enabled,onDone,options={}){
 }
 function stopVoiceGuide(){try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch{}}
 const CIRCUIT_FULL=[
- {name:'Crunch classique',target:'10 à 20 répétitions',manual:true},
- {name:'Ciseaux',target:'20 à 40 secondes',seconds:30},
- {name:'Relevé de jambes',target:'10 à 20 répétitions',manual:true},
- {name:'Planche',target:'30 à 60 secondes',seconds:45},
- {name:'Toucher talons',target:'15 à 25 répétitions',manual:true},
- {name:'Crunch inversé',target:'10 à 15 répétitions',manual:true},
- {name:'Gainage latéral — côté droit',target:'30 à 45 secondes · côté droit',seconds:40,ficheNo:7},
- {name:'Gainage latéral — côté gauche',target:'30 à 45 secondes · côté gauche',seconds:40,ficheNo:7},
- {name:'Mountain climbers',target:'30 à 60 secondes',seconds:45,ficheNo:8}
+ {name:'Crunch classique',target:'20 répétitions',repetitions:20,manual:true,ficheNo:1},
+ {name:'Ciseaux',target:'30 secondes',seconds:30,ficheNo:2},
+ {name:'Relevé de jambes',target:'15 répétitions',repetitions:15,manual:true,ficheNo:3},
+ {name:'Toucher talons',target:'20 répétitions',repetitions:20,manual:true,ficheNo:5},
+ {name:'Crunch inversé',target:'15 répétitions',repetitions:15,manual:true,ficheNo:6},
+ {name:'Mountain climbers',target:'45 secondes',seconds:45,ficheNo:8},
+ {name:'Planche',target:'60 secondes',seconds:60,ficheNo:4},
+ {name:'Gainage latéral — côté droit',target:'30 secondes · côté droit',seconds:30,ficheNo:7},
+ {name:'Gainage latéral — côté gauche',target:'30 secondes · côté gauche',seconds:30,ficheNo:7}
 ];
 const CIRCUIT_INTENSIVE=[
  {name:'V-ups',target:'15 répétitions',manual:true},
@@ -2435,7 +2453,7 @@ function circuitGuideSteps(id,session,no){
  const sheetSession=intensive?'FM2':(['G1B','G2C','G3A','G3B'].includes(session)?session:(id==='ex-circuit-abdos-8-min'?'G1B':'G3B'));
  const raw=(intensive?CIRCUIT_INTENSIVE:CIRCUIT_FULL).map(x=>({...x}));
  if(sheetSession==='G3A'){
-   raw[5]={name:'Rouleau abdominal',target:'10 à 15 répétitions',manual:true};
+   raw[4]={name:'Rouleau abdominal',target:'15 répétitions',repetitions:15,manual:true,ficheNo:6};
  }
  return raw.map((x,i)=>({...x,ficheNo:x.ficheNo||i+1,preview:`assets/guide/${sheetSession}-${String(x.ficheNo||i+1).padStart(2,'0')}.jpg`}));
 }
@@ -2445,9 +2463,9 @@ function openCircuitGuide(id,session,no){
  const key='circuit:'+session+':'+no+':'+id;
  const cfg=state.guideConfigs?.[key]||{};
  const steps=circuitSettings(id,session,no).steps;
- const title=(intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name).replace(/8\s*min/i,cfg.durationLabel||'8 min');
- const rounds=Number(cfg.rounds)||1;
- guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds,loopToTarget:rounds===1,targetSeconds:cfg.targetSeconds||athDurationSeconds(cfg.durationLabel)||480,voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
+ const title=(intensive?'Circuit Abdos Intensif — 8 min':exercise(id).name).replace(/8\s*min/i,cfg.durationLabel||(intensive?'10 min':'12 min'));
+ const rounds=1;
+ guideScreen(title,steps,{key,source:'circuit',editable:true,session,no,id,rest:cfg.rest??0,roundRest:cfg.roundRest??(intensive?30:0),rounds,loopToTarget:true,targetSeconds:cfg.targetSeconds||athDurationSeconds(cfg.durationLabel)||(intensive?600:720),voice:cfg.voice!==false,fullSheet:sheetFor(id,session,no)});
 }
 function athDurationSeconds(value){
  const m=String(value||'').toLowerCase().match(/(\d+)\s*(min|minute|s|sec|seconde)/);
@@ -2520,10 +2538,10 @@ function guideScreen(title,providedSteps,options={}){
    localStorage.removeItem(GUIDE_DRAFT_KEY);draft=null;
  }
  const isResume=!!draft&&draft.key===key;
- const model=isResume?draft:{key,title,steps:providedSteps.map(x=>({...x})),index:0,round:1,rounds:options.rounds||1,rest:options.rest??0,roundRest:options.roundRest??0,loopToTarget:!!options.loopToTarget,targetSeconds:options.targetSeconds||0,voice:options.voice!==false,source:options.source||'',phase:'ready',remaining:0,elapsed:0,manualElapsed:0,started:false,paused:false,finished:false};
+ const model=isResume?draft:{key,title,steps:providedSteps.map(x=>({...x})),index:0,round:1,rounds:options.rounds||1,rest:options.rest??0,roundRest:options.roundRest??0,loopToTarget:!!options.loopToTarget,targetSeconds:options.targetSeconds||0,voice:options.voice!==false,source:options.source||'',phase:'ready',remaining:0,elapsed:0,manualElapsed:0,completedMovements:0,started:false,paused:false,finished:false};
  model.title=title;
  // Never replace an active draft's timing: only fresh guides read newly saved settings.
- if(model.source==='circuit'&&!isResume){model.rounds=options.rounds||1;model.loopToTarget=model.rounds===1;model.targetSeconds=options.targetSeconds||480;}
+ if(model.source==='circuit'&&!isResume){model.rounds=options.rounds||1;model.loopToTarget=true;model.targetSeconds=options.targetSeconds||480;}
  // Preserve paused ATH B sessions created before continuous-interval metadata existed.
  if(isResume&&model.source==='ath'&&model.steps.length===providedSteps.length){model.steps=model.steps.map((step,i)=>({...providedSteps[i],...step,intervalBlock:providedSteps[i].intervalBlock,recovery:providedSteps[i].recovery,athTimeCue:providedSteps[i].athTimeCue,athTimeBlock:providedSteps[i].athTimeBlock}));}
  if(isResume)model.paused=true; // Closing the window never silently restarts the workout.
@@ -2573,7 +2591,7 @@ function guideScreen(title,providedSteps,options={}){
     ${editing?`<div class="guide-move-actions"><button class="btn" data-guide-up="${i}" aria-label="Monter ${esc(s.name)}" ${i===0?'disabled':''}>↑</button><button class="btn" data-guide-down="${i}" aria-label="Descendre ${esc(s.name)}" ${i===model.steps.length-1?'disabled':''}>↓</button></div>`:(i===model.index?'<span class="guide-current-mark">EN COURS</span>':'')}
    </div>`).join('');
   if(editing){
-   function updateRow(i){const s=model.steps[i];const name=$(`[data-guide-name="${i}"]`,list),target=$(`[data-guide-target="${i}"]`,list),seconds=$(`[data-guide-seconds="${i}"]`,list);if(name)s.name=name.value.slice(0,100);if(target)s.target=target.value.slice(0,90);if(seconds){const n=Number(seconds.value);if(Number.isInteger(n)&&n>=5&&n<=3600)s.seconds=n;}}
+   function updateRow(i){const s=model.steps[i];const name=$(`[data-guide-name="${i}"]`,list),target=$(`[data-guide-target="${i}"]`,list),seconds=$(`[data-guide-seconds="${i}"]`,list);if(name)s.name=name.value.slice(0,100);if(target)s.target=target.value.slice(0,90);if(seconds){const n=Number(seconds.value);if(Number.isInteger(n)&&n>=5&&n<=3600){s.seconds=n;s.target=n+' secondes';}}}
    $$('[data-guide-name],[data-guide-target],[data-guide-seconds]',list).forEach(input=>input.onchange=()=>{updateRow(Number(input.dataset.guideName??input.dataset.guideTarget??input.dataset.guideSeconds));renderActive();});
    $$('[data-guide-up],[data-guide-down]',list).forEach(btn=>btn.onclick=()=>{const i=Number(btn.dataset.guideUp??btn.dataset.guideDown),next=btn.dataset.guideUp!==undefined?i-1:i+1;model.steps.forEach((s,j)=>updateRow(j));[model.steps[i],model.steps[next]]=[model.steps[next],model.steps[i]];renderList();renderActive();});
   }
@@ -2594,7 +2612,7 @@ function guideScreen(title,providedSteps,options={}){
   done.textContent=model.phase==='rest'?'Passer le repos':'Exercice suivant';
   el('guide-config').hidden=model.started;
   if(el('guide-edit'))el('guide-edit').disabled=model.started;
-  el('guide-status').textContent=model.finished?'Séance terminée. Vous pouvez fermer cette fenêtre.':model.loopToTarget&&model.elapsed>=model.targetSeconds?'Objectif atteint : terminez le mouvement en cours pour clôturer la séance.':'';
+  el('guide-status').textContent=model.finished?(model.source==='circuit'?'Circuit terminé : '+(model.completedMovements||0)+' mouvements validés. Résultat enregistré.':'Séance terminée. Vous pouvez fermer cette fenêtre.'):model.loopToTarget&&model.elapsed>=model.targetSeconds?'Objectif atteint : terminez le mouvement en cours pour clôturer la séance.':'';
  }
  function isContinuousTransition(){
    const current=model.steps[model.index],next=model.steps[model.index+1];
@@ -2663,7 +2681,7 @@ function guideScreen(title,providedSteps,options={}){
  }
  function countdown(token){
    if(token!==prepToken||model.paused||model.finished)return;
-   const seconds=model.source==='circuit'?5:3;
+   const seconds=3;
    model.phase='prep';model.remaining=seconds;
    prepLength=seconds;prepStarted=false;announcedCues=new Set();
    let fallback=null;
@@ -2674,7 +2692,7 @@ function guideScreen(title,providedSteps,options={}){
    if(model.voice){
      // The first number starts the countdown; subsequent numbers follow the true clock.
      fallback=setTimeout(beginVisual,2500);
-     if(!voiceGuide(seconds===5?'Cinq':'Trois',true,undefined,{onStart:beginVisual}))beginVisual();
+     if(!voiceGuide(model.source==='circuit'?'Préparez-vous. '+model.steps[model.index].name+'. '+(model.steps[model.index].target||'')+'. Trois': 'Trois',true,undefined,{onStart:beginVisual}))beginVisual();
    }else beginVisual();
    renderActive();
  }
@@ -2682,13 +2700,8 @@ function guideScreen(title,providedSteps,options={}){
    stopTicker();stopVoiceGuide();const token=++prepToken;
    model.phase='intro';model.remaining=3;model.countdownSpoken=false;
    renderList();renderActive();persist();
-   let completed=false;
-   const next=()=>{
-     if(completed||token!==prepToken||model.paused||model.finished)return;
-     completed=true;clearTimeout(fallback);countdown(token);
-   };
-   const fallback=setTimeout(next,14000);
-   voiceGuide('Préparez-vous. '+model.steps[model.index].name+'. '+(model.steps[model.index].target||''),model.voice,next);
+   // One three-second preparation only, not presentation + another countdown.
+   countdown(token);
  }
  function startWork(options={}){
    if(model.finished||model.paused)return;
@@ -2732,12 +2745,13 @@ function guideScreen(title,providedSteps,options={}){
  }
  function completeStep(){
   if(model.finished)return;
+  if(model.source==='circuit')model.completedMovements=(model.completedMovements||0)+1;
   if(isContinuousTransition()){
     // The global elapsed clock is continuous; only the phase countdown is reset.
     model.index++;startWork({continuous:true});return;
   }
   stopTicker();
-  // The eight-minute objective ends AFTER the current movement, never mid-repetition.
+  // The configured circuit objective ends AFTER the current movement, never mid-repetition.
   if(model.loopToTarget&&model.elapsed>=model.targetSeconds){voiceGuide('Stop',model.voice);finish();return;}
   // Round recovery is handled only at round boundaries, never after the final exercise.
   if(model.index===model.steps.length-1){voiceGuide('Stop',model.voice);advance();return;}
@@ -2745,6 +2759,13 @@ function guideScreen(title,providedSteps,options={}){
   else{advance();}
  }
  function finish(){
+  if(model.source==='circuit'&&model.started){
+    const entry={date:localISODate(),key:model.key,id:options.id,session:options.session,no:options.no,targetSeconds:model.targetSeconds,elapsedSeconds:Math.round(model.elapsed),movements:model.completedMovements||0,stepCount:model.steps.length,roundRest:model.roundRest,steps:model.steps.map(s=>({name:s.name,target:s.target,seconds:s.seconds||0,repetitions:s.repetitions||0}))};
+    state.circuitPerformances=state.circuitPerformances||[];
+    const previous=[...state.circuitPerformances].reverse().find(x=>x.key===entry.key&&x.targetSeconds===entry.targetSeconds&&x.roundRest===entry.roundRest&&JSON.stringify(x.steps)===JSON.stringify(entry.steps));
+    entry.status=!previous?'Première référence':entry.movements>previous.movements?'Réussi':entry.movements===previous.movements?'Réussi — maintien':'Échoué';
+    state.circuitPerformances.push(entry);performanceMarkupCache.clear();save();
+  }
   stopTicker();model.finished=true;model.paused=false;model.phase='done';localStorage.removeItem(GUIDE_DRAFT_KEY);refreshGuideEntrypoints();renderActive();renderList();voiceGuide('Séance terminée',model.voice);
  }
  function freeze(){
@@ -2755,11 +2776,11 @@ function guideScreen(title,providedSteps,options={}){
   const rest=Number(el('guide-rest').value),roundRest=Number(el('guide-round-rest').value),rounds=model.source==='circuit'?model.rounds:Number(el('guide-rounds').value);
   if(![rest,roundRest].every(x=>Number.isInteger(x)&&x>=0&&x<=600)||!Number.isInteger(rounds)||rounds<1||rounds>30){alert('Réglages invalides : repos 0–600 secondes et tours 1–30.');return false;}
   model.rest=rest;model.roundRest=model.source==='ath'?0:roundRest;model.rounds=model.source==='ath'?1:rounds;model.voice=el('guide-voice').checked;
-  if(model.source==='circuit')model.loopToTarget=model.rounds===1;
+  if(model.source==='circuit')model.loopToTarget=true;
   if(editing)toggleEdit();storeConfig();return true;
  }
  function toggleEdit(){
-  if(editing){model.steps.forEach((s,i)=>{const name=$(`[data-guide-name="${i}"]`,list),target=$(`[data-guide-target="${i}"]`,list),seconds=$(`[data-guide-seconds="${i}"]`,list);if(name&&name.value.trim())s.name=name.value.trim().slice(0,100);if(target)s.target=target.value.trim().slice(0,90);if(seconds){const n=Number(seconds.value);if(Number.isInteger(n)&&n>=5&&n<=3600)s.seconds=n;}});}
+  if(editing){model.steps.forEach((s,i)=>{const name=$(`[data-guide-name="${i}"]`,list),target=$(`[data-guide-target="${i}"]`,list),seconds=$(`[data-guide-seconds="${i}"]`,list);if(name&&name.value.trim())s.name=name.value.trim().slice(0,100);if(target)s.target=target.value.trim().slice(0,90);if(seconds){const n=Number(seconds.value);if(Number.isInteger(n)&&n>=5&&n<=3600){s.seconds=n;s.target=n+' secondes';}}});}
   editing=!editing;el('guide-edit').textContent=editing?'Terminer':'Modifier';renderList();renderActive();
  }
  if(el('guide-edit'))el('guide-edit').onclick=toggleEdit;
