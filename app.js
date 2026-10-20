@@ -2690,6 +2690,15 @@ function guideScreen(title,providedSteps,options={}){
      prepStarted=true;clearTimeout(fallback);
      model.phase='prep';beginTicker(seconds);
    };
+   const beginSpokenCountdown=()=>{
+     if(token!==prepToken||model.paused||model.finished)return;
+     if(model.voice){
+       // Start the visible 3-second countdown when "Trois" actually begins speaking.
+       // The subsequent 2 and 1 cues are still handled by tick().
+       const watchdog=setTimeout(beginVisual,2200);
+       voiceGuide('Trois',true,undefined,{interrupt:false,onStart:()=>{clearTimeout(watchdog);beginVisual();}});
+     }else beginVisual();
+   };
    if(model.voice){
      // Wait for the entire spoken introduction before starting the 3-second preparation.
      // The watchdog only handles browsers that fail to dispatch speech completion.
@@ -2697,9 +2706,9 @@ function guideScreen(title,providedSteps,options={}){
      const announcement=model.source==='circuit'
        ?'Préparez-vous. '+step.name+'. '+(step.target||'')+'.'
        :'Préparez-vous.';
-     fallback=setTimeout(beginVisual,15000);
-     voiceGuide(announcement,true,beginVisual);
-   }else beginVisual();
+     fallback=setTimeout(beginSpokenCountdown,15000);
+     voiceGuide(announcement,true,beginSpokenCountdown);
+   }else beginSpokenCountdown();
    renderActive();
  }
  function prepare(){
