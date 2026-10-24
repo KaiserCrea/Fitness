@@ -749,7 +749,7 @@ function todayExerciseCard(id,session,no,cur){
     <div class="ex-info"><div class="ex-name"><span class="inline-no">${no}.</span> ${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><div class="ex-ref">Charge / référence prévue <b>${esc(refWithUnit(ref))}</b></div>${actualSetsFor(id)?`<div class="tiny muted">Dernière fois : ${esc(actualSetsFor(id).sets.join(" / "))} · ${esc(refWithUnit(actualSetsFor(id).weight))}</div>`:""}${cur.setReps?.[occKey(id,no)]?`<div class="tiny gold">Aujourd’hui : ${esc(cur.setReps[occKey(id,no)].join(" / "))}</div>`:""}</div>
     <button class="backlink chev" data-sheet="${esc(id)}" data-session="${esc(session)}" data-no="${no}" aria-label="Voir la fiche">${icon("chevron")}</button>
     ${isAbCircuit(id)?`<div class="circuit-guide-entry"><button class="btn guide-entry" data-circuit-guide="${esc(id)}" data-session="${esc(session)}" data-no="${no}">${esc(guideEntryLabel('circuit:'+session+':'+no+':'+id))}</button></div>`:''}<div class="status-actions">
-      ${[["Réussi","check"],["Échoué","x"],["Non réalisé","ban"]].map(([x,ic])=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}">${icon(ic)} ${x}</button>`).join("")}
+      ${[["Réussi","check"],["Échoué","x"],["Non réalisé","ban"]].map(([x,ic])=>`<button class="status-btn ${st===x?"sel":""}" data-status="${x}" data-id="${esc(id)}" data-no="${no}" ${isAbCircuit(id)&&st&&x!=="Non réalisé"?"disabled":""}>${icon(ic)} ${x}</button>`).join("")}
     </div>
   </div>`;
 }
@@ -775,6 +775,7 @@ function cancelCurrentSession(){
   openModal(`<h3>Annuler la séance ?</h3><p>Les informations saisies pour cette séance seront supprimées. Le cycle, l’historique et les statistiques ne seront pas modifiés.</p><div class="modal-actions"><button class="btn ghost" data-close-modal>Continuer la séance</button><button class="btn gold" id="confirm-cancel-session">Annuler la séance</button></div>`,()=>{$("#confirm-cancel-session").onclick=finish;});
 }
 function setExerciseStatus(id,status,no){
+  if(isAbCircuit(id)&&status!=="Non réalisé")return;
   const cur=state.today;if(!cur)return;cur.status=cur.status||{};cur.values=cur.values||{};cur.nextRefs=cur.nextRefs||{};cur.reps=cur.reps||{};cur.nextReps=cur.nextReps||{};cur.setReps=cur.setReps||{};
   const key=occKey(id,no),current=occurrenceValue(cur,id,no);
   if(cur.status[key]===status){delete cur.status[key];delete cur.nextRefs[key];if(cur.setReps)delete cur.setReps[key];save();render();return;}
@@ -2560,7 +2561,7 @@ function guideScreen(title,providedSteps,options={}){
    <div class="guide-config" id="guide-config"><div class="param-grid"><div class="field"><label>Repos entre exercices (s)</label><input id="guide-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.rest}"></div><div class="field"><label>Repos entre tours (s)</label><input id="guide-round-rest" type="number" inputmode="numeric" min="0" max="600" value="${model.roundRest}"></div>${model.source==='ath'?'<div class="field"><label>Tours</label><input id="guide-rounds" type="number" inputmode="numeric" min="1" max="30" value="1" disabled></div>':`<div class="guide-auto-rounds">${model.loopToTarget?'Tours automatiques · objectif '+Math.round(model.targetSeconds/60)+' min':model.rounds+' tours programmés'}</div>`}</div>
    ${model.source==='circuit'?`<p class="guide-loop-label">${model.loopToTarget?'Un nouveau tour commence si la durée cible n’est pas atteinte.':'Le guidage s’arrête après les '+model.rounds+' tours définis.'} Les paramètres des mouvements se règlent depuis leur fiche avant le démarrage.</p>`:''}
    <label class="guide-check"><input id="guide-voice" type="checkbox" ${model.voice?'checked':''}> Coach vocal français</label></div>
-   <p id="guide-status" class="guide-status" role="status"></p>
+   <p id="guide-status" class="guide-status" role="status"></p><div id="guide-finish-summary" class="guide-finish-summary" hidden></div>
    <details id="guide-details" class="guide-details"><summary>Voir le déroulement <span>${model.steps.length} mouvements</span></summary><div class="guide-list-heading"><h3>Déroulement</h3>${options.editable?'<button class="btn guide-edit-btn" id="guide-edit" type="button">Modifier</button>':''}</div><div id="guide-list" class="guide-list"></div></details>
    <div class="v2418-guide-actions" role="group" aria-label="Commandes de séance"><button type="button" class="btn gold" id="guide-start">${isResume?'Reprendre':'Démarrer'}</button><button type="button" class="btn" id="guide-done" disabled>Exercice suivant</button><button type="button" class="btn guide-abandon" id="guide-abandon">Terminer définitivement</button></div>
    <p class="tiny muted guide-footnote">Le démarrage est manuel. Les exercices en répétitions passent au suivant uniquement après validation. En fermant cette fenêtre, la séance reste en pause et peut être reprise. La voix peut être interrompue si Android verrouille l’écran.</p>
@@ -2598,6 +2599,8 @@ function guideScreen(title,providedSteps,options={}){
  }
  function renderActive(){
   const step=model.steps[model.index];if(!step)return;
+  el('guide-active').hidden=!!model.finished&&model.source==='circuit';
+  el('guide-next').hidden=!!model.finished&&model.source==='circuit';
   el('guide-step-counter').textContent=`MOUVEMENT ${model.index+1}/${model.steps.length} · TOUR ${model.round}${model.loopToTarget?' · OBJECTIF '+timeText(model.targetSeconds):'/'+model.rounds}`;
   el('guide-step-name').textContent=step.name;
   el('guide-step-target').textContent=step.target|| (step.manual?'Validez à la fin des répétitions':'');
@@ -2607,12 +2610,14 @@ function guideScreen(title,providedSteps,options={}){
   el('guide-clock').textContent=timeText(model.phase==='work'&&step.manual?model.manualElapsed:model.remaining);
   el('guide-elapsed-value').textContent=timeText(model.elapsed);
   el('guide-elapsed-goal').textContent=model.targetSeconds?'Objectif : '+timeText(model.targetSeconds):'';
+  const summary=el("guide-finish-summary");
+  if(model.finished&&model.source==="circuit"){const n=model.completedMovements||0,total=model.steps.length||1;summary.hidden=false;summary.innerHTML=`<h3>Bilan du circuit</h3><p><b>${Math.floor(n/total)} tour(s) complet(s) + ${n%total} mouvement(s)</b></p><p>${n} mouvements validés · ${timeText(model.elapsed)} réalisés / ${timeText(model.targetSeconds)} prévus</p><p><b>${esc(model.finalStatus||"Première référence")}</b></p><p class="tiny muted">Résultat sauvegardé automatiquement dans les performances.</p>`;el("guide-abandon").textContent="Enregistrer et terminer";}else{summary.hidden=true;el("guide-abandon").textContent="Terminer définitivement";}
   start.disabled=model.finished;start.textContent=!model.started?'Démarrer':model.paused?'Reprendre':'Pause';
   done.disabled=!model.started||model.paused||model.finished||!['work','rest'].includes(model.phase);
   done.textContent=model.phase==='rest'?'Passer le repos':'Exercice suivant';
   el('guide-config').hidden=model.started;
   if(el('guide-edit'))el('guide-edit').disabled=model.started;
-  el('guide-status').textContent=model.finished?(model.source==='circuit'?'Circuit terminé : '+(model.completedMovements||0)+' mouvements validés. Résultat enregistré.':'Séance terminée. Vous pouvez fermer cette fenêtre.'):model.loopToTarget&&model.elapsed>=model.targetSeconds?'Objectif atteint : terminez le mouvement en cours pour clôturer la séance.':'';
+  el('guide-status').textContent=model.finished?(model.source==='circuit'?'Circuit terminé. Résultat enregistré.':'Séance terminée. Vous pouvez fermer cette fenêtre.'):model.loopToTarget&&model.elapsed>=model.targetSeconds?'Objectif atteint : terminez le mouvement en cours pour clôturer la séance.':'';
  }
  function isContinuousTransition(){
    const current=model.steps[model.index],next=model.steps[model.index+1];
@@ -2774,15 +2779,30 @@ function guideScreen(title,providedSteps,options={}){
   else{advance();}
  }
  function finish(){
+  if(model.finished)return; // Never save the same circuit twice.
+  stopTicker();model.finished=true;model.paused=false;model.phase='done';
   if(model.source==='circuit'&&model.started){
     const entry={date:localISODate(),key:model.key,id:options.id,session:options.session,no:options.no,targetSeconds:model.targetSeconds,elapsedSeconds:Math.round(model.elapsed),movements:model.completedMovements||0,stepCount:model.steps.length,roundRest:model.roundRest,steps:model.steps.map(s=>({name:s.name,target:s.target,seconds:s.seconds||0,repetitions:s.repetitions||0}))};
     state.circuitPerformances=state.circuitPerformances||[];
-    const previous=[...state.circuitPerformances].reverse().find(x=>x.key===entry.key&&x.targetSeconds===entry.targetSeconds&&x.roundRest===entry.roundRest&&JSON.stringify(x.steps)===JSON.stringify(entry.steps));
+    const previous=[...state.circuitPerformances].reverse().find(x=>x.id===entry.id&&x.targetSeconds===entry.targetSeconds&&x.roundRest===entry.roundRest&&JSON.stringify(x.steps)===JSON.stringify(entry.steps));
     entry.status=!previous?'Première référence':entry.movements>previous.movements?'Réussi':entry.movements===previous.movements?'Réussi — maintien':'Échoué';
-    state.circuitPerformances.push(entry);performanceMarkupCache.clear();save();
+    model.finalStatus=entry.status;
+    state.circuitPerformances.push(entry);
+    // The guided circuit is part of the current strength workout, not an unrelated result.
+    const cur=state.today;
+    if(cur&&cur.session===options.session&&activeSessionIds(cur)[Number(options.no)-1]===options.id){
+      cur.status=cur.status||{};
+      const key=occKey(options.id,options.no);
+      cur.status[key]=entry.status==='Échoué'?'Échoué':'Réussi';
+      if(Object.prototype.hasOwnProperty.call(cur.status,options.id))delete cur.status[options.id];
+      cur.circuitResults=cur.circuitResults||{};cur.circuitResults[key]={...entry};
+    }
+    performanceMarkupCache.clear();save();
   }
-  stopTicker();model.finished=true;model.paused=false;model.phase='done';localStorage.removeItem(GUIDE_DRAFT_KEY);refreshGuideEntrypoints();renderActive();renderList();voiceGuide('Séance terminée',model.voice);
+  localStorage.removeItem(GUIDE_DRAFT_KEY);
+  refreshGuideEntrypoints();renderActive();renderList();voiceGuide('Séance terminée',model.voice);
  }
+
  function freeze(){
   if(ticker){const now=Date.now();if(['work','rest'].includes(model.phase))model.elapsed+=Math.max(0,(now-lastTick)/1000);if(model.phase==='work'&&model.steps[model.index].manual)model.manualElapsed+=Math.max(0,Math.max(0,(now-lastTick)/1000));else model.remaining=Math.max(0,Math.ceil((deadline-now)/1000));stopTicker();}
   if(!model.finished){model.paused=true;++prepToken;stopVoiceGuide();renderActive();persist();}
@@ -2809,6 +2829,7 @@ function guideScreen(title,providedSteps,options={}){
  done.onclick=()=>{if(model.paused||model.finished)return;if(model.phase==='rest'){stopTicker();if(model.afterRest==='round'){model.afterRest='';prepare();}else advance();}else if(model.phase==='work')completeStep();};
  el('guide-abandon').onclick=()=>{
   if(model.started&&!model.finished&&!confirm('Terminer définitivement ce guidage ? La progression du chronomètre ne pourra plus être reprise.'))return;
+  if(model.finished){close(true);render();return;}
   model.finished=true;localStorage.removeItem(GUIDE_DRAFT_KEY);close(true);
  };
  if(isResume){el('guide-status').textContent='Séance conservée en pause. Appuyez sur Reprendre pour continuer.';}
