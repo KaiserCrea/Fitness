@@ -1692,8 +1692,26 @@ function circuitProgressMarkup(){
  const grouped=new Map();for(const x of entries){const group=x.id==='ex-circuit-abdos-intensif-8-min'?'Intensif':'Classique';if(!grouped.has(group))grouped.set(group,[]);grouped.get(group).push(x);}
  return `<section class="ath-progress-section is-open"><div class="ath-progress-toggle" style="cursor:default"><span><b>Circuits abdos — performances</b><small>${entries.length} séance(s) guidée(s) enregistrée(s)</small></span></div><div class="ath-progress-list" style="display:block">${[...grouped].map(([name,rows])=>`<div class="ath-progress-card" style="display:block"><b>Circuit abdos ${esc(name.toLowerCase())}</b>${rows.slice(-12).reverse().map(x=>`<div class="ath-detail-row"><b>${esc(formatDate(x.date))} · ${Math.round(x.targetSeconds/60)} min</b><span>${Math.floor(x.movements/x.stepCount)} tour(s) + ${x.movements%x.stepCount} mouvement(s) · ${esc(x.status)} · ${Math.floor(x.elapsedSeconds/60)} min ${String(x.elapsedSeconds%60).padStart(2,'0')} s</span></div>`).join('')}</div>`).join('')||'<div class="card empty">Les résultats des circuits apparaîtront ici après un guidage terminé.</div>'}</div></section>`;
 }
+function circuitRowsForProgress(id){
+  const cid=canonicalId(id);
+  return (state.circuitPerformances||[]).filter(x=>canonicalId(x.id)===cid).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+}
+function circuitTrendForProgress(rows){
+  if(rows.length<2)return {key:'none',label:rows.length?'Première référence':'Données insuffisantes'};
+  const a=rows.at(-2),b=rows.at(-1);
+  const comparable=a.targetSeconds===b.targetSeconds&&a.stepCount===b.stepCount&&a.roundRest===b.roundRest&&JSON.stringify(a.steps)===JSON.stringify(b.steps);
+  if(!comparable)return {key:'none',label:'Première référence'};
+  if(b.movements>a.movements)return {key:'up-light',label:'Progression'};
+  if(b.movements<a.movements)return {key:'down-light',label:'Régression'};
+  return {key:'flat',label:'Stable'};
+}
+function openCircuitProgressDetail(id){
+ const rows=circuitRowsForProgress(id);if(!rows.length)return;
+ const e=exercise(id);
+ openModal(`<h3>${esc(e.name)}</h3><p class="tiny muted">Historique des séances guidées · ${rows.length} résultat(s)</p><div class="ath-detail-history">${rows.slice().reverse().map(x=>`<div class="ath-detail-row"><b>${esc(formatDate(x.date))} · ${Math.round(Number(x.targetSeconds||0)/60)} min</b><span>${Math.floor(Number(x.movements||0)/Math.max(1,Number(x.stepCount||1)))} tour(s) + ${Number(x.movements||0)%Math.max(1,Number(x.stepCount||1))} mouvement(s) · ${esc(x.status||'')} · ${Math.floor(Number(x.elapsedSeconds||0)/60)} min ${String(Number(x.elapsedSeconds||0)%60).padStart(2,'0')} s</span></div>`).join('')}</div><button class="btn gold block" data-close-modal>Fermer</button>`);
+}
 function renderProgressPerformance(){
-  const cacheKey=progressionPeriod+"|"+progressionGroup+"|status:"+progressionStatusFilter+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0");
+  const cacheKey=progressionPeriod+"|"+progressionGroup+"|status:"+progressionStatusFilter+"|"+localISODate()+"|ath:"+(athleticProgressExpanded?"1":"0")+"|circuits:"+(state.circuitPerformances||[]).length;
   if(performanceMarkupCache.has(cacheKey))return performanceMarkupCache.get(cacheKey);
   const perf=allPerf(),reg=registry();
   // Retired exercises remain in recorded sessions, outside the active performance list.
@@ -1708,7 +1726,6 @@ function renderProgressPerformance(){
     progressionStatusFilter==="average"?ids.filter(id=>contributions.has(id)):ids;
   const html=`${progressHomeTabs()}<div class="tabs">${[["1m","Semaines"],["3m","Mois"],["1y","Années"],["all","Tous"]].map(([p,l])=>`<button data-prog-period="${p}" class="${progressionPeriod===p?"on":""}">${l}</button>`).join("")}</div>
     ${athleticProgressMarkup()}
-    ${circuitProgressMarkup()}
     <div class="metrics performance-summary"><button type="button" class="metric metric-action ${progressionStatusFilter==="all"?"is-active":""}" data-performance-filter="all" aria-pressed="${progressionStatusFilter==="all"?"true":"false"}"><b>${active.length}</b><span>Exercices suivis</span></button><button type="button" class="metric metric-action ${progressionStatusFilter==="progressing"?"is-active":""}" data-performance-filter="progressing" aria-pressed="${progressionStatusFilter==="progressing"?"true":"false"}"><b>${active.length?Math.round(progressing/active.length*100):0}%</b><span>En progression</span></button><button type="button" class="metric metric-action ${progressionStatusFilter==="average"?"is-active":""}" data-performance-filter="average" aria-pressed="${progressionStatusFilter==="average"?"true":"false"}"><b>${averageIncrease(perf,active)}%</b><span>Augmentation moyenne</span></button></div>
     <div class="filter-row">${["Tous","Pectoraux","Dos","Épaules","Biceps","Triceps","Jambes","Abdos"].map(g=>`<button data-prog-group="${g}" class="${progressionGroup===g?"on":""}">${g}</button>`).join("")}</div>
     ${progressionStatusFilter==='average'?`<p class="tiny muted average-explanation">${contributions.size} exercice${contributions.size>1?'s':''} pris en compte dans la moyenne, y compris les évolutions stables ou en baisse.</p>`:''}
@@ -1810,7 +1827,7 @@ function renderProgress(){
     b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();selectWeek();}};
   });
   $$("[data-prog-group]").forEach(b=>b.onclick=()=>{progressionGroup=b.dataset.progGroup;persistUI();history.replaceState(navState(),"");render();});
-  $$("[data-progress-id]").forEach(r=>r.onclick=()=>pushNav({type:"progressDetail",id:r.dataset.progressId,sub:"evolution"}));
+  $$("[data-progress-id]").forEach(r=>r.onclick=()=>{const id=r.dataset.progressId;if(circuitRowsForProgress(id).length)openCircuitProgressDetail(id);else pushNav({type:"progressDetail",id,sub:"evolution"});});
 }
 function averageContributors(perf,ids){
   return ids.map(id=>({id,percent:progressionChange(performanceTrendRecords(perf[id]||[]))?.percent}))
@@ -1821,9 +1838,9 @@ function averageIncrease(perf,ids){
   return rows.length?Math.round(rows.reduce((sum,row)=>sum+row.percent,0)/rows.length):0;
 }
 function progressRow(id,no,arr,contribution=null){
-  const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),trend=trendFor(id,performanceTrendRecords(arr)),last=arr.at(-1);
+  const e=exercise(id),o=occurrenceList(id)[0]||{s:e.firstSession,n:e.firstNo},img=thumbnailFor(id,o.s,o.n),circuitRows=circuitRowsForProgress(id),trend=circuitRows.length?circuitTrendForProgress(circuitRows):trendFor(id,performanceTrendRecords(arr)),last=arr.at(-1);
   return `<div class="progress-row" data-progress-id="${esc(id)}"><div class="num">${String(no).padStart(2,"0")}</div><div class="thumb"><img class="${thumbClass(img)}" loading="lazy" decoding="async" data-fallback src="${img||"./assets/hero-progress.jpg"}"></div>
-    <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">${validPerformanceSets(last).length?`<span class="performance-last-sets">${esc(validPerformanceSets(last).join(" / "))}</span>`:""}Dernière séance ${formatDate(last.date)}</div>`:""}${Number.isFinite(contribution)?`<div class="performance-contribution">${contribution>0?"+":""}${contribution} % sur la période</div>`:""}</div>
+    <div><div class="ex-name">${esc(e.name)}</div><div class="ex-sub">${esc(groupForId(id))}</div><b style="font-size:13px">${esc(last?refWithUnit(last.value):refWithUnit(referenceFor(id)))}</b>${last?`<div class="tiny muted">${validPerformanceSets(last).length?`<span class="performance-last-sets">${esc(validPerformanceSets(last).join(" / "))}</span>`:""}Dernière séance ${formatDate(last.date)}</div>`:""}${circuitRows.length?`<div class="tiny muted">${circuitRows.length} séance(s) guidée(s) · dernière ${esc(formatDate(circuitRows.at(-1).date))}</div>`:""}${Number.isFinite(contribution)?`<div class="performance-contribution">${contribution>0?"+":""}${contribution} % sur la période</div>`:""}</div>
     <div class="trend ${esc(trend.key)}">${trendBadgeInner(trend)}</div></div>`;
 }
 function performanceHeroProfile(id,e){
