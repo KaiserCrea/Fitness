@@ -1,4 +1,4 @@
-const CACHE = "fitness-v24-28-01-gold-clean";
+const CACHE = "fitness-gold-reference-v8-clean";
 const IMAGE_CACHE = "fitness-static-images-v24185";
 const ROOT = [
   "./sheet-layouts.js",

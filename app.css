@@ -2442,116 +2442,105 @@ body.lock-program-home{
 .duration-bars.is-year{gap:4px}
 .duration-bars.is-year .duration-bar-col>b{font-size:clamp(7px,2vw,9px)}
 
-/* ================================================================
-   AUJOURD'HUI — style unifié, référence maquette 25 octobre 2026.
-   Remplace intégralement les couches d'essai V1 à V7.
-   Aucun autre écran, donnée, miniature ou comportement modifié.
-   ================================================================ */
+
+/* =======================================================================
+   ÉCRAN AUJOURD'HUI — référence graphique validée, version reconstruite.
+   Styles isolés : aucun changement des autres écrans ni de leur logique.
+   Les points lumineux sont de vrais calques CSS, pas des images générées.
+   ======================================================================= */
 .today-waiting-screen{
-  --today-gold-light:#fff4bf;
-  --today-gold-mid:#f9cf71;
-  --today-gold-deep:#d99736;
-  --today-edge:#f4c777;
+  --gold-hi:#fff4bd;--gold-light:#ffe59c;--gold-mid:#f6c36b;--gold-deep:#bc7829;
 }
 .today-waiting-screen>.today-waiting-gym{
-  background-image:linear-gradient(180deg,rgba(0,0,0,.43) 0%,rgba(0,0,0,.24) 18%,transparent 42%,rgba(0,0,0,.04) 74%,rgba(0,0,0,.42) 100%),url('./assets/today-waiting-v20.jpg');
-  background-position:center center;
-  background-size:cover;
-  filter:contrast(1.055) saturate(1.08) brightness(1.025);
+  background-image:linear-gradient(180deg,rgba(0,0,0,.39) 0%,rgba(0,0,0,.17) 18%,transparent 40%,transparent 77%,rgba(0,0,0,.36) 100%),url('./assets/today-waiting-v20.jpg');
+  background-size:cover;background-position:center center;
+  filter:contrast(1.09) saturate(1.12) brightness(1.055);
 }
-/* Titres : l'ombre noire héritée de .waiting-copy est explicitement annulée. */
 .today-waiting-screen .waiting-copy{text-shadow:none;padding-bottom:18px}
 .today-waiting-screen .waiting-copy h1,
 .today-waiting-screen .today-complement-picker>.section-title{
-  font-family:Georgia,'Times New Roman',serif;
-  font-weight:400;
-  color:#ffdf85;
-  background-image:linear-gradient(180deg,#fff8db 0%,#ffe79c 26%,#ffd274 53%,#efb455 77%,#d89238 100%);
-  -webkit-background-clip:text;background-clip:text;
-  -webkit-text-fill-color:transparent;
+  font-family:Georgia,'Times New Roman',serif;font-weight:400;
+  color:#ffe3a0;
+  background-image:linear-gradient(180deg,#fffbe0 0%,#ffeab3 22%,#ffd88c 43%,#f8c575 67%,#e6a34b 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   text-shadow:none;
-  filter:drop-shadow(0 0 3px rgba(252,197,92,.31));
+  filter:drop-shadow(0 0 2px rgba(255,209,119,.48));
 }
 .today-waiting-screen .waiting-copy h1{margin-bottom:3px}
-.today-waiting-screen .waiting-copy .subtitle{
-  font-size:clamp(13px,3.45vw,15px);
-  line-height:1.25;color:#eee9e0;text-shadow:0 1px 3px rgba(0,0,0,.36);
-}
+.today-waiting-screen .waiting-copy .subtitle{font-size:clamp(13px,3.45vw,15px);line-height:1.25;color:#eeeae5;text-shadow:0 1px 2px rgba(0,0,0,.26)}
 .today-waiting-screen .today-complement-picker{position:relative;z-index:2}
-.today-waiting-screen .today-complement-picker>.section-title{
-  position:relative;margin-bottom:15px;padding-bottom:8px;
-}
+.today-waiting-screen .today-complement-picker>.section-title{position:relative;margin-bottom:12px;padding-bottom:8px}
 .today-waiting-screen .today-complement-picker>.section-title::after{
-  content:'';position:absolute;left:0;bottom:0;width:70%;height:1px;
-  background:linear-gradient(90deg,transparent 0%,rgba(245,195,98,.66) 13%,rgba(255,232,156,.91) 49%,rgba(244,188,79,.52) 81%,transparent 100%);
-  box-shadow:0 0 5px rgba(255,187,76,.42);
+  content:'';position:absolute;bottom:0;left:0;width:70%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,210,117,.78) 25%,rgba(255,239,178,.95) 51%,rgba(255,198,94,.58) 78%,transparent);
+  box-shadow:0 0 5px rgba(255,197,87,.45);
 }
-/* Verre noir translucide : aucun reflet blanc dans les angles. */
+/* Noir/verre translucide, liseré lumineux et éclats localisés sur le contour. */
 .today-waiting-screen .today-complement-card{
-  min-height:97px;
-  padding:13px 12px;
-  gap:9px;
-  border:1px solid rgba(255,209,122,.96);
-  border-radius:15px;
-  background:linear-gradient(125deg,rgba(12,10,8,.60),rgba(0,0,0,.53) 48%,rgba(12,9,6,.56));
-  -webkit-backdrop-filter:blur(6px) saturate(1.08);
-  backdrop-filter:blur(6px) saturate(1.08);
-  box-shadow:inset 0 1px 0 rgba(255,224,158,.21),inset 0 -1px 0 rgba(255,194,88,.30),
-    0 0 0 1px rgba(170,102,24,.13),0 0 8px rgba(255,195,90,.48),
-    0 4px 13px rgba(255,171,54,.32),0 0 19px rgba(222,142,44,.18);
+  position:relative;isolation:isolate;overflow:visible;
+  min-height:105px;padding:13px 12px;gap:9px;
+  border-radius:15px;border:1px solid rgba(255,214,131,.95);
+  background:linear-gradient(105deg,rgba(31,22,11,.58) 0%,rgba(7,6,5,.63) 44%,rgba(8,7,6,.63) 100%);
+  -webkit-backdrop-filter:blur(5px) saturate(1.06);backdrop-filter:blur(5px) saturate(1.06);
+  box-shadow:inset 0 1px 0 rgba(255,231,168,.15),inset 0 -1px 0 rgba(244,180,85,.19),
+    0 0 5px rgba(255,199,100,.65),0 0 13px rgba(242,167,63,.36),0 3px 12px rgba(211,129,35,.21);
 }
-.today-waiting-screen .today-complement-card::before,
+.today-waiting-screen .today-complement-card::before{
+  content:''!important;position:absolute;inset:-4px;z-index:-1;pointer-events:none;border-radius:19px;
+  background:
+    radial-gradient(ellipse 25px 13px at 5% 8%,rgba(255,246,192,.94),rgba(255,191,83,.48) 33%,transparent 82%),
+    radial-gradient(ellipse 33px 12px at 94% 98%,rgba(255,241,179,.96),rgba(255,175,65,.52) 35%,transparent 85%),
+    radial-gradient(ellipse 48px 9px at 50% 100%,rgba(255,212,119,.54),transparent 83%);
+  filter:blur(3px);
+}
 .today-waiting-screen .today-complement-card::after{content:none!important}
 .today-waiting-screen .today-complement-card b{
-  font-weight:600;
-  color:#ffdf8c;
-  background:linear-gradient(180deg,#fff2c6,#fbd47c 53%,#dfa24a);
+  font-weight:600;color:#ffe3a0;
+  background-image:linear-gradient(180deg,#fff6d0,#ffe1a1 55%,#e9b56a);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
-  text-shadow:none;filter:drop-shadow(0 0 2px rgba(255,195,87,.24));
+  text-shadow:none;filter:drop-shadow(0 0 1px rgba(255,218,138,.24));
 }
-.today-waiting-screen .today-complement-card span{color:#d8d1c6}
-.today-waiting-screen .today-complement-card .icon{color:#f6d9a1}
+.today-waiting-screen .today-complement-card span{color:#ded6cc}
+.today-waiting-screen .today-complement-card .icon{color:#ffe1a6}
 .today-waiting-screen>.waiting-cycle-chip{
-  position:absolute;
-  padding-right:31px;
-  border:1px solid rgba(255,205,117,.96);
-  background:linear-gradient(135deg,rgba(14,11,8,.65),rgba(0,0,0,.59));
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  box-shadow:inset 0 1px 0 rgba(255,225,153,.20),0 0 10px rgba(255,190,79,.55),0 0 20px rgba(230,144,39,.23);
+  position:absolute;isolation:isolate;padding-right:31px;overflow:visible;
+  border:1px solid rgba(255,209,120,.98);border-radius:13px;
+  background:linear-gradient(120deg,rgba(24,17,10,.68),rgba(0,0,0,.66));
+  -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);
+  box-shadow:inset 0 1px 0 rgba(255,228,151,.17),0 0 6px rgba(255,194,91,.69),0 0 15px rgba(235,150,45,.36);
 }
-.today-waiting-screen>.waiting-cycle-chip::after{content:none!important}
+.today-waiting-screen>.waiting-cycle-chip::after{
+  content:''!important;position:absolute;pointer-events:none;z-index:-1;
+  left:24%;right:24%;bottom:-5px;height:8px;
+  background:radial-gradient(ellipse at center,rgba(255,248,198,.94),rgba(255,194,77,.63) 37%,transparent 76%);
+  filter:blur(3px);
+}
 .today-waiting-screen>.waiting-cycle-chip::before{
   content:'>';position:absolute;right:10px;top:50%;transform:translateY(-50%);
-  color:#f4e7cf;font:300 21px/1 Arial,Helvetica,sans-serif;
-  text-shadow:0 0 3px rgba(255,206,125,.22);pointer-events:none;
+  color:#f7ead1;font:300 21px/1 Arial,Helvetica,sans-serif;text-shadow:none;pointer-events:none;
 }
-.today-waiting-screen>.waiting-cycle-chip b{color:#f9dda0;text-shadow:none}
-/* Barre nav : pleine largeur, liserés uniquement haut/bas. */
+.today-waiting-screen>.waiting-cycle-chip b{color:#ffe3a3;text-shadow:none}
+/* Barre de navigation conforme à la référence, lueur centrale en pied. */
 body:has(.today-waiting-screen) .bottom-nav{
-  left:2px;right:2px;bottom:var(--safe-bottom);
-  height:var(--nav-h);padding-bottom:0;
-  border:0;border-top:1px solid rgba(255,207,116,.79);
-  border-bottom:1px solid rgba(255,195,94,.72);
-  border-radius:15px;
-  background:linear-gradient(180deg,rgba(9,9,9,.87),rgba(0,0,0,.89));
+  left:0;right:0;bottom:var(--safe-bottom);height:var(--nav-h);padding-bottom:0;
+  border:0;border-top:1px solid rgba(244,196,108,.62);
+  border-bottom:1px solid rgba(255,197,91,.84);border-radius:12px 12px 0 0;
+  background:linear-gradient(180deg,rgba(10,10,10,.88),rgba(1,1,1,.91));
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  box-shadow:0 -2px 9px rgba(220,143,43,.17),0 2px 9px rgba(222,148,45,.18);
+  box-shadow:0 -1px 7px rgba(225,145,39,.20),0 1px 8px rgba(234,157,46,.25);
 }
-body:has(.today-waiting-screen) .bottom-nav__inner{
-  width:100%;height:100%;overflow:hidden;border-radius:14px;
-}
-body:has(.today-waiting-screen) .bottom-nav button{color:#bcbcbc}
+body:has(.today-waiting-screen) .bottom-nav__inner{height:100%;width:100%;overflow:visible}
+body:has(.today-waiting-screen) .bottom-nav button{color:#c3c3c3}
 body:has(.today-waiting-screen) .bottom-nav button.on{
-  color:#ffe1a0;
-  background:radial-gradient(ellipse at 50% 100%,rgba(160,93,26,.25),rgba(80,50,19,.11) 54%,transparent 84%);
+  position:relative;overflow:visible;color:#ffe0a1;
+  background:linear-gradient(180deg,rgba(117,72,22,.06),rgba(155,96,29,.29));
   box-shadow:none;
 }
 body:has(.today-waiting-screen) .bottom-nav button.on::after{
-  content:'';position:absolute;left:29%;right:29%;bottom:-1px;height:10px;
-  background:radial-gradient(ellipse at 50% 100%,#fff9d9 0%,rgba(255,213,114,.98) 23%,rgba(250,171,60,.54) 47%,transparent 79%);
-  filter:drop-shadow(0 0 6px rgba(255,179,69,.75));pointer-events:none;
+  content:'';position:absolute;bottom:-5px;left:20%;right:20%;height:16px;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 85%,rgba(255,250,215,1) 0%,rgba(255,220,136,.99) 14%,rgba(255,176,65,.78) 38%,transparent 80%);
+  filter:drop-shadow(0 0 8px rgba(255,177,64,.95));
 }
 body:has(.today-waiting-screen) .bottom-nav button.on .nav-ico .icon{
-  stroke:#ffdc91;
-  filter:drop-shadow(0 0 3px rgba(255,223,141,.92)) drop-shadow(0 0 6px rgba(247,171,59,.56));
+  stroke:#ffdfa0;filter:drop-shadow(0 0 3px rgba(255,229,150,.90)) drop-shadow(0 0 7px rgba(250,177,64,.58));
 }
