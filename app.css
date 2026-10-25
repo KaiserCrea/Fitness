@@ -2441,3 +2441,35 @@ body.lock-program-home{
 /* Vue annuelle : valeurs compactes, sans étiquette pour les mois à zéro. */
 .duration-bars.is-year{gap:4px}
 .duration-bars.is-year .duration-bar-col>b{font-size:clamp(7px,2vw,9px)}
+
+/* Essai graphique validé : écran Aujourd'hui uniquement.
+   Aucun changement de disposition, photographie ou fonctionnalité. */
+.today-waiting-screen > .today-waiting-gym {
+  background-image:
+    linear-gradient(180deg, rgba(0,0,0,.52) 0%, rgba(0,0,0,.27) 23%, transparent 47%),
+    url('./assets/today-waiting-v20.jpg');
+}
+.today-waiting-screen .waiting-copy h1 {
+  text-shadow: 0 2px 5px #000, 0 0 13px rgba(0,0,0,.52);
+}
+.today-waiting-screen .comp-choice {
+  border-color: #d0aa5e;
+  background-color: rgba(16,15,12,.79);
+  box-shadow: inset 0 1px 0 rgba(255,238,177,.24),
+              0 0 0 1px rgba(99,65,21,.18),
+              0 0 12px rgba(207,152,62,.15);
+}
+.today-waiting-screen .waiting-cycle-chip {
+  border-color: #d0aa5e;
+  box-shadow: inset 0 1px 0 rgba(255,236,170,.18),
+              0 0 11px rgba(212,154,56,.15);
+}
+.bottom-nav button[data-tab="today"].on .nav-ico .icon {
+  stroke: #f4d17a;
+  filter: drop-shadow(0 0 3px rgba(255,211,110,.75))
+          drop-shadow(0 0 7px rgba(222,159,51,.36));
+}
+.bottom-nav button[data-tab="today"].on {
+  background: radial-gradient(ellipse at 50% 48%, rgba(200,139,46,.22), transparent 75%);
+  color: #f4d17a;
+}
