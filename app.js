@@ -401,6 +401,7 @@ function sheetFor(id,session,no){
   const custom=state.customExercises?.[id]?.sheetPath;return custom?pathUrl(custom):"";
 }
 function thumbnailFor(id,session,no){
+  if(id==='ex-elevations-laterales-assis-avec-halteres')return pathUrl('miniatures/G3C/03_elevations_laterales_assis_halteres.png');
   if(RETIRED_EXERCISES[id])return pathUrl(RETIRED_EXERCISES[id].thumbnail);
   const direct=THUMBNAILS[`${session}|${no}`];
   if(direct&&DATA.sessions?.[session]?.[Math.max(0,(+no||1)-1)]?.id===id)return pathUrl(direct);
@@ -918,7 +919,7 @@ function athMetricDefinition(step){
   const name=String(step?.name||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   if(/sled/.test(name))return [{key:"passages",label:"Passages effectués",step:"1"},{key:"distancePerPassM",label:"Distance par passage (m)",step:"0.5"},{key:"loadKg",label:"Charge (kg)",step:"1"},{key:"recoverySeconds",label:"Récupération (s)",step:"1"}];
   if(/rameur/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"resistance",label:"Niveau de résistance",step:"1"},{key:"distanceM",label:"Distance (m)",step:"1"}];
-  if(/velo/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"resistance",label:"Résistance",step:"1"},{key:"effortSeconds",label:"Effort (s)",step:"1"},{key:"recoverySeconds",label:"Récupération (s)",step:"1"},{key:"distanceKm",label:"Distance réalisée (km)",step:"0.01"}];
+  if(/velo/.test(name)){const basic=[{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"resistance",label:"Résistance",step:"1"}];return /interval/.test(name)?[...basic,{key:"effortSeconds",label:"Effort (s)",step:"1"},{key:"recoverySeconds",label:"Récupération (s)",step:"1"},{key:"distanceKm",label:"Distance réalisée (km)",step:"0.01"}]:[...basic,{key:"distanceKm",label:"Distance réalisée (km)",step:"0.01"}];}
   if(/tapis/.test(name))return /interval/.test(name)?[{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"effortSeconds",label:"Effort (s)",step:"1"},{key:"recoverySeconds",label:"Récupération (s)",step:"1"},{key:"workSpeedKmh",label:"Vitesse effort (km/h)",step:"0.1"},{key:"recoverySpeedKmh",label:"Vitesse récupération (km/h)",step:"0.1"},{key:"inclinePct",label:"Inclinaison (%)",step:"0.5"},{key:"distanceKm",label:"Distance réalisée (km)",step:"0.01"}]:[{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"distanceKm",label:"Distance (km)",step:"0.01"},{key:"speedKmh",label:"Vitesse (km/h)",step:"0.1"},{key:"inclinePct",label:"Inclinaison (%)",step:"0.5"}];
   if(/stepper|escalier/.test(name))return [{key:"durationMin",label:"Durée (min)",step:"0.5"},{key:"resistance",label:"Niveau de résistance",step:"1"},{key:"steps",label:"Étages / pas réalisés",step:"1"}];
   if(/mobilite|etirement/.test(name))return [];
@@ -2971,6 +2972,24 @@ function persistReloadPosition(){try{sessionStorage.setItem(RELOAD_SCROLL_KEY,St
 window.addEventListener("pagehide",persistReloadPosition);
 window.addEventListener("beforeunload",persistReloadPosition);
 initializeSharedProgress();
+// One-time targeted update: preserve completed sessions and all recorded history.
+if(!state.g3cSeatedRaiseAndCalves25V1){
+  const oldId='ex-elevation-laterale-bilaterale-poulie-basse';
+  const newId='ex-elevations-laterales-assis-avec-halteres';
+  const oldOrder=state.programOverrides?.G3C;
+  if(Array.isArray(oldOrder)){
+    const idx=oldOrder.indexOf(oldId);
+    if(idx>=0 && !oldOrder.includes(newId))oldOrder[idx]=newId;
+  }
+  state.params[newId]={type:'strength',series:'4',repetitions:'12',charge:'2 × 8 kg',reposSeries:'60–90 s',reposExercices:'2 min'};
+  state.refs[newId]='2 × 8 kg';
+  const calf='ex-mollets-assis-a-la-machine';
+  state.params[calf]={...state.params[calf],type:'strength',series:'4',repetitions:'20',charge:'2 × 25 kg'};
+  state.refs[calf]='2 × 25 kg';
+  setSharedProgress(calf,{charge:'2 × 25 kg',repetitions:'20'});
+  state.g3cSeatedRaiseAndCalves25V1=true;
+  save();
+}
 render();
 if(isPageReload)requestAnimationFrame(()=>window.scrollTo({top:reloadScrollY,left:0,behavior:"auto"}));
 else if(view.type==="root")restoreTabScroll(tab);
