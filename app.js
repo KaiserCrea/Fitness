@@ -155,6 +155,13 @@ function migrate(){
   s.ephemeralSessions=Array.isArray(s.ephemeralSessions)?s.ephemeralSessions.filter(x=>x&&Array.isArray(x.exerciseIds)):[];
   s.progressionSettings=s.progressionSettings||{}; s.lastComplement=s.lastComplement||{}; s.athParams=s.athParams||{}; s.athPerformance=Array.isArray(s.athPerformance)?s.athPerformance.filter(x=>x&&typeof x==="object"):[]; s.guideConfigs=s.guideConfigs||{};
   s.measurements=Array.isArray(s.measurements)?s.measurements.filter(x=>x&&typeof x==="object"):[]; s.bodySettings=s.bodySettings||{heightCm:""};
+  // ATH A redesign: remove only obsolete per-step settings, retain Sled Push and history.
+  if(!s.athATapis2026){
+    const prior=s.athParams['ATHLÉTIQUE A']||{};
+    s.athParams['ATHLÉTIQUE A']={...(prior[3]?{3:prior[3]}:{})};
+    s.athATapis2026=true;
+  }
+
   if(!raw?.nextAth || !raw?.nextFm) inferRotations(s);
   // Preserve the previous reordering model by converting sessionOrder into complete overrides only when safe.
   Object.entries(s.sessionOrder).forEach(([session,ids])=>{
@@ -1036,7 +1043,7 @@ function athDefaultInterval(step){
 }
 function athStepConfig(session,index){
   const step=DATA.ath?.[session]?.[index];if(!step)return null;
-  const defaults=session==="ATHLÉTIQUE A"&&index===1?{"Niveau / intensité":"2"}:session==="ATHLÉTIQUE A"&&index===2?{"Résistance / niveau":"6"}:session==="ATHLÉTIQUE A"&&index===3?{"Passages":"6","Répartition des charges":"3 passages à 80 kg, 3 passages à 100 kg"}:{};
+  const defaults=session==="ATHLÉTIQUE A"?([{"Vitesse":"5 km/h","Inclinaison":"5 %"},{"Vitesse":"5,5 km/h","Inclinaison":"10 %"},{"Vitesse effort":"9 km/h","Vitesse récupération":"5,5 km/h","Inclinaison":"1 %"},{"Passages":"6","Répartition des charges":"3 passages à 80 kg, 3 passages à 100 kg"},{"Vitesse":"5 km/h","Inclinaison":"0 à 3 %"},{}][index]||{}):{};
   const saved={...defaults,...(state.athParams?.[session]?.[index]||{})};
   const isRemaining=/temps restant/i.test(step.duration||'');
   // "Temps restant pour atteindre 60 min" is a dynamic remainder, not 60 minutes of extra work.
